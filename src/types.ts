@@ -1,0 +1,64 @@
+export type DoshaType = 'Vata' | 'Pitta' | 'Kapha' | 'Anami' | 'Dual' | 'Unknown';
+
+export interface YogaPose {
+  nameEnglish: string;
+  nameSanskrit: string;
+  duration: string;
+  benefits: string;
+  instructions: string;
+  poseImageUrl?: string;
+  videoUrl?: string;
+}
+
+export interface AyurvedicAdvice {
+  assessment: string;
+  doshaPrimary: DoshaType;
+  dietaryTips: string[];
+  lifestyleTips: string[];
+  recommendedHerbs: string[];
+}
+
+export interface BreathworkPattern {
+  name: string;
+  sanskritName?: string;
+  description: string;
+  inhale: number; // in seconds
+  holdActive: number; // in seconds
+  exhale: number; // in seconds
+  holdEmpty: number; // in seconds
+  cycles: number;
+  benefits: string;
+}
+
+export interface RecommendationResult {
+  summary: string;
+  doshaTendency: string;
+  primaryEnergy: string;
+  yogaPractice: {
+    title: string;
+    description: string;
+    poses: YogaPose[];
+    durationMinutes: number;
+  };
+  ayurvedicAdvice: AyurvedicAdvice;
+  breathwork: BreathworkPattern;
+  lifestyleTips: string[];
+  savedAt?: string;
+  _isFallback?: boolean;
+}
+
+export interface SavedPractice {
+  id: string;
+  title: string;
+  date: string;
+  query: string;
+  category: 'Yoga' | 'Ayurveda' | 'Breathwork' | 'Holistic';
+  result: RecommendationResult;
+}
+
+export interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  timestamp: string;
+}

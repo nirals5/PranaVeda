@@ -1,0 +1,493 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Sparkles, Mic, ArrowRight, HelpCircle, Flame, Wind, Droplet, Star, Play, RotateCcw, CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import PranaBackground from './components/PranaBackground';
+import Logo from './components/Logo';
+import VoiceModal from './components/VoiceModal';
+import WellnessInsight from './components/WellnessInsight';
+import CoachingDashboard from './components/CoachingDashboard';
+import { RecommendationResult, SavedPractice } from './types';
+import RecoveryTrends from './components/RecoveryTrends';
+
+export default function App() {
+  const [currentView, setCurrentView] = useState<'coach' | 'recovery'>('coach');
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState('Analyzing wellness patterns...');
+  const [currentResult, setCurrentResult] = useState<RecommendationResult | null>(null);
+  const [savedPractices, setSavedPractices] = useState<SavedPractice[]>([]);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  
+  // Track currently active saving ID to toggling
+  const [activePracticeId, setActivePracticeId] = useState<string | null>(null);
+
+  const [notification, setNotification] = useState<{ message: string; type: 'info' | 'success' | 'warn' } | null>(null);
+
+  const showToast = (message: string, type: 'info' | 'success' | 'warn' = 'info') => {
+    setNotification({ message, type });
+  };
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 4200);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  // Load saved practices from localStorage on boot
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('pranaveda_practices');
+      if (stored) {
+        setSavedPractices(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn("Could not read localStorage:", e);
+    }
+  }, []);
+
+  // Cycle meditative loading messages
+  useEffect(() => {
+    let interval: number;
+    if (isLoading) {
+      const messages = [
+        "Analyzing wellness patterns...",
+        "Evaluating planetary circadian rhythms...",
+        "Identifying Vata-Imbalance indicators...",
+        "Formulating equal-breath ratios...",
+        "Optimizing 10-minute Hatha sequences...",
+        "Infusing compassionate Ayurvedic advice..."
+      ];
+      let idx = 0;
+      interval = window.setInterval(() => {
+        idx = (idx + 1) % messages.length;
+        setLoadingText(messages[idx]);
+      }, 2500);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isLoading]);
+
+  // Determine time of day greeting
+  const getGreeting = () => {
+    const hours = new Date().getHours();
+    if (hours < 12) return "Good morning, seeker.";
+    if (hours < 17) return "Good afternoon, reflective heart.";
+    return "Good evening, peaceful traveler.";
+  };
+
+  // Submit trigger to Express + Gemini Backend
+  const handleConsultCoach = async (text: string) => {
+    if (!text.trim()) return;
+    setIsLoading(true);
+    setLoadingText("Analyzing wellness patterns...");
+    
+    try {
+      const response = await fetch('/api/coaching', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          feeling: text,
+          timeOfDay: new Date().toLocaleTimeString()
+        })
+      });
+
+      if (response.ok) {
+        const data: RecommendationResult = await response.json();
+        setCurrentResult(data);
+        // Create an active temporary practice ID in case they decide to save it
+        setActivePracticeId(`temp_${Date.now()}`);
+        if (data._isFallback) {
+          showToast("PranaVeda is currently in high-demand centering mode. Beautiful offline wisdom has been delivered.", "info");
+        } else {
+          showToast("Soma resonance synthesized successfully. Your custom daily ritual is ready.", "success");
+        }
+      } else {
+        throw new Error("API call failed");
+      }
+    } catch (err) {
+      console.error("Consultation failed:", err);
+      // Serve direct front-end fallback state in case server is completely down
+      const fallbackResult: RecommendationResult = {
+        summary: "A transient connection wind disrupted live synthesis. We have served your grounded baseline ritual to center your prana.",
+        doshaTendency: "Elevated Vata due to environment noise.",
+        primaryEnergy: "Restful Baseline",
+        yogaPractice: {
+          title: "Centered Baseline Flow",
+          description: "A stabilizing 10-minute ritual to ground attention in the present moment.",
+          poses: [
+            {
+              nameEnglish: "Child's Pose",
+              nameSanskrit: "Balasana",
+              duration: "3 minutes",
+              benefits: "Instantly calms the brain and down-regulates stress.",
+              instructions: "Kneel, sit on your heels, fold forward over your thighs, and rest your forehead on the ground while extending arms."
+            },
+            {
+              nameEnglish: "Corpse Pose",
+              nameSanskrit: "Savasana",
+              duration: "7 minutes",
+              benefits: "Absorbs physical inputs and resets nervous system.",
+              instructions: "Lie flat on your back, palms facing up, eyes resting closed. Completely sink your skeletal weight into gravity."
+            }
+          ],
+          durationMinutes: 10
+        },
+        ayurvedicAdvice: {
+          assessment: "Stabilize scattered focus with immediate physical contact.",
+          doshaPrimary: "Vata",
+          dietaryTips: ["Sip hot ginger tea", "Eat warm, mushy foods", "Avoid dry elements"],
+          lifestyleTips: ["Rest in quiet warmth", "Dim overhead screen lighting", "Focus on slow breathing"],
+          recommendedHerbs: ["Chamomile", "Ginger infusion"]
+        },
+        breathwork: {
+          name: "Sama Vritti",
+          sanskritName: "Equal Breathing",
+          description: "Balances dual breath inflows and outflows.",
+          inhale: 4,
+          holdActive: 4,
+          exhale: 4,
+          holdEmpty: 0,
+          cycles: 8,
+          benefits: "Induces profound neurological stability."
+        },
+        lifestyleTips: ["Rest offline", "Hydrate with warm tea"],
+        _isFallback: true
+      };
+      setCurrentResult(fallbackResult);
+      setActivePracticeId(`temp_${Date.now()}`);
+      showToast("Grounding connection fallback ritual activated.", "warn");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Bookmarks Management
+  const handleToggleSave = () => {
+    if (!currentResult || !activePracticeId) return;
+
+    const exists = savedPractices.find(p => p.id === activePracticeId || p.result.primaryEnergy === currentResult.primaryEnergy);
+    if (exists) {
+      // Remove it
+      const filtered = savedPractices.filter(p => p.id !== exists.id);
+      setSavedPractices(filtered);
+      localStorage.setItem('pranaveda_practices', JSON.stringify(filtered));
+      showToast("Practice deleted from Saved list.", "info");
+    } else {
+      // Add it
+      const newSaved: SavedPractice = {
+        id: activePracticeId.startsWith('temp_') ? activePracticeId : `save_${Date.now()}`,
+        title: currentResult.yogaPractice.title,
+        date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        query: inputValue || "Voice Wellness Consultation",
+        category: 'Yoga',
+        result: currentResult
+      };
+      
+      const updated = [newSaved, ...savedPractices];
+      setSavedPractices(updated);
+      localStorage.setItem('pranaveda_practices', JSON.stringify(updated));
+      showToast("Wellness ritual safely bookmarked.", "success");
+    }
+  };
+
+  const handleSelectSavedPractice = (practice: SavedPractice) => {
+    setCurrentResult(practice.result);
+    setActivePracticeId(practice.id);
+    setInputValue(practice.query);
+  };
+
+  const handleDeleteSavedPractice = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const filtered = savedPractices.filter(p => p.id !== id);
+    setSavedPractices(filtered);
+    localStorage.setItem('pranaveda_practices', JSON.stringify(filtered));
+    if (activePracticeId === id) {
+      setActivePracticeId(null);
+    }
+  };
+
+  const handleSelectSuggestion = (text: string) => {
+    setInputValue(text);
+    handleConsultCoach(text);
+  };
+
+  // Check if currentResult is already bookmarked
+  const isResultSaved = () => {
+    if (!currentResult) return false;
+    return savedPractices.some(p => p.result.primaryEnergy === currentResult.primaryEnergy);
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col justify-between font-sans text-stone-900 relative">
+      {/* 1. Dynamic Ambient Background */}
+      <PranaBackground />
+
+      {/* 2. Brand Header Panel */}
+      <header className="w-full max-w-7xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 z-10 relative">
+        <Logo size="md" />
+        
+        <div className="flex items-center gap-2 bg-white/40 p-1 rounded-2xl border border-white/60 shadow-xs">
+          <button
+            onClick={() => setCurrentView('coach')}
+            className={`py-2 px-5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              currentView === 'coach'
+                ? 'bg-[#8A79A5]/90 text-white shadow-sm'
+                : 'text-stone-550 hover:text-stone-900'
+            }`}
+          >
+            Consult AI Coach
+          </button>
+          
+          <button
+            onClick={() => setCurrentView('recovery')}
+            className={`py-2 px-5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              currentView === 'recovery'
+                ? 'bg-[#8A79A5]/90 text-white shadow-sm'
+                : 'text-stone-550 hover:text-stone-900'
+            }`}
+          >
+            Recovery & Trends
+          </button>
+        </div>
+      </header>
+
+      {/* 3. Main Central App Area */}
+      <main className="flex-1 flex flex-col items-center justify-center w-full max-w-7xl mx-auto z-10 relative">
+        <AnimatePresence mode="wait">
+          
+          {/* LOADER OVERLAY (Deeply atmospheric breathing lotus) */}
+          {isLoading && (
+            <motion.div
+              key="loader"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center space-y-10 py-20 px-8 text-center max-w-md mx-auto"
+            >
+              {/* Giant breathing lotus capsule */}
+              <div className="relative w-40 h-40 flex items-center justify-center">
+                {/* Micro outer expansion rings */}
+                <motion.div
+                  animate={{
+                    scale: [1, 1.45, 1],
+                    opacity: [0.18, 0, 0.18],
+                  }}
+                  transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute inset-0 border-2 border-[#8A79A5] rounded-full blur-[1px]"
+                />
+                
+                <div className="w-28 h-28 rounded-full bg-white/70 border border-white/90 shadow-xl flex items-center justify-center">
+                  <svg
+                    viewBox="0 0 100 100"
+                    className="w-16 h-16 text-[#8A79A5]"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                  >
+                    <path d="M 50 80 C 20 60, 20 35, 38 25 C 47 45, 49 65, 50 80" />
+                    <path d="M 50 80 C 80 60, 80 35, 62 25 C 53 45, 51 65, 50 80" />
+                    <path d="M 50 80 C 42 50, 45 20, 50 10 C 55 20, 58 50, 50 80" />
+                  </svg>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-serif font-light text-stone-850 text-xl tracking-tight uppercase">
+                  Consulting PranaVeda AI
+                </h3>
+                <p className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold animate-pulse">
+                  {loadingText}
+                </p>
+                <p className="text-xs text-stone-500 font-serif italic max-w-xs mx-auto leading-relaxed">
+                  "Let your awareness expand. Your personal wellness goals are merging with Ayurvedic wisdom."
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* RECOVERY DASHBOARD SCREEN */}
+          {!isLoading && currentView === 'recovery' && (
+            <motion.div
+              key="recovery-dashboard"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="w-full"
+            >
+              <RecoveryTrends showNotification={showToast} />
+            </motion.div>
+          )}
+ 
+          {/* RESULTS DASHBOARD SCREEN */}
+          {!isLoading && currentView === 'coach' && currentResult && (
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="w-full"
+            >
+              <CoachingDashboard
+                result={currentResult}
+                onBack={() => setCurrentResult(null)}
+                isSaved={isResultSaved()}
+                onToggleSave={handleToggleSave}
+                showNotification={showToast}
+              />
+            </motion.div>
+          )}
+
+          {/* INITIAL WELCOME SCREEN (Soma Input Console) */}
+          {!isLoading && currentView === 'coach' && !currentResult && (
+            <motion.div
+              key="welcome"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center w-full px-6 text-center space-y-12"
+            >
+              
+              {/* Editorial Display Intro */}
+              <div className="space-y-4 max-w-2xl mt-12">
+                <span className="p-1.5 px-4 rounded-full text-[10px] font-mono tracking-[0.2em] font-bold bg-[#E8E1F2]/80 text-stone-700 uppercase shadow-xs">
+                  Ancient Wisdom • Personalized Guidance
+                </span>
+                
+                <h1 className="text-4xl sm:text-[54px] font-serif font-normal italic text-[#2D3436] tracking-tight leading-tight">
+                  {getGreeting()}
+                </h1>
+                
+                <p className="text-base sm:text-lg font-light text-[#2D3436]/60 leading-relaxed max-w-xl mx-auto font-sans">
+                  Share your symptoms, thoughts, or goals with your AI wellness mentor to receive custom, beautiful therapeutic solutions.
+                </p>
+              </div>
+
+              {/* Major Input Area (The Soma Input Circle Container) */}
+              <div className="w-full max-w-2xl space-y-5">
+                <div className="text-[11px] tracking-[0.15em] font-mono text-[#2D3436]/40 uppercase font-bold">
+                  How are you feeling today?
+                </div>
+
+                {/* Highly structured rounded input capsule */}
+                <div 
+                  className="relative flex items-center bg-white/60 backdrop-blur-[20px] rounded-[40px] border border-white/80 p-3.5 px-6 shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:bg-white/80 hover:border-white hover:shadow-[0_12px_36px_rgba(138,121,165,0.15)] transition-all duration-300 group"
+                >
+                  <input
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleConsultCoach(inputValue);
+                    }}
+                    placeholder="Tell PranaVeda how you're feeling..."
+                    className="w-full bg-transparent border-none text-[#2D3436] placeholder-[#2D3436]/30 font-sans text-base sm:text-[18px] focus:outline-none focus:ring-0 mr-4 py-1"
+                  />
+
+                  {/* Micro Buttons */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => setShowVoiceModal(true)}
+                      className="p-3 rounded-full bg-white border border-black/5 hover:bg-[#E8E1F2] text-stone-700 transition-all cursor-pointer shadow-md hover:scale-105"
+                      title="Activate voice consultation"
+                    >
+                      <Mic className="w-4 h-4 text-stone-600 flex-shrink-0 animate-[pulse_2s_infinite]" />
+                    </button>
+                    
+                    <button
+                      onClick={() => handleConsultCoach(inputValue)}
+                      className="p-3 rounded-full bg-[#2D3436] border border-stone-800 text-white hover:bg-stone-700 transition-all cursor-pointer shadow-md hover:scale-105 flex items-center justify-center"
+                      title="Consult Coach"
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sugges-chips list (chip-cloud) */}
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-3 max-w-3xl mx-auto">
+                  {[
+                    "I haven't been sleeping well lately",
+                    "I feel stressed and overwhelmed",
+                    "My lower back feels tight",
+                    "Help me create a morning yoga practice",
+                    "What does Ayurveda suggest for low energy?"
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      onClick={() => handleSelectSuggestion(chip)}
+                      className="py-2.5 px-6 rounded-[30px] bg-white/40 border border-white/60 hover:bg-white text-sm text-[#2D3436] transition-all duration-300 shadow-[0_10px_30px_rgba(0,0,0,0.02)] hover:-translate-y-0.5 cursor-pointer font-sans"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Secondary elements (Daily details, saved archives) */}
+              <WellnessInsight
+                savedPractices={savedPractices}
+                onSelectPractice={handleSelectSavedPractice}
+                onDeletePractice={handleDeleteSavedPractice}
+                onSelectSuggestion={handleSelectSuggestion}
+              />
+
+            </motion.div>
+          )}
+
+        </AnimatePresence>
+      </main>
+
+      {/* 4. Advanced Vocal overlay Modal */}
+      <VoiceModal
+        isOpen={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
+        onSubmitPrompt={(text) => {
+          setInputValue(text);
+          handleConsultCoach(text);
+        }}
+      />
+
+      {/* 5. Minimal Human Footer */}
+      <footer className="w-full text-center py-6 text-[10px] font-mono tracking-widest text-[#8A79A5]/60 z-10 relative">
+        NAMASTE • AI-INTEGRATED WELLNESS SCIENCE © 2026
+      </footer>
+
+      {/* 6. Custom Elegant Floating Glassmorphism Toast Notification */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 15, scale: 0.95 }}
+            className={`fixed bottom-6 right-6 z-50 p-4 px-5 rounded-2xl border backdrop-blur-md shadow-2xl flex items-center gap-3.5 max-w-sm font-sans transition-all duration-300 ${
+              notification.type === 'success'
+                ? 'bg-emerald-950/90 text-emerald-100 border-emerald-800/80 shadow-emerald-950/10'
+                : notification.type === 'warn'
+                  ? 'bg-rose-950/90 text-rose-100 border-rose-800/80 shadow-rose-950/10'
+                  : 'bg-stone-900/90 text-stone-100 border-stone-800/80 shadow-stone-950/10'
+            }`}
+          >
+            {notification.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />}
+            {notification.type === 'warn' && <AlertCircle className="w-5 h-5 text-rose-400 flex-shrink-0" />}
+            {notification.type === 'info' && <Info className="w-5 h-5 text-indigo-300 flex-shrink-0" />}
+            
+            <p className="text-[12.5px] leading-relaxed flex-1 font-medium">{notification.message}</p>
+            
+            <button
+              onClick={() => setNotification(null)}
+              className="p-1 rounded-full text-white/40 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

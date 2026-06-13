@@ -1,0 +1,6 @@
+{
+  "name": "PranaVeda",
+  "description": "Premium AI wellness coach combining Yoga and Ayurveda for personalized guidance, daily practices, and habit-building support.",
+  "requestFramePermissions": ["microphone", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
