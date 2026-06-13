@@ -6,6 +6,7 @@ import {
   Clock, Coffee, BookOpen, Volume2, HelpCircle 
 } from 'lucide-react';
 import { RecommendationResult, SavedPractice } from '../types';
+import { useSpeech } from '../hooks/useSpeech';
 
 const getFallbackPoseImage = (pose: { nameEnglish: string; nameSanskrit?: string }) => {
   const name = (pose.nameEnglish || '').toLowerCase();
@@ -74,6 +75,9 @@ export default function CoachingDashboard({
   const [breathingTimeRemaining, setBreathingTimeRemaining] = useState(result.breathwork.inhale);
   const [breathingCycleCount, setBreathingCycleCount] = useState(1);
   const breathingTimerRef = useRef<number | null>(null);
+
+  const { speak, stop: stopSpeech } = useSpeech();
+  useEffect(() => () => stopSpeech(), [stopSpeech]);
 
   // Load appropriate energy icon based on text
   const getEnergyIcon = (energy: string) => {
@@ -146,55 +150,27 @@ export default function CoachingDashboard({
     };
   }, [isBreathingRunning, breathingPhase, result]);
 
-  // Voice synthesis cue helper for breathing and actions
+  // Naturalizes a phase cue phrase, then speaks it via ElevenLabs (with browser TTS fallback)
   const speakVocalPhase = (phrase: string) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      
-      // Naturalize phrase transitions for organic, breathing-centered cadence
-      let naturalized = phrase;
-      const lower = phrase.toLowerCase();
-      if (lower.includes('inhale deeply') || lower === 'inhale') {
-        naturalized = "Inhale... slowly... drawing in pure air... feeling deep calm.";
-      } else if (lower.includes('hold breath full') || lower.includes('hold full')) {
-        naturalized = "Hold the breath full... serene... steady... feel the space expanding within.";
-      } else if (lower.includes('exhale slowly') || lower === 'exhale') {
-        naturalized = "Exhale... completely... releasing all density... resting into gravity.";
-      } else if (lower.includes('hold empty')) {
-        naturalized = "Hold empty... absolute pause... still... fully grounded.";
-      } else if (lower.includes('beginning')) {
-        naturalized = phrase.replace('Beginning', 'Beginning the nourishing practice of ');
-      } else {
-        // Humanize text by transforming punctuation and structures into structural pauses
-        naturalized = phrase
-          .replace(':', '... ')
-          .replace(', or', '... also known as... ')
-          .replace(/,/g, '... ');
-      }
-
-      const utterance = new SpeechSynthesisUtterance(naturalized);
-      utterance.rate = 0.8; // Gentle, grounding pace
-      utterance.pitch = 0.95; // Warm, soothing tone
-      
-      // Find standard high-quality natural voice default
-      const voices = window.speechSynthesis.getVoices();
-      const EnglishVoices = voices.filter(v => v.lang.toLowerCase().includes('en'));
-      const listToSelect = EnglishVoices.length > 0 ? EnglishVoices : voices;
-      const selectedVoice = listToSelect.find(v => 
-        v.name.includes('Natural') || 
-        v.name.includes('Google') || 
-        v.name.includes('Premium') || 
-        v.name.includes('Siri') ||
-        v.name.includes('Samantha') ||
-        v.name.includes('Daniel')
-      ) || listToSelect[0];
-      
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
-      
-      window.speechSynthesis.speak(utterance);
+    let naturalized = phrase;
+    const lower = phrase.toLowerCase();
+    if (lower.includes('inhale deeply') || lower === 'inhale') {
+      naturalized = "Inhale... slowly... drawing in pure air... feeling deep calm.";
+    } else if (lower.includes('hold breath full') || lower.includes('hold full')) {
+      naturalized = "Hold the breath full... serene... steady... feel the space expanding within.";
+    } else if (lower.includes('exhale slowly') || lower === 'exhale') {
+      naturalized = "Exhale... completely... releasing all density... resting into gravity.";
+    } else if (lower.includes('hold empty')) {
+      naturalized = "Hold empty... absolute pause... still... fully grounded.";
+    } else if (lower.includes('beginning')) {
+      naturalized = phrase.replace('Beginning', 'Beginning the nourishing practice of ');
+    } else {
+      naturalized = phrase
+        .replace(':', '... ')
+        .replace(', or', '... also known as... ')
+        .replace(/,/g, '... ');
     }
+    speak(naturalized);
   };
 
   const toggleBreathing = () => {
@@ -368,9 +344,18 @@ export default function CoachingDashboard({
             {result.primaryEnergy} <span className="font-normal italic text-[#8A79A5]">State</span>
           </h2>
           
-          <p className="text-sm md:text-base font-serif text-stone-700 leading-relaxed max-w-xl">
-            {result.summary}
-          </p>
+          <div className="flex items-start gap-3">
+            <p className="text-sm md:text-base font-serif text-stone-700 leading-relaxed max-w-xl flex-1">
+              {result.summary}
+            </p>
+            <button
+              onClick={() => speak(result.summary)}
+              className="mt-1 p-2 rounded-full bg-white/60 border border-white/80 text-stone-400 hover:text-[#8A79A5] hover:bg-[#E8E1F2] transition-all flex-shrink-0 cursor-pointer shadow-sm"
+              title="Listen to summary"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Dosha Circle Analysis Display */}

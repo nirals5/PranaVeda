@@ -362,6 +362,48 @@ app.get('/api/insight', async (req, res) => {
   return res.json(result);
 });
 
+// ElevenLabs TTS proxy — streams audio/mpeg back to the client
+app.post('/api/tts', async (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: 'text is required' });
+
+  const elevenKey = process.env.ELEVENLABS_API_KEY;
+  const voiceId = process.env.ELEVENLABS_VOICE_ID;
+
+  if (!elevenKey || elevenKey === 'MY_ELEVENLABS_API_KEY' || !voiceId || voiceId === 'MY_ELEVENLABS_VOICE_ID') {
+    return res.status(503).json({ unavailable: true });
+  }
+
+  try {
+    const upstream = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': elevenKey,
+      },
+      body: JSON.stringify({
+        text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+      }),
+    });
+
+    if (!upstream.ok) {
+      const msg = await upstream.text();
+      console.error('[ElevenLabs] API error:', msg);
+      return res.status(502).json({ error: 'ElevenLabs upstream error' });
+    }
+
+    const buffer = await upstream.arrayBuffer();
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('[ElevenLabs] Request failed:', err);
+    res.status(502).json({ error: 'TTS request failed' });
+  }
+});
+
 // Start server setup
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
