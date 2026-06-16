@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Mic, MicOff, X, Sparkles, Volume2, VolumeX, Check } from 'lucide-react';
 
 interface VoiceModalProps {
@@ -9,16 +9,13 @@ interface VoiceModalProps {
 }
 
 export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceModalProps) {
+  const prefersReducedMotion = useReducedMotion();
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [statusText, setStatusText] = useState('Opening voice assistant...');
   const [mediaError, setMediaError] = useState(false);
   
   const recognitionRef = useRef<any>(null);
-  const waveformIntervalRef = useRef<number | null>(null);
-  
-  // Waveform visualization elements
-  const [waveHeights, setWaveHeights] = useState<number[]>([15, 30, 10, 40, 20, 5, 25, 45, 10, 30, 15]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -83,11 +80,6 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
       runSimulatedSpeech();
     }
 
-    // Animate waveform bars for vocal tactile feedback
-    waveformIntervalRef.current = window.setInterval(() => {
-      setWaveHeights(prev => prev.map(() => Math.floor(Math.random() * 55) + 12));
-    }, 120);
-
     return () => {
       stopRecording();
     };
@@ -115,10 +107,6 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
 
   const stopRecording = () => {
     setIsRecording(false);
-    if (waveformIntervalRef.current) {
-      clearInterval(waveformIntervalRef.current);
-      waveformIntervalRef.current = null;
-    }
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -185,7 +173,7 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
             <div className="relative flex items-center justify-center">
               {/* Outer radiating ripples */}
               <motion.div
-                animate={{
+                animate={prefersReducedMotion ? {} : {
                   scale: [1, 1.4, 1],
                   opacity: [0.15, 0, 0.15],
                 }}
@@ -197,7 +185,7 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
                 className="absolute inset-0 w-32 h-32 rounded-full border-2 border-[#8A79A5] blur-sm"
               />
               <motion.div
-                animate={{
+                animate={prefersReducedMotion ? {} : {
                   scale: [1.2, 1.6, 1.2],
                   opacity: [0.1, 0, 0.1],
                 }}
@@ -211,32 +199,22 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
               />
 
               {/* Central Glowing Mic Capsule */}
-              <div 
-                className={`w-28 h-28 rounded-full bg-gradient-to-tr from-white via-[#FBEDE9] to-[#E8E1F2] flex items-center justify-center shadow-[0_12px_36px_rgba(138,121,165,0.15)] border-2 border-white`}
+              <motion.div
+                className="w-28 h-28 rounded-full bg-gradient-to-tr from-white via-[#FBEDE9] to-[#E8E1F2] flex items-center justify-center border-2 border-white"
+                animate={prefersReducedMotion ? {
+                  boxShadow: '0 0 0 5px rgba(138,121,165,0.35), 0 10px 28px rgba(138,121,165,0.15)',
+                } : {
+                  scale: [1, 1.06, 1],
+                  boxShadow: [
+                    '0 0 0 5px rgba(138,121,165,0.45), 0 8px 24px rgba(138,121,165,0.18)',
+                    '0 0 0 28px rgba(138,121,165,0), 0 18px 48px rgba(138,121,165,0.08)',
+                    '0 0 0 5px rgba(138,121,165,0.45), 0 8px 24px rgba(138,121,165,0.18)',
+                  ],
+                }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               >
-                <div className="text-stone-800 animate-[bounce_4s_infinite_ease-in-out]">
-                  <Mic className="w-9 h-9 text-[#8A79A5]" />
-                </div>
-              </div>
-            </div>
-
-            {/* Micro Waveform visualization */}
-            <div className="flex items-center gap-1.5 h-16 justify-center">
-              {waveHeights.map((h, i) => (
-                <motion.div
-                  key={i}
-                  className="w-1 rounded-full bg-[#8A79A5]/50 hover:bg-[#8A79A5]"
-                  style={{ height: `${h}px` }}
-                  animate={{
-                    backgroundColor: isRecording ? ['rgba(138,121,165,0.4)', 'rgba(138,121,165,1)', 'rgba(138,121,165,0.4)'] : 'rgb(214,211,209)'
-                  }}
-                  transition={{
-                    duration: 1.5,
-                    repeat: Infinity,
-                    delay: i * 0.1
-                  }}
-                />
-              ))}
+                <Mic className="w-9 h-9 text-[#8A79A5]" />
+              </motion.div>
             </div>
 
             {/* Coach Voice Status */}

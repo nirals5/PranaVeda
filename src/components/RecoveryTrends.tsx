@@ -569,15 +569,15 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
               </div>
 
               {/* Active Streaks & Habit Accomplishments (Replicating User Posture Pro 5-Day Streak Mockup!) */}
-              <div className="bg-gradient-to-br from-amber-50/75 via-orange-50/55 to-yellow-50/40 border border-amber-200/40 p-6 rounded-2xl shadow-xs space-y-4 relative overflow-hidden">
+              <div className="bg-gradient-to-br from-[#FBEDE9]/75 via-[#FBEDE9]/40 to-white/20 border border-[#C8815A]/20 p-6 rounded-2xl shadow-xs space-y-4 relative overflow-hidden">
                 <div className="absolute top-[-10px] right-[-10px] opacity-10">
-                  <Flame className="w-24 h-24 text-orange-500" />
+                  <Flame className="w-24 h-24 text-[#C8815A]" />
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 font-mono text-xs">
-                    <Flame className="w-4 h-4 text-orange-650 fill-orange-550 animate-pulse" />
-                    <span className="text-[10px] font-mono tracking-widest text-[#A66C5E] uppercase font-bold">
+                    <Flame className="w-4 h-4 text-[#C8815A] fill-[#C8815A]/60 animate-pulse" />
+                    <span className="text-[10px] font-mono tracking-widest text-[#C8815A] uppercase font-bold">
                       Habit Streak
                     </span>
                   </div>
@@ -596,10 +596,10 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                 </div>
 
                 {/* Milestone Reward Box with Claim Trigger */}
-                <div className="p-3 bg-white/70 backdrop-blur-xs border border-amber-200/40 rounded-xl flex gap-2.5">
-                  <Award className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="p-3 bg-white/70 backdrop-blur-xs border border-[#C8815A]/20 rounded-xl flex gap-2.5">
+                  <Award className="w-5 h-5 text-[#C8815A] flex-shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
-                    <span className="text-[9px] font-mono font-bold text-amber-700 uppercase block">Rewards Checklist</span>
+                    <span className="text-[9px] font-mono font-bold text-[#C8815A] uppercase block">Rewards Checklist</span>
                     <p className="text-[11px] text-stone-700 font-medium">
                       {rewardClaimed ? `${rewardClaimed} 🎉` : "Complete today's 3 actions to unlock your organic elixir!"}
                     </p>
@@ -607,7 +607,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                 </div>
 
                 {/* Interactive Action Items to complete the loop */}
-                <div className="pt-2 border-t border-amber-250/30 space-y-2">
+                <div className="pt-2 border-t border-[#C8815A]/20 space-y-2">
                   <span className="text-[9px] font-mono text-stone-400 font-bold uppercase block">Daily Micro-Habits</span>
                   {[
                     { id: 'breath', label: '1. Complete Breathholding Test' },

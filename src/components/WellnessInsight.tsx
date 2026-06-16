@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Compass, Sparkles, BookOpen, Trash2, ArrowRight, Play, HeartHandshake, Wind } from 'lucide-react';
 import { SavedPractice } from '../types';
 
@@ -16,6 +16,7 @@ export default function WellnessInsight({
   onDeletePractice,
   onSelectSuggestion,
 }: WellnessInsightProps) {
+  const prefersReducedMotion = useReducedMotion();
   const [insight, setInsight] = useState<{
     headline: string;
     quote: string;
@@ -107,7 +108,7 @@ export default function WellnessInsight({
             <span className="text-xs text-stone-500/70 uppercase font-mono tracking-wider font-bold">
               Daily Insight
             </span>
-            <Compass className="w-4 h-4 text-stone-500 animate-[spin_15s_linear_infinite]" />
+            <Compass className="w-4 h-4 text-stone-500" />
           </div>
           
           <AnimatePresence mode="wait">
@@ -207,7 +208,7 @@ export default function WellnessInsight({
                   </div>
                   <button
                     onClick={(e) => onDeletePractice(practice.id, e)}
-                    className="p-1 px-1.5 text-stone-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                    className="p-1 px-1.5 text-stone-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
                     title="Delete Saved Practice"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -249,7 +250,7 @@ export default function WellnessInsight({
             <span className="text-xs text-stone-500/70 uppercase font-mono tracking-wider font-bold">
               Breathing Reset
             </span>
-            <Wind className="w-4 h-4 text-stone-500 animate-[pulse_2s_infinite]" />
+            <Wind className={`w-4 h-4 text-stone-500 ${prefersReducedMotion ? '' : 'animate-[pulse_2s_infinite]'}`} />
           </div>
 
           <div className="flex flex-col items-center justify-center py-2">

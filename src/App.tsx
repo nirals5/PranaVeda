@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Sparkles, Mic, ArrowRight, HelpCircle, Flame, Wind, Droplet, Star, Play, RotateCcw, CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import PranaBackground from './components/PranaBackground';
 import Logo from './components/Logo';
@@ -10,6 +10,7 @@ import { RecommendationResult, SavedPractice } from './types';
 import RecoveryTrends from './components/RecoveryTrends';
 
 export default function App() {
+  const prefersReducedMotion = useReducedMotion();
   const [currentView, setCurrentView] = useState<'coach' | 'recovery'>('coach');
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -274,7 +275,7 @@ export default function App() {
               <div className="relative w-40 h-40 flex items-center justify-center">
                 {/* Micro outer expansion rings */}
                 <motion.div
-                  animate={{
+                  animate={prefersReducedMotion ? {} : {
                     scale: [1, 1.45, 1],
                     opacity: [0.18, 0, 0.18],
                   }}
@@ -301,7 +302,7 @@ export default function App() {
                 <h3 className="font-serif font-light text-stone-850 text-xl tracking-tight uppercase">
                   Consulting PranaVeda AI
                 </h3>
-                <p className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold animate-pulse">
+                <p className={`text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold ${prefersReducedMotion ? '' : 'animate-pulse'}`}>
                   {loadingText}
                 </p>
                 <p className="text-xs text-stone-500 font-serif italic max-w-xs mx-auto leading-relaxed">
@@ -375,8 +376,8 @@ export default function App() {
                 </div>
 
                 {/* Highly structured rounded input capsule */}
-                <div 
-                  className="relative flex items-center bg-white/60 backdrop-blur-[20px] rounded-[40px] border border-white/80 p-3.5 px-6 shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:bg-white/80 hover:border-white hover:shadow-[0_12px_36px_rgba(138,121,165,0.15)] transition-all duration-300 group"
+                <div
+                  className="relative flex items-center bg-white/60 backdrop-blur-[20px] rounded-[40px] border border-white/80 p-3.5 px-6 shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:bg-white/80 hover:border-white hover:shadow-[0_12px_36px_rgba(138,121,165,0.15)] focus-within:border-[#8A79A5]/40 focus-within:shadow-[0_12px_36px_rgba(138,121,165,0.2)] transition-all duration-300 group"
                 >
                   <input
                     type="text"
@@ -386,18 +387,21 @@ export default function App() {
                       if (e.key === 'Enter') handleConsultCoach(inputValue);
                     }}
                     placeholder="Tell PranaVeda how you're feeling..."
-                    className="w-full bg-transparent border-none text-[#2D3436] placeholder-[#2D3436]/30 font-sans text-base sm:text-[18px] focus:outline-none focus:ring-0 mr-4 py-1"
+                    className="w-full bg-transparent border-none text-[#2D3436] placeholder-[#2D3436]/30 font-sans text-base sm:text-[18px] focus-visible:outline-none focus-visible:ring-0 mr-4 py-1"
                   />
 
                   {/* Micro Buttons */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
+                    <motion.button
                       onClick={() => setShowVoiceModal(true)}
-                      className="p-3 rounded-full bg-white border border-black/5 hover:bg-[#E8E1F2] text-stone-700 transition-all cursor-pointer shadow-md hover:scale-105"
+                      className="p-3 rounded-full bg-white border border-black/5 hover:bg-[#E8E1F2] text-stone-700 cursor-pointer shadow-md"
                       title="Activate voice consultation"
+                      whileHover={prefersReducedMotion ? {} : { scale: 1.05 }}
+                      whileTap={prefersReducedMotion ? {} : { scale: 0.88 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                     >
-                      <Mic className="w-4 h-4 text-stone-600 flex-shrink-0 animate-[pulse_2s_infinite]" />
-                    </button>
+                      <Mic className="w-4 h-4 text-stone-600 flex-shrink-0" />
+                    </motion.button>
                     
                     <button
                       onClick={() => handleConsultCoach(inputValue)}

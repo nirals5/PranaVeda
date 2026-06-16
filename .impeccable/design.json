@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-15T00:00:00.000Z",
+  "title": "Design System: PranaVeda",
+  "extensions": {
+    "colorMeta": {
+      "lavender":      { "role": "primary",   "displayName": "Sacred Lavender",  "canonical": "#8A79A5", "tonalRamp": ["#1e1929","#2f2740","#453b5c","#5d5178","#8A79A5","#a896be","#c4b9d5","#e8e1f2"] },
+      "lavender-deep": { "role": "primary",   "displayName": "Deep Lavender",    "canonical": "#71608E", "tonalRamp": ["#19152a","#281f3d","#3b2f57","#554473","#71608E","#8f80ab","#b0a4c6","#d6d0e5"] },
+      "lavender-tint": { "role": "tertiary",  "displayName": "Lavender Tint",    "canonical": "#E8E1F2", "tonalRamp": ["#c4b9d5","#cdc6dc","#d6cee3","#dfd8ec","#E8E1F2","#ede8f5","#f3f0f8","#faf8fd"] },
+      "terracotta":    { "role": "secondary", "displayName": "Warm Terracotta",  "canonical": "#A66C5E", "tonalRamp": ["#2a1510","#431f17","#643127","#87493c","#A66C5E","#c28f80","#dbb5a8","#fbede9"] },
+      "peach-tint":    { "role": "tertiary",  "displayName": "Peach Tint",       "canonical": "#FBEDE9", "tonalRamp": ["#dbb5a8","#e4c4ba","#ecd3cb","#f3dfda","#FBEDE9","#fdf1ee","#fef6f4","#fffaf9"] },
+      "slate-muted":   { "role": "tertiary",  "displayName": "Muted Slate",      "canonical": "#90A4AE", "tonalRamp": ["#192830","#243742","#3b5561","#587382","#90A4AE","#afc0c9","#cdd7dc","#e5eced"] },
+      "blue-tint":     { "role": "tertiary",  "displayName": "Blue Tint",        "canonical": "#DFE8FA", "tonalRamp": ["#b7cffb","#c5d8fc","#d0dffb","#d9e5fc","#DFE8FA","#e7eefb","#eff3fd","#f7f9fe"] },
+      "mint-tint":     { "role": "tertiary",  "displayName": "Mint Tint",        "canonical": "#DDF5EE", "tonalRamp": ["#a2e6d4","#b4ebdb","#c3efe2","#d0f2e8","#DDF5EE","#e5f7f2","#edf9f5","#f4fcf9"] },
+      "ink":           { "role": "neutral",   "displayName": "Ink",              "canonical": "#2D3436", "tonalRamp": ["#0d0f10","#181c1d","#2D3436","#3f4d50","#546469","#728086","#9ea9ac","#d5dadb"] },
+      "stone-700":     { "role": "neutral",   "displayName": "Stone 700",        "canonical": "#44515A", "tonalRamp": ["#141a1d","#222c31","#2e3c42","#44515A","#596b74","#7a8f97","#a4b4bb","#d3dbde"] },
+      "stone-500":     { "role": "neutral",   "displayName": "Stone 500",        "canonical": "#78909C", "tonalRamp": ["#1f2e34","#2d404a","#415a65","#57737e","#78909C","#96aab4","#b6c5cb","#d9e1e4"] },
+      "stone-200":     { "role": "neutral",   "displayName": "Stone 200",        "canonical": "#CFD8DC", "tonalRamp": ["#8898a0","#9daab0","#b3bdc2","#c3cccf","#CFD8DC","#d9e0e3","#e4e9eb","#f1f3f4"] },
+      "stone-100":     { "role": "neutral",   "displayName": "Stone 100",        "canonical": "#ECEFF1", "tonalRamp": ["#aebfc8","#bfccd3","#cbd6dc","#d8e2e6","#ECEFF1","#f0f3f4","#f5f7f8","#fafbfb"] },
+      "warm-white":    { "role": "neutral",   "displayName": "Warm White",       "canonical": "#F5F3EF", "tonalRamp": ["#bab7b2","#c7c4bf","#d3d0cb","#e0ddd8","#F5F3EF","#f7f6f2","#f9f8f5","#fdfcfb"] },
+      "success":       { "role": "semantic",  "displayName": "Success",          "canonical": "#10B981", "tonalRamp": ["#052e1d","#075c35","#0a8a4e","#0da869","#10B981","#3ed49b","#80e7bf","#c8f5e4"] },
+      "warning":       { "role": "semantic",  "displayName": "Warning",          "canonical": "#F59E0B", "tonalRamp": ["#4a2f03","#7a4c05","#a96a07","#d88509","#F59E0B","#f8b83b","#fad07d","#fdeec6"] },
+      "error":         { "role": "semantic",  "displayName": "Error",            "canonical": "#EF4444", "tonalRamp": ["#4a0e0e","#7a1515","#a31c1c","#cc2b2b","#EF4444","#f47070","#f9a8a8","#fddada"] }
+    },
+    "typographyMeta": {
+      "display":       { "displayName": "Display",           "purpose": "Hero greeting, page-level statements. One per screen. Always sentence case." },
+      "display-italic":{ "displayName": "Display Italic",    "purpose": "Section headings with dosha emphasis. Mix of 300 and 400 within one heading is intentional." },
+      "heading":       { "displayName": "Heading",           "purpose": "Card titles, coaching category headers, modal titles." },
+      "body-serif":    { "displayName": "Body Serif Quote",  "purpose": "AI coaching text, philosophical copy, in-practice guidance. Always italic. Max 65ch." },
+      "body":          { "displayName": "Body Sans",         "purpose": "UI descriptions, input placeholder, secondary information. Max 70ch." },
+      "label":         { "displayName": "Label",             "purpose": "Badge text, tab labels, section markers, chip text. The instrument-readout register. Always uppercase." },
+      "micro":         { "displayName": "Micro",             "purpose": "Footer, sub-badges, status chips. Maximum one use per screen. Always uppercase." },
+      "timer":         { "displayName": "Timer",             "purpose": "Breathwork countdown displays only. This register exists nowhere else in the system." }
+    },
+    "shadows": [
+      { "name": "lift-subtle",  "value": "0 10px 30px rgba(0,0,0,0.03)",          "purpose": "Default lift under Soma input capsule and primary coaching cards." },
+      { "name": "lift-lavender","value": "0 12px 36px rgba(138,121,165,0.15)",    "purpose": "Hover state on the Soma input — a lavender-tinted bloom signalling readiness." },
+      { "name": "none",         "value": "none",                                   "purpose": "Default. Glass surfaces are shadow-free at rest." }
+    ],
+    "motion": [
+      { "name": "ease-standard",  "value": "cubic-bezier(0.4, 0, 0.2, 1)",        "purpose": "Default state transitions (color, background, border)." },
+      { "name": "ease-out-soft",  "value": "cubic-bezier(0.0, 0, 0.2, 1)",        "purpose": "Enter transitions, element arrival." },
+      { "name": "ease-breath",    "value": "ease-in-out",                          "purpose": "Breathing lotus and ambient pulsing — slow, body-aware rhythms." },
+      { "name": "duration-fast",  "value": "150ms",                               "purpose": "Micro-interactions: scale on button press." },
+      { "name": "duration-std",   "value": "200ms",                               "purpose": "Standard state changes: hover color, background shift." },
+      { "name": "duration-slow",  "value": "300ms",                               "purpose": "Page transitions, modal entry, view switches." },
+      { "name": "duration-breath","value": "3500ms",                              "purpose": "Breathing lotus animation cycle." },
+      { "name": "duration-pulse", "value": "2000ms",                              "purpose": "Mic icon readiness pulse." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px",  "purpose": "Welcome screen stacks to single column; header collapses." },
+      { "name": "md", "value": "768px",  "purpose": "Coaching dashboard switches from single to two-column layout." },
+      { "name": "lg", "value": "1024px", "purpose": "Max content width kicks in; side panels become visible." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Circular icon-only submit button. Used in the Soma input cluster and coaching actions.",
+      "html": "<button class=\"ds-btn-primary\" aria-label=\"Submit\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"M12 5l7 7-7 7\"/></svg></button>",
+      "css": ".ds-btn-primary { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 9999px; background: #2D3436; border: 1px solid #374649; color: #F5F3EF; cursor: pointer; transition: background 200ms cubic-bezier(0.4,0,0.2,1), transform 200ms cubic-bezier(0.0,0,0.2,1); } .ds-btn-primary:hover { background: #404d50; transform: scale(1.05); } .ds-btn-primary:active { transform: scale(0.97); transition-duration: 150ms; } .ds-btn-primary:focus-visible { outline: 2px solid #8A79A5; outline-offset: 2px; }"
+    },
+    {
+      "name": "Voice Button",
+      "kind": "button",
+      "refersTo": "button-voice",
+      "description": "Circular mic button. Triggers VoiceModal. Pulses at 2s to signal readiness.",
+      "html": "<button class=\"ds-btn-voice\" aria-label=\"Voice input\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"2\" width=\"6\" height=\"11\" rx=\"3\"/><path d=\"M19 10v2a7 7 0 0 1-14 0v-2\"/><line x1=\"12\" y1=\"19\" x2=\"12\" y2=\"23\"/><line x1=\"8\" y1=\"23\" x2=\"16\" y2=\"23\"/></svg></button>",
+      "css": "@keyframes ds-mic-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } } .ds-btn-voice { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 9999px; background: #ffffff; border: 1px solid rgba(0,0,0,0.05); color: #44515A; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: background 200ms cubic-bezier(0.4,0,0.2,1), transform 200ms cubic-bezier(0.0,0,0.2,1); } .ds-btn-voice svg { animation: ds-mic-pulse 2s ease-in-out infinite; } .ds-btn-voice:hover { background: #E8E1F2; transform: scale(1.05); } .ds-btn-voice:focus-visible { outline: 2px solid #8A79A5; outline-offset: 2px; } @media (prefers-reduced-motion: reduce) { .ds-btn-voice svg { animation: none; } }"
+    },
+    {
+      "name": "Soma Input Capsule",
+      "kind": "input",
+      "refersTo": "input-soma",
+      "description": "The primary interaction object. Full-width pill housing the feeling input, voice button, and submit button as a unified glass cluster.",
+      "html": "<div class=\"ds-soma\"><input class=\"ds-soma-field\" type=\"text\" placeholder=\"Tell PranaVeda how you're feeling...\" /><div class=\"ds-soma-actions\"><button class=\"ds-soma-mic\" aria-label=\"Voice input\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"2\" width=\"6\" height=\"11\" rx=\"3\"/><path d=\"M19 10v2a7 7 0 0 1-14 0v-2\"/><line x1=\"12\" y1=\"19\" x2=\"12\" y2=\"23\"/><line x1=\"8\" y1=\"23\" x2=\"16\" y2=\"23\"/></svg></button><button class=\"ds-soma-submit\" aria-label=\"Submit\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"M12 5l7 7-7 7\"/></svg></button></div></div>",
+      "css": ".ds-soma { display: flex; align-items: center; background: rgba(255,255,255,0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.8); border-radius: 9999px; padding: 14px 14px 14px 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); gap: 8px; transition: background 300ms cubic-bezier(0.4,0,0.2,1), border-color 300ms, box-shadow 300ms; } .ds-soma:hover, .ds-soma:focus-within { background: rgba(255,255,255,0.8); border-color: #ffffff; box-shadow: 0 12px 36px rgba(138,121,165,0.15); } .ds-soma-field { flex: 1; background: transparent; border: none; outline: none; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 16px; color: #2D3436; } .ds-soma-field::placeholder { color: rgba(45,52,54,0.3); } .ds-soma-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; } .ds-soma-mic { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 9999px; background: #ffffff; border: 1px solid rgba(0,0,0,0.05); color: #44515A; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.08); transition: background 200ms, transform 200ms; } .ds-soma-mic:hover { background: #E8E1F2; transform: scale(1.05); } .ds-soma-submit { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 9999px; background: #2D3436; border: 1px solid #374649; color: #F5F3EF; cursor: pointer; transition: background 200ms, transform 200ms; } .ds-soma-submit:hover { background: #404d50; transform: scale(1.05); }"
+    },
+    {
+      "name": "Tab Switcher",
+      "kind": "nav",
+      "refersTo": "tab-active",
+      "description": "Two-state view switcher between Consult AI Coach and Recovery & Trends. Mono uppercase labels.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab ds-tab--active\">Consult AI Coach</button><button class=\"ds-tab ds-tab--inactive\">Recovery &amp; Trends</button></div>",
+      "css": ".ds-tabs { display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.4); padding: 4px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.6); } .ds-tab { padding: 8px 20px; border-radius: 12px; font-family: monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; border: none; transition: background 200ms cubic-bezier(0.4,0,0.2,1), color 200ms; } .ds-tab--active { background: rgba(138,121,165,0.9); color: #ffffff; box-shadow: 0 2px 6px rgba(138,121,165,0.2); } .ds-tab--inactive { background: transparent; color: #78909C; } .ds-tab--inactive:hover { color: #2D3436; } .ds-tab:focus-visible { outline: 2px solid #8A79A5; outline-offset: 2px; }"
+    },
+    {
+      "name": "Suggestion Chip",
+      "kind": "chip",
+      "refersTo": "chip-suggestion",
+      "description": "Prompted wellness query chips on the welcome screen. Carry real content, not decorative labels.",
+      "html": "<button class=\"ds-chip\">I haven't been sleeping well lately</button>",
+      "css": ".ds-chip { padding: 10px 24px; border-radius: 9999px; background: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.6); color: #2D3436; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 14px; font-weight: 400; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,0.02); transition: background 300ms cubic-bezier(0.4,0,0.2,1), transform 300ms cubic-bezier(0.0,0,0.2,1), box-shadow 300ms; } .ds-chip:hover { background: #ffffff; transform: translateY(-2px); box-shadow: 0 14px 34px rgba(0,0,0,0.05); } .ds-chip:focus-visible { outline: 2px solid #8A79A5; outline-offset: 2px; }"
+    },
+    {
+      "name": "Glass Card",
+      "kind": "card",
+      "refersTo": "card-glass",
+      "description": "Primary coaching content container. Never nested inside another glass card.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-eyebrow\">Yoga Practice</p><h3 class=\"ds-card-title\">Morning Grounding Flow</h3><p class=\"ds-card-body\">A 10-minute stabilising sequence to root your awareness before the day begins.</p></div>",
+      "css": ".ds-card { background: rgba(255,255,255,0.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.8); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 8px; } .ds-card-eyebrow { font-family: monospace; font-size: 9px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #8A79A5; } .ds-card-title { font-family: 'Playfair Display', Georgia, serif; font-size: 1.25rem; font-weight: 400; line-height: 1.3; color: #2D3436; } .ds-card-body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 14px; font-weight: 400; line-height: 1.6; color: #44515A; max-width: 60ch; }"
+    },
+    {
+      "name": "Toast Notification",
+      "kind": "custom",
+      "refersTo": "card-glass",
+      "description": "Floating feedback notification. Three variants: success (emerald), warn (rose), info (stone). Bottom-right anchored.",
+      "html": "<div class=\"ds-toast ds-toast--success\"><svg class=\"ds-toast-icon\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg><p class=\"ds-toast-msg\">Soma resonance synthesized. Your ritual is ready.</p></div>",
+      "css": ".ds-toast { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 16px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); max-width: 360px; } .ds-toast--success { background: rgba(5,22,18,0.9); border: 1px solid rgba(16,185,129,0.3); color: #d1fae5; } .ds-toast--warn { background: rgba(30,8,8,0.9); border: 1px solid rgba(239,68,68,0.3); color: #fee2e2; } .ds-toast--info { background: rgba(10,14,15,0.9); border: 1px solid rgba(120,144,156,0.3); color: #e2e8ea; } .ds-toast-icon { flex-shrink: 0; } .ds-toast--success .ds-toast-icon { color: #10B981; } .ds-toast--warn .ds-toast-icon { color: #EF4444; } .ds-toast--info .ds-toast-icon { color: #90A4AE; } .ds-toast-msg { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 12.5px; font-weight: 500; line-height: 1.5; flex: 1; }"
+    },
+    {
+      "name": "Breathwork Timer",
+      "kind": "custom",
+      "refersTo": "card-glass",
+      "description": "Standalone countdown display for pranayama sequences. The Timer register is used nowhere else.",
+      "html": "<div class=\"ds-timer-card\"><p class=\"ds-timer-name\">Sama Vritti · Equal Breathing</p><div class=\"ds-timer-display\">2:00</div><p class=\"ds-timer-meta\">4 · 4 · 4 · 0 · 8 cycles</p></div>",
+      "css": ".ds-timer-card { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px 40px; background: rgba(255,255,255,0.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.8); border-radius: 16px; } .ds-timer-name { font-family: 'Playfair Display', Georgia, serif; font-size: 15px; font-style: italic; font-weight: 400; color: #44515A; text-align: center; } .ds-timer-display { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 72px; font-weight: 200; line-height: 1; letter-spacing: -0.02em; color: #1a2226; } .ds-timer-meta { font-family: monospace; font-size: 9px; font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase; color: rgba(138,121,165,0.6); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Living Ritual",
+    "overview": "PranaVeda is designed to be a daily object, not a destination. Like a beautifully made journal or a precision health instrument — Oura ring energy in software — it exists to be used, then forgotten. Every screen is engineered to disappear: to surface the practice, the breath, the body, and then step aside. The interface does not celebrate itself.\n\nThe aesthetic draws from Apple Health's clinical data clarity, Oura's body-intelligence restraint, Calm's breath-aware motion, and Neo Mirai's editorial minimalism. The result is neither a meditation app nor a wellness dashboard. It is a ritual companion with a quiet, authoritative voice — one that knows something about your body and is calm about it.\n\nGlass surfaces carry all the atmospheric weight. Playfair Display carries the sacred intelligence. Together they create the sensation of reading a beautifully typeset prescription written just for you. Sacred geometry, mystical iconography, and temple aesthetics are explicitly rejected.",
+    "keyCharacteristics": [
+      "Glassmorphic surfaces used structurally, never decoratively",
+      "Playfair Display + monospace label system creates the editorial-intelligence contrast axis",
+      "Motion is slow, body-aware, and always reducible — it breathes, it does not perform",
+      "Four dosha-mapped color tints carry semantic meaning; never purely decorative",
+      "White space is active — silence is the brand voice"
+    ],
+    "rules": [
+      { "name": "The Tint Semantics Rule",     "body": "The four dosha tints (#E8E1F2, #FBEDE9, #DDF5EE, #DFE8FA) are semantic signals, not ambient color. Each maps to a dosha state surfaced in AI responses. Never apply them as general background fills or for visual interest alone.", "section": "colors" },
+      { "name": "The Lavender Restraint Rule", "body": "Sacred Lavender (#8A79A5) covers ≤20% of any given screen. One active state. One brand moment. Its scarcity is what makes it feel intentional.", "section": "colors" },
+      { "name": "The Register Contrast Rule",  "body": "Every typographic composition must cross at least two registers: Playfair prose + mono label, or display serif + body sans. Never place two mono-only or two serif-only elements at the same hierarchy level.", "section": "typography" },
+      { "name": "The Sentence Case Rule",      "body": "Display and heading text is always sentence case. UPPERCASE is reserved exclusively for Label and Micro registers. Uppercase Playfair Display is prohibited.", "section": "typography" },
+      { "name": "The Purposeful Glass Rule",   "body": "Every backdrop-filter: blur() in the UI has a structural job: separating one layer from the ambient background. If removing the blur doesn't change the perceived hierarchy, it doesn't belong.", "section": "elevation" },
+      { "name": "The No-Nested-Glass Rule",    "body": "Glass cards are never nested inside other glass cards. When a card already has backdrop-filter, its children use opaque or transparent backgrounds only.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Sacred Lavender (#8A79A5) for active states, labels, and brand moments only — its scarcity signals importance.",
+      "Do use Playfair Display in sentence case for all display and heading text, including italic emphasis.",
+      "Do reserve the mono uppercase Label register for instrument-readout contexts: badge text, tab labels, section markers, chip text, and metadata lines only.",
+      "Do pair every breathing or ambient animation with a @media (prefers-reduced-motion: reduce) fallback — typically an instant crossfade or opacity transition.",
+      "Do maintain the glass hierarchy: inputs at white/60%, primary cards at white/55%, nav and chips at white/40%.",
+      "Do cap Body Serif text at 65ch and Body Sans at 70ch. Apply text-wrap: balance to Display and Heading elements.",
+      "Do use the four dosha tints semantically — only in coaching contexts where a dosha state is explicitly identified by the AI."
+    ],
+    "donts": [
+      "Don't use generic SaaS or dashboard patterns: no metric hero cards with big numbers and small stat labels, no persistent sidebar navigation, no layouts with multiple competing primary CTAs.",
+      "Don't use fast-energy or gym-app motion: no bounce easing, no staggered section entrances with identical timing, no urgency-signaling countdowns outside the breathwork timer.",
+      "Don't make the UI feel like a chat interface or AI conversation thread. Coaching outputs are structured ritual compositions — complete, beautiful, and presented as a whole — never as conversational bubbles.",
+      "Don't use fantasy or mystical visual language: no temple imagery, sacred geometry overlays, mandala backgrounds, glowing orbs, or heavy spiritual iconography.",
+      "Don't use glassmorphism decoratively. Every backdrop-filter: blur() must have a structural hierarchy job.",
+      "Don't nest glass cards inside glass cards. The No-Nested-Glass Rule is absolute.",
+      "Don't use gradient text (background-clip: text + gradient background). Emphasis is weight or size only.",
+      "Don't use border-left or border-right greater than 1px as a colored stripe accent on any card, list item, or callout.",
+      "Don't uppercase Playfair Display at any size. Uppercase is the mono register's territory only."
+    ]
+  }
+}
