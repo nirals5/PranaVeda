@@ -230,13 +230,13 @@ export default function App() {
       <PranaBackground />
 
       {/* 2. Brand Header Panel */}
-      <header className="w-full max-w-7xl mx-auto px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 z-10 relative">
+      <header className="w-full max-w-7xl mx-auto px-5 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 z-10 relative">
         <Logo size="md" />
         
-        <div className="flex items-center gap-2 bg-white/40 p-1 rounded-2xl border border-white/60 shadow-xs">
+        <div className="flex items-center gap-2 bg-white/40 p-1 rounded-2xl border border-white/60 shadow-xs w-full sm:w-auto max-w-[360px]">
           <button
             onClick={() => setCurrentView('coach')}
-            className={`py-2 px-5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none py-2 px-3 sm:px-5 rounded-xl text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
               currentView === 'coach'
                 ? 'bg-[#8A79A5]/90 text-white shadow-sm'
                 : 'text-stone-550 hover:text-stone-900'
@@ -247,7 +247,7 @@ export default function App() {
           
           <button
             onClick={() => setCurrentView('recovery')}
-            className={`py-2 px-5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none py-2 px-3 sm:px-5 rounded-xl text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
               currentView === 'recovery'
                 ? 'bg-[#8A79A5]/90 text-white shadow-sm'
                 : 'text-stone-550 hover:text-stone-900'
@@ -351,13 +351,13 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center w-full px-6 text-center space-y-12"
+              className="flex flex-col items-center w-full px-5 sm:px-6 text-center space-y-10 sm:space-y-12"
             >
               
               {/* Editorial Display Intro */}
-              <div className="space-y-4 max-w-2xl mt-12">
+              <div className="space-y-4 max-w-2xl mt-8 sm:mt-12">
                 <span className="p-1.5 px-4 rounded-full text-[10px] font-mono tracking-[0.2em] font-bold bg-[#E8E1F2]/80 text-stone-700 uppercase shadow-xs">
-                  Ancient Wisdom • Personalized Guidance
+                  Personalized yoga and Ayurvedic guidance, powered by AI.
                 </span>
                 
                 <h1 className="text-4xl sm:text-[54px] font-serif font-normal italic text-[#2D3436] tracking-tight leading-tight">
@@ -365,7 +365,7 @@ export default function App() {
                 </h1>
                 
                 <p className="text-base sm:text-lg font-light text-[#2D3436]/60 leading-relaxed max-w-xl mx-auto font-sans">
-                  Share your symptoms, thoughts, or goals with your AI wellness mentor to receive custom, beautiful therapeutic solutions.
+                  Tell me how you feel, and I'll suggest a practice that fits your body, energy, and goals.
                 </p>
               </div>
 
@@ -377,7 +377,7 @@ export default function App() {
 
                 {/* Highly structured rounded input capsule */}
                 <div
-                  className="relative flex items-center bg-white/60 backdrop-blur-[20px] rounded-[40px] border border-white/80 p-3.5 px-6 shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:bg-white/80 hover:border-white hover:shadow-[0_12px_36px_rgba(138,121,165,0.15)] focus-within:border-[#8A79A5]/40 focus-within:shadow-[0_12px_36px_rgba(138,121,165,0.2)] transition-all duration-300 group"
+                  className="relative flex items-center bg-white/60 backdrop-blur-[20px] rounded-[40px] border border-white/80 p-3 sm:p-3.5 px-5 sm:px-6 shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:bg-white/80 hover:border-white hover:shadow-[0_12px_36px_rgba(138,121,165,0.15)] focus-within:border-[#8A79A5]/40 focus-within:shadow-[0_12px_36px_rgba(138,121,165,0.2)] transition-all duration-300 group"
                 >
                   <input
                     type="text"
@@ -387,13 +387,15 @@ export default function App() {
                       if (e.key === 'Enter') handleConsultCoach(inputValue);
                     }}
                     placeholder="Tell PranaVeda how you're feeling..."
-                    className="w-full bg-transparent border-none text-[#2D3436] placeholder-[#2D3436]/30 font-sans text-base sm:text-[18px] focus-visible:outline-none focus-visible:ring-0 mr-4 py-1"
+                    aria-label="Tell PranaVeda how you're feeling"
+                    className="w-full min-w-0 bg-transparent border-none text-[#2D3436] placeholder-[#2D3436]/30 font-sans text-base sm:text-[18px] focus-visible:outline-none focus-visible:ring-0 mr-3 sm:mr-4 py-1"
                   />
 
                   {/* Micro Buttons */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <motion.button
                       onClick={() => setShowVoiceModal(true)}
+                      aria-label="Activate voice consultation"
                       className="p-3 rounded-full bg-white border border-black/5 hover:bg-[#E8E1F2] text-stone-700 cursor-pointer shadow-md"
                       title="Activate voice consultation"
                       whileHover={prefersReducedMotion ? {} : { scale: 1.05 }}
@@ -405,6 +407,7 @@ export default function App() {
                     
                     <button
                       onClick={() => handleConsultCoach(inputValue)}
+                      aria-label="Consult Coach"
                       className="p-3 rounded-full bg-[#2D3436] border border-stone-800 text-white hover:bg-stone-700 transition-all cursor-pointer shadow-md hover:scale-105 flex items-center justify-center"
                       title="Consult Coach"
                     >
@@ -414,7 +417,7 @@ export default function App() {
                 </div>
 
                 {/* Sugges-chips list (chip-cloud) */}
-                <div className="flex flex-wrap items-center justify-center gap-3 pt-3 max-w-3xl mx-auto">
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-3 max-w-3xl mx-auto pb-4 sm:pb-0">
                   {[
                     "I haven't been sleeping well lately",
                     "I feel stressed and overwhelmed",

@@ -94,7 +94,7 @@ export default function WellnessInsight({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl mt-14 px-6 pb-12 z-10 relative">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl mt-10 sm:mt-14 px-5 sm:px-6 pb-12 z-10 relative">
       
       {/* CARD 1: Today's Wellness Insight */}
       <motion.div
@@ -143,7 +143,7 @@ export default function WellnessInsight({
                   <div className="text-xs font-mono tracking-widest text-[#8A79A5] uppercase font-bold">
                     FOCUS: {insight.focus}
                   </div>
-                  <p className="text-xs text-stone-600 mt-1.5 leading-relaxed truncate font-medium" title={insight.practice}>
+                  <p className="text-xs text-stone-600 mt-1.5 leading-relaxed font-medium" title={insight.practice}>
                     {insight.practice}
                   </p>
                 </div>
@@ -180,7 +180,7 @@ export default function WellnessInsight({
                   No bookmarked rituals.
                 </p>
                 <p className="text-xs text-stone-500 mt-1.5 max-w-[200px] leading-relaxed">
-                  Ask PranaVeda to create a diagnostic sequence to get started.
+                  Ask PranaVeda to create a grounding ritual to get started.
                 </p>
               </div>
             ) : (

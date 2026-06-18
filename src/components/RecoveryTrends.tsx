@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, 
@@ -22,7 +22,6 @@ import {
   Trophy
 } from 'lucide-react';
 import { 
-  ResponsiveContainer, 
   AreaChart, 
   Area, 
   XAxis, 
@@ -65,6 +64,39 @@ const DEFAULT_METRICS: LogRecord[] = [
 
 interface RecoveryTrendsProps {
   showNotification?: (message: string, type: 'info' | 'success' | 'warn') => void;
+}
+
+function ChartFrame({
+  height,
+  children,
+}: {
+  height: number;
+  children: (size: { width: number; height: number }) => React.ReactElement;
+}) {
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const updateWidth = () => {
+      setWidth(Math.max(0, Math.floor(frameRef.current?.clientWidth ?? 0)));
+    };
+
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    if (frameRef.current) observer.observe(frameRef.current);
+    window.addEventListener('resize', updateWidth);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, []);
+
+  return (
+    <div ref={frameRef} className="h-full w-full min-w-0">
+      {width > 0 ? children({ width, height }) : null}
+    </div>
+  );
 }
 
 export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps = {}) {
@@ -454,7 +486,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
       };
     }
     return {
-      title: "Kapha Dominance (Earth / Water5)",
+      title: "Kapha Dominance (Earth / Water)",
       description: "An abundance of grounding water and structural stability is present. Focus on activating energy flows, heating pranayamas (Kapalabhati), and dynamic posture flows to stimulate sluggish digestion or low energy.",
       color: "bg-[#FBEDE9]/80 text-[#A66C5E] border-stone-100"
     };
@@ -480,7 +512,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
             Holistic Recovery Dashboard
           </h2>
           <p className="text-stone-600 text-xs sm:text-sm font-light leading-relaxed">
-            Assess posture alignment with glowing skeletal AI mappings, test breath holding coefficient thresholds live, sync touch-pulse vitals, and track your daily sleep-breathing indices.
+            Track sleep, breath capacity, posture practice, and Ayurvedic-inspired balance patterns in one gentle recovery view.
           </p>
         </div>
 
@@ -498,8 +530,8 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
           { id: 'trends', label: 'Overview & Trends', icon: TrendingUp },
           { id: 'sleep', label: 'Sleep Tracker', icon: Moon },
           { id: 'breathing', label: 'Breathing Capacity', icon: Wind },
-          { id: 'posture', label: 'AI Posture Scan', icon: Accessibility },
-          { id: 'pulse', label: 'Pulse Diagnosis', icon: Activity }
+          { id: 'posture', label: 'Posture Check', icon: Accessibility },
+          { id: 'pulse', label: 'Pulse Reflection', icon: Activity }
         ].map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
@@ -532,7 +564,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className="grid grid-cols-1 lg:grid-cols-3 gap-8"
+            className="grid grid-cols-1 lg:grid-cols-3 gap-8 min-w-0"
           >
             {/* Left Metrics Cards List */}
             <div className="lg:col-span-1 space-y-6">
@@ -591,7 +623,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                     Posture Pro: {streakCount}-Day Streak!
                   </h4>
                   <p className="text-xs text-stone-600 leading-relaxed font-sans font-light">
-                    You've achieved perfect yoga postures for {streakCount} days in a row! Treat yourself to a refreshing smoothie today. Keep going—you're building a lasting habit.
+                    You've completed posture practice for {streakCount} days in a row. Treat yourself to a refreshing smoothie today. Keep going; you're building a lasting habit.
                   </p>
                 </div>
 
@@ -611,8 +643,8 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                   <span className="text-[9px] font-mono text-stone-400 font-bold uppercase block">Daily Micro-Habits</span>
                   {[
                     { id: 'breath', label: '1. Complete Breathholding Test' },
-                    { id: 'posture', label: '2. Perform AI Skeletal Posture Scan' },
-                    { id: 'pulse', label: '3. Perform Radial Pulse Nadi Scan' }
+                    { id: 'posture', label: '2. Complete posture check-in' },
+                    { id: 'pulse', label: '3. Complete pulse reflection' }
                   ].map((habit) => {
                     const completed = completedHabits.includes(habit.id);
                     return (
@@ -670,7 +702,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
             </div>
 
             {/* Right Rich Charts Grid (Recharts) */}
-            <div className="lg:col-span-2 space-y-8 bg-white/45 backdrop-blur-md border border-white/70 p-6 rounded-3xl shadow-xs">
+            <div className="lg:col-span-2 space-y-8 bg-white/45 backdrop-blur-md border border-white/70 p-5 sm:p-6 rounded-3xl shadow-xs min-w-0">
               
               <div className="flex items-center justify-between mb-2">
                 <div>
@@ -688,9 +720,10 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                 <span className="text-[10px] uppercase tracking-wider font-mono text-stone-400 font-bold block">
                   1. Synthesis Index Recovery Score Trend (%)
                 </span>
-                <div className="h-60 w-full bg-white/50 rounded-xl p-2 border border-stone-100/50">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={metrics}>
+                <div className="h-60 min-h-60 min-w-0 w-full bg-white/50 rounded-xl p-2 border border-stone-100/50">
+                  <ChartFrame height={224}>
+                    {({ width, height }) => (
+                    <AreaChart data={metrics} width={width} height={height}>
                       <defs>
                         <linearGradient id="colorRecovery" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#8A79A5" stopOpacity={0.25}/>
@@ -703,7 +736,8 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                       <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #ECEFF1', fontSize: '11px' }} />
                       <Area type="monotone" dataKey="recoveryScore" name="Synthesis Level %" stroke="#8A79A5" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRecovery)" />
                     </AreaChart>
-                  </ResponsiveContainer>
+                    )}
+                  </ChartFrame>
                 </div>
               </div>
 
@@ -741,9 +775,10 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                   </div>
                 </div>
 
-                <div className="h-56 w-full bg-white/50 rounded-xl p-2.5 border border-stone-150/30">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={getCorrelationData()}>
+                <div className="h-56 min-h-56 min-w-0 w-full bg-white/50 rounded-xl p-2.5 border border-stone-150/30">
+                  <ChartFrame height={204}>
+                    {({ width, height }) => (
+                    <ComposedChart data={getCorrelationData()} width={width} height={height}>
                       <CartesianGrid strokeDasharray="2 2" vertical={false} stroke="#ECEFF1" />
                       <XAxis dataKey="name" stroke="#90A4AE" fontSize={10} />
                       <YAxis yAxisId="left" stroke="#A66C5E" fontSize={10} domain={[40, 100]} label={{ value: 'Sleep Score', angle: -90, position: 'insideLeft', style: {fontSize: 8, fill: '#A66C5E'} }} />
@@ -763,7 +798,8 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                       <Bar yAxisId="right" dataKey="mindfulness" name="Mindfulness Sessions" fill="#D3C9E3" barSize={35} radius={[4, 4, 0, 0]} />
                       <Line yAxisId="left" type="monotone" dataKey="sleep" name="Sleep Score" stroke="#A66C5E" strokeWidth={3.5} dot={{ r: 5, fill: "#A66C5E" }} activeDot={{ r: 8 }} />
                     </ComposedChart>
-                  </ResponsiveContainer>
+                    )}
+                  </ChartFrame>
                 </div>
 
                 <div className="p-3 bg-amber-50/40 border border-amber-100/30 rounded-xl space-y-1">
@@ -790,16 +826,18 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                     </h4>
                   </div>
 
-                  <div className="h-40 w-full bg-white/50 rounded-xl p-2 border border-stone-100/50">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={HRV_DATA}>
+                  <div className="h-40 min-h-40 min-w-0 w-full bg-white/50 rounded-xl p-2 border border-stone-100/50">
+                    <ChartFrame height={144}>
+                      {({ width, height }) => (
+                      <BarChart data={HRV_DATA} width={width} height={height}>
                         <CartesianGrid strokeDasharray="2 2" vertical={false} stroke="#F1F3F4" />
                         <XAxis dataKey="name" stroke="#90A4AE" fontSize={9} />
                         <YAxis stroke="#90A4AE" fontSize={9} />
                         <Tooltip contentStyle={{ borderRadius: '8px', fontSize: '10px' }} />
                         <Bar dataKey="hrv" name="HRV ms" fill="#F0C3B4" radius={[3, 3, 0, 0]} barSize={20} />
                       </BarChart>
-                    </ResponsiveContainer>
+                      )}
+                    </ChartFrame>
                   </div>
 
                   <div className="p-2.5 bg-green-50/40 border border-green-100/30 rounded-lg">
@@ -820,9 +858,10 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                     </h4>
                   </div>
 
-                  <div className="h-40 w-full bg-white/50 rounded-xl p-2 border border-stone-100/50">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={metrics}>
+                  <div className="h-40 min-h-40 min-w-0 w-full bg-white/50 rounded-xl p-2 border border-stone-100/50">
+                    <ChartFrame height={144}>
+                      {({ width, height }) => (
+                      <AreaChart data={metrics} width={width} height={height}>
                         <defs>
                           <linearGradient id="colorBreath" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#8A79A5" stopOpacity={0.25}/>
@@ -835,7 +874,8 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                         <Tooltip />
                         <Area type="monotone" dataKey="breathRetentionSeconds" name="Retention Capacity (s)" stroke="#8A79A5" fillOpacity={1} strokeWidth={2} fill="url(#colorBreath)" />
                       </AreaChart>
-                    </ResponsiveContainer>
+                      )}
+                    </ChartFrame>
                   </div>
 
                   <p className="text-[10px] text-stone-500 font-mono text-center">
@@ -1296,17 +1336,17 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
               </div>
             </div>
 
-            {/* Diagnostic Pulse Outcome Report */}
+            {/* Pulse reflection outcome report */}
             <div className="bg-white/55 backdrop-blur-md border border-white/70 p-6 sm:p-8 rounded-3xl shadow-xs space-y-6 flex flex-col justify-between">
               <div>
                 <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block mb-2">
-                  Diagnostic Vital Pulse
+                  Pulse Reflection
                 </span>
                 <h3 className="text-xl sm:text-2xl font-serif font-light text-stone-850">
-                  Ayurvedic Nadi Report
+                  Ayurvedic-Inspired Nadi Notes
                 </h3>
                 <p className="text-[#2D3436]/75 text-xs sm:text-sm leading-relaxed font-sans font-normal mt-2">
-                  The radial heart rhythm reflects the dynamic flow of your blood vessels. Under Ayurveda, each biological doshas dictates heart rhythms:
+                  Use this as a reflective wellness ritual, not a medical reading. Ayurveda associates different pulse qualities with Vata, Pitta, and Kapha patterns.
                 </p>
               </div>
 
@@ -1329,7 +1369,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                     Nadi Reader Standby
                   </p>
                   <p className="text-xs italic leading-relaxed font-serif max-w-[200px]">
-                    Pulse diagnosis indices generate automatically when touch scan finishes.
+                    Pulse reflection notes appear when the touch ritual finishes.
                   </p>
                 </div>
               )}
@@ -1338,9 +1378,9 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                 onClick={() => {
                   if (!pulsePattern) {
                     if (showNotification) {
-                      showNotification("Please run the vital diagnostic scan first!", "warn");
+                      showNotification("Please run the pulse reflection first.", "warn");
                     } else {
-                      alert("Run the vital diagnostic scan first!");
+                      alert("Run the pulse reflection first.");
                     }
                     return;
                   }
@@ -1398,7 +1438,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                 Register Today's Biometrics
               </h3>
               <p className="text-xs text-stone-500 font-mono">
-                Log diagnostic variables manually to construct 7-day health trend analyses
+                Log daily wellness variables manually to build a 7-day trend view
               </p>
             </div>
 

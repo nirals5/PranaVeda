@@ -1,0 +1,363 @@
+{
+  "color": {
+    "lavender": {
+      "value": "#8A79A5",
+      "type": "color",
+      "description": "Sacred Lavender — primary brand color. Active states, labels, focus rings."
+    },
+    "lavender-deep": {
+      "value": "#71608E",
+      "type": "color",
+      "description": "Deep Lavender — hover/pressed variant of primary."
+    },
+    "lavender-tint": {
+      "value": "#E8E1F2",
+      "type": "color",
+      "description": "Lavender Tint — Vata dosha semantic tint. Badge backgrounds."
+    },
+    "terracotta": {
+      "value": "#A66C5E",
+      "type": "color",
+      "description": "Warm Terracotta — secondary brand color."
+    },
+    "peach": {
+      "value": "#C8815A",
+      "type": "color",
+      "description": "Deeper Peach — logo accent, brand warmth."
+    },
+    "peach-tint": {
+      "value": "#FBEDE9",
+      "type": "color",
+      "description": "Peach Tint — Pitta dosha semantic tint."
+    },
+    "sage": {
+      "value": "#6A9478",
+      "type": "color",
+      "description": "Herb Green — logo leaf accent."
+    },
+    "mint-tint": {
+      "value": "#DDF5EE",
+      "type": "color",
+      "description": "Mint Tint — Kapha dosha semantic tint."
+    },
+    "blue-tint": {
+      "value": "#DFE8FA",
+      "type": "color",
+      "description": "Blue Tint — fourth dosha tint. Vata-air contexts."
+    },
+    "slate-muted": {
+      "value": "#90A4AE",
+      "type": "color",
+      "description": "Muted Slate — tertiary, subtle UI elements."
+    },
+    "ink": {
+      "value": "#2D3436",
+      "type": "color",
+      "description": "Ink — primary text, submit button background."
+    },
+    "stone-700": {
+      "value": "#44515A",
+      "type": "color",
+      "description": "Stone 700 — secondary text, icon color."
+    },
+    "stone-500": {
+      "value": "#78909C",
+      "type": "color",
+      "description": "Stone 500 — tertiary text, placeholder."
+    },
+    "stone-200": {
+      "value": "#CFD8DC",
+      "type": "color",
+      "description": "Stone 200 — dividers, subtle borders."
+    },
+    "stone-100": {
+      "value": "#ECEFF1",
+      "type": "color",
+      "description": "Stone 100 — lightest neutral surface."
+    },
+    "warm-white": {
+      "value": "#F5F3EF",
+      "type": "color",
+      "description": "Warm White — page/app background base."
+    },
+    "success": {
+      "value": "#10B981",
+      "type": "color",
+      "description": "Success — emerald toast icon."
+    },
+    "warning": {
+      "value": "#F59E0B",
+      "type": "color",
+      "description": "Warning — amber semantic."
+    },
+    "error": {
+      "value": "#EF4444",
+      "type": "color",
+      "description": "Error — rose toast icon, delete hover."
+    }
+  },
+  "shadow": {
+    "lift-subtle": {
+      "value": {
+        "x": 0,
+        "y": 10,
+        "blur": 30,
+        "spread": 0,
+        "color": "rgba(0,0,0,0.03)",
+        "type": "dropShadow"
+      },
+      "type": "boxShadow",
+      "description": "Default lift under Soma input capsule and primary coaching cards."
+    },
+    "lift-lavender": {
+      "value": {
+        "x": 0,
+        "y": 12,
+        "blur": 36,
+        "spread": 0,
+        "color": "rgba(138,121,165,0.15)",
+        "type": "dropShadow"
+      },
+      "type": "boxShadow",
+      "description": "Hover state on Soma input — lavender-tinted bloom signalling readiness."
+    }
+  },
+  "motion": {
+    "ease-standard": {
+      "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "type": "other",
+      "description": "Default state transitions — color, background, border."
+    },
+    "ease-out-soft": {
+      "value": "cubic-bezier(0.0, 0, 0.2, 1)",
+      "type": "other",
+      "description": "Enter transitions, element arrival."
+    },
+    "ease-breath": {
+      "value": "ease-in-out",
+      "type": "other",
+      "description": "Breathing lotus and ambient pulsing — slow, body-aware rhythms."
+    },
+    "duration-fast": {
+      "value": "150ms",
+      "type": "other",
+      "description": "Micro-interactions: scale on button press."
+    },
+    "duration-std": {
+      "value": "200ms",
+      "type": "other",
+      "description": "Standard state changes: hover color, background shift."
+    },
+    "duration-slow": {
+      "value": "300ms",
+      "type": "other",
+      "description": "Page transitions, modal entry, view switches."
+    },
+    "duration-breath": {
+      "value": "3500ms",
+      "type": "other",
+      "description": "Breathing lotus animation cycle."
+    },
+    "duration-pulse": {
+      "value": "2000ms",
+      "type": "other",
+      "description": "Mic icon readiness pulse."
+    }
+  },
+  "breakpoint": {
+    "sm": {
+      "value": "640",
+      "type": "other",
+      "description": "Welcome screen stacks to single column; header collapses."
+    },
+    "md": {
+      "value": "768",
+      "type": "other",
+      "description": "Coaching dashboard switches from single to two-column layout."
+    },
+    "lg": {
+      "value": "1024",
+      "type": "other",
+      "description": "Max content width kicks in; side panels become visible."
+    }
+  },
+  "typography": {
+    "display": {
+      "value": {
+        "fontFamily": "Playfair Display",
+        "fontWeight": "400",
+        "fontSize": "54",
+        "lineHeight": "1.1",
+        "letterSpacing": "-0.02em",
+        "textCase": "none",
+        "textDecoration": "none"
+      },
+      "type": "typography",
+      "description": "Hero greeting, page-level statements. One per screen. Always sentence case. Italic variant preferred."
+    },
+    "heading": {
+      "value": {
+        "fontFamily": "Playfair Display",
+        "fontWeight": "400",
+        "fontSize": "20",
+        "lineHeight": "1.3",
+        "letterSpacing": "0",
+        "textCase": "none",
+        "textDecoration": "none"
+      },
+      "type": "typography",
+      "description": "Card titles, coaching category headers, modal titles."
+    },
+    "body-serif": {
+      "value": {
+        "fontFamily": "Playfair Display",
+        "fontWeight": "300",
+        "fontSize": "15",
+        "lineHeight": "1.65",
+        "letterSpacing": "0",
+        "textCase": "none",
+        "textDecoration": "none"
+      },
+      "type": "typography",
+      "description": "AI coaching text, philosophical copy, in-practice guidance. Always italic. Max 65ch."
+    },
+    "body": {
+      "value": {
+        "fontFamily": "Plus Jakarta Sans",
+        "fontWeight": "300",
+        "fontSize": "16",
+        "lineHeight": "1.6",
+        "letterSpacing": "0",
+        "textCase": "none",
+        "textDecoration": "none"
+      },
+      "type": "typography",
+      "description": "UI descriptions, input placeholder, secondary information. Max 70ch."
+    },
+    "label": {
+      "value": {
+        "fontFamily": "monospace",
+        "fontWeight": "700",
+        "fontSize": "11",
+        "lineHeight": "1",
+        "letterSpacing": "0.08em",
+        "textCase": "uppercase",
+        "textDecoration": "none"
+      },
+      "type": "typography",
+      "description": "Badge text, tab labels, section markers, chip text. Always uppercase."
+    },
+    "micro": {
+      "value": {
+        "fontFamily": "monospace",
+        "fontWeight": "700",
+        "fontSize": "9",
+        "lineHeight": "1",
+        "letterSpacing": "0.22em",
+        "textCase": "uppercase",
+        "textDecoration": "none"
+      },
+      "type": "typography",
+      "description": "Footer, sub-badges, eyebrows, status chips. Maximum one use per screen. Always uppercase."
+    },
+    "timer": {
+      "value": {
+        "fontFamily": "SFMono-Regular, Consolas, monospace",
+        "fontWeight": "200",
+        "fontSize": "72",
+        "lineHeight": "1",
+        "letterSpacing": "-0.02em",
+        "textCase": "none",
+        "textDecoration": "none"
+      },
+      "type": "typography",
+      "description": "Breathwork countdown displays only. This register exists nowhere else in the system."
+    }
+  },
+  "borderRadius": {
+    "pill": {
+      "value": "9999",
+      "type": "borderRadius",
+      "description": "Fully rounded — buttons, chips, input capsule."
+    },
+    "capsule": {
+      "value": "40",
+      "type": "borderRadius",
+      "description": "Soma input capsule."
+    },
+    "card": {
+      "value": "16",
+      "type": "borderRadius",
+      "description": "Glass cards, toasts, tab switcher container."
+    },
+    "tab": {
+      "value": "12",
+      "type": "borderRadius",
+      "description": "Individual tab buttons inside the switcher."
+    },
+    "sm": {
+      "value": "8",
+      "type": "borderRadius",
+      "description": "Small inner elements, nested containers."
+    }
+  },
+  "borderWidth": {
+    "default": {
+      "value": "1",
+      "type": "borderWidth",
+      "description": "All borders in the system are 1px. The sole exception is the focus ring at 2px."
+    },
+    "focus": {
+      "value": "2",
+      "type": "borderWidth",
+      "description": "Focus-visible ring width."
+    }
+  },
+  "gradient": {
+    "radial-peach": {
+      "value": "radial-gradient(circle, rgba(251,237,233,0.4) 0%, rgba(251,237,233,0.05) 70%)",
+      "type": "other",
+      "description": "Peach tint radial glow fading to transparent. Warm, Pitta-associated."
+    },
+    "radial-lavender": {
+      "value": "radial-gradient(circle, rgba(232,225,242,0.45) 0%, rgba(232,225,242,0.05) 75%)",
+      "type": "other",
+      "description": "Lavender tint radial glow fading to transparent. Primary brand tint."
+    },
+    "radial-blue": {
+      "value": "radial-gradient(circle, rgba(223,232,250,0.4) 0%, rgba(223,232,250,0.05) 70%)",
+      "type": "other",
+      "description": "Blue tint radial glow fading to transparent. Vata-air associated."
+    },
+    "radial-mint": {
+      "value": "radial-gradient(circle, rgba(221,245,238,0.3) 0%, rgba(221,245,238,0.05) 70%)",
+      "type": "other",
+      "description": "Mint tint radial glow fading to transparent. Kapha/earth associated."
+    },
+    "linear-peach-lavender": {
+      "value": "linear-gradient(to top right, #ffffff, #FBEDE9, #E8E1F2)",
+      "type": "other",
+      "description": "Diagonal blend from white through peach into lavender. Warm-to-cool tonal arc."
+    },
+    "linear-lavender-blue": {
+      "value": "linear-gradient(to top right, #E8E1F2, #DFE8FA)",
+      "type": "other",
+      "description": "Diagonal blend from lavender tint to blue tint. Cool ethereal pairing."
+    },
+    "linear-lavender-mint": {
+      "value": "linear-gradient(to top right, rgba(232,225,242,0.25), rgba(221,245,238,0.25))",
+      "type": "other",
+      "description": "Soft diagonal blend from lavender tint to mint tint at low opacity. Subtle surface tint."
+    },
+    "linear-peach-fade": {
+      "value": "linear-gradient(to bottom right, rgba(251,237,233,0.75), rgba(251,237,233,0.4), rgba(255,255,255,0.2))",
+      "type": "other",
+      "description": "Peach tint fading into white. Warm card surface."
+    },
+    "linear-stone-fade": {
+      "value": "linear-gradient(to bottom right, rgba(248,249,250,0.4), rgba(241,243,244,0.2))",
+      "type": "other",
+      "description": "Neutral stone-50 to stone-100 fade. Subtle background for list containers."
+    }
+  }
+}

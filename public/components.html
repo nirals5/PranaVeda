@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PranaVeda — Component Gallery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,300;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: #F5F3EF;
+      color: #2D3436;
+      padding: 48px 40px;
+    }
+
+    .gallery-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 28px;
+      font-weight: 400;
+      color: #2D3436;
+      margin-bottom: 8px;
+    }
+    .gallery-sub {
+      font-family: monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #8A79A5;
+      margin-bottom: 56px;
+    }
+
+    .section {
+      margin-bottom: 64px;
+    }
+    .section-label {
+      font-family: monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #90A4AE;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    .component-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .component-block {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .component-name {
+      font-family: monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #90A4AE;
+    }
+
+    /* ── Buttons ── */
+    .ds-btn-primary {
+      display: flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px;
+      border-radius: 9999px;
+      background: #2D3436;
+      border: 1px solid #374649;
+      color: #F5F3EF;
+      cursor: pointer;
+      transition: background 200ms cubic-bezier(0.4,0,0.2,1), transform 200ms cubic-bezier(0.0,0,0.2,1);
+    }
+    .ds-btn-primary:hover { background: #404d50; transform: scale(1.05); }
+    .ds-btn-primary:focus-visible { outline: 2px solid #8A79A5; outline-offset: 2px; }
+
+    @keyframes ds-mic-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .ds-btn-voice {
+      display: flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px;
+      border-radius: 9999px;
+      background: #ffffff;
+      border: 1px solid rgba(0,0,0,0.05);
+      color: #44515A;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: background 200ms cubic-bezier(0.4,0,0.2,1), transform 200ms;
+    }
+    .ds-btn-voice svg { animation: ds-mic-pulse 2s ease-in-out infinite; }
+    .ds-btn-voice:hover { background: #E8E1F2; transform: scale(1.05); }
+    .ds-btn-voice:focus-visible { outline: 2px solid #8A79A5; outline-offset: 2px; }
+
+    /* ── Tab Switcher ── */
+    .ds-tabs {
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(255,255,255,0.4);
+      padding: 4px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.6);
+    }
+    .ds-tab {
+      padding: 8px 20px;
+      border-radius: 12px;
+      font-family: monospace;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer; border: none;
+      transition: background 200ms cubic-bezier(0.4,0,0.2,1), color 200ms;
+    }
+    .ds-tab--active { background: rgba(138,121,165,0.9); color: #ffffff; box-shadow: 0 2px 6px rgba(138,121,165,0.2); }
+    .ds-tab--inactive { background: transparent; color: #78909C; }
+    .ds-tab--inactive:hover { color: #2D3436; }
+    .ds-tab:focus-visible { outline: 2px solid #8A79A5; outline-offset: 2px; }
+
+    /* ── Soma Input Capsule ── */
+    .ds-soma {
+      display: flex; align-items: center;
+      background: rgba(255,255,255,0.6);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.8);
+      border-radius: 9999px;
+      padding: 14px 14px 14px 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+      gap: 8px;
+      width: 560px; max-width: 100%;
+      transition: background 300ms, border-color 300ms, box-shadow 300ms;
+    }
+    .ds-soma:hover, .ds-soma:focus-within {
+      background: rgba(255,255,255,0.8);
+      border-color: #ffffff;
+      box-shadow: 0 12px 36px rgba(138,121,165,0.15);
+    }
+    .ds-soma-field {
+      flex: 1; background: transparent; border: none; outline: none;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-size: 16px; color: #2D3436;
+    }
+    .ds-soma-field::placeholder { color: rgba(45,52,54,0.3); }
+    .ds-soma-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .ds-soma-mic {
+      display: flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px; border-radius: 9999px;
+      background: #ffffff; border: 1px solid rgba(0,0,0,0.05); color: #44515A;
+      cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      transition: background 200ms, transform 200ms;
+    }
+    .ds-soma-mic:hover { background: #E8E1F2; transform: scale(1.05); }
+    .ds-soma-submit {
+      display: flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px; border-radius: 9999px;
+      background: #2D3436; border: 1px solid #374649; color: #F5F3EF;
+      cursor: pointer; transition: background 200ms, transform 200ms;
+    }
+    .ds-soma-submit:hover { background: #404d50; transform: scale(1.05); }
+
+    /* ── Suggestion Chip ── */
+    .ds-chip {
+      padding: 10px 24px; border-radius: 9999px;
+      background: rgba(255,255,255,0.4);
+      border: 1px solid rgba(255,255,255,0.6);
+      color: #2D3436;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-size: 14px; font-weight: 400; cursor: pointer;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+      transition: background 300ms, transform 300ms, box-shadow 300ms;
+    }
+    .ds-chip:hover { background: #ffffff; transform: translateY(-2px); box-shadow: 0 14px 34px rgba(0,0,0,0.05); }
+    .ds-chip:focus-visible { outline: 2px solid #8A79A5; outline-offset: 2px; }
+
+    /* ── Glass Card ── */
+    .ds-card {
+      background: rgba(255,255,255,0.55);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.8);
+      border-radius: 16px; padding: 24px;
+      display: flex; flex-direction: column; gap: 8px;
+      width: 320px;
+    }
+    .ds-card-eyebrow {
+      font-family: monospace; font-size: 9px; font-weight: 700;
+      letter-spacing: 0.18em; text-transform: uppercase; color: #8A79A5;
+    }
+    .ds-card-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.25rem; font-weight: 400; line-height: 1.3; color: #2D3436;
+    }
+    .ds-card-body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-size: 14px; font-weight: 400; line-height: 1.6; color: #44515A;
+    }
+
+    /* ── Toast ── */
+    .ds-toast {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px 20px; border-radius: 16px;
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      max-width: 360px;
+    }
+    .ds-toast--success { background: rgba(5,22,18,0.9); border: 1px solid rgba(16,185,129,0.3); color: #d1fae5; }
+    .ds-toast--warn    { background: rgba(30,8,8,0.9);  border: 1px solid rgba(239,68,68,0.3);  color: #fee2e2; }
+    .ds-toast--info    { background: rgba(10,14,15,0.9); border: 1px solid rgba(120,144,156,0.3);color: #e2e8ea; }
+    .ds-toast-icon { flex-shrink: 0; }
+    .ds-toast--success .ds-toast-icon { color: #10B981; }
+    .ds-toast--warn    .ds-toast-icon { color: #EF4444; }
+    .ds-toast--info    .ds-toast-icon { color: #90A4AE; }
+    .ds-toast-msg {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-size: 12.5px; font-weight: 500; line-height: 1.5; flex: 1;
+    }
+
+    /* ── Breathwork Timer ── */
+    .ds-timer-card {
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      padding: 32px 40px;
+      background: rgba(255,255,255,0.55);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.8);
+      border-radius: 16px;
+    }
+    .ds-timer-name {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 15px; font-style: italic; font-weight: 400;
+      color: #44515A; text-align: center;
+    }
+    .ds-timer-display {
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 72px; font-weight: 200; line-height: 1;
+      letter-spacing: -0.02em; color: #1a2226;
+    }
+    .ds-timer-meta {
+      font-family: monospace; font-size: 9px; font-weight: 700;
+      letter-spacing: 0.25em; text-transform: uppercase; color: rgba(138,121,165,0.6);
+    }
+
+    /* ── Color Palette ── */
+    .color-grid {
+      display: flex; flex-wrap: wrap; gap: 12px;
+    }
+    .color-swatch {
+      display: flex; flex-direction: column; gap: 6px; align-items: center;
+    }
+    .color-dot {
+      width: 48px; height: 48px; border-radius: 12px;
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+    .color-label {
+      font-family: monospace; font-size: 8px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase; color: #90A4AE;
+      text-align: center;
+    }
+    .color-hex {
+      font-family: monospace; font-size: 8px; color: #78909C;
+    }
+
+    /* ── Gradient Swatches ── */
+    .gradient-grid {
+      display: flex; flex-wrap: wrap; gap: 16px;
+    }
+    .gradient-swatch {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .gradient-dot {
+      width: 80px; height: 80px; border-radius: 16px;
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+    .gradient-label {
+      font-family: monospace; font-size: 8px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase; color: #90A4AE;
+      max-width: 80px;
+    }
+  </style>
+</head>
+<body>
+
+  <p class="gallery-title">PranaVeda Design System</p>
+  <p class="gallery-sub">Component Gallery · Import via html.to.design</p>
+
+  <!-- Gradient Swatches -->
+  <div class="section">
+    <p class="section-label">Gradients — Radial</p>
+    <div class="gradient-grid">
+      <div class="gradient-swatch">
+        <div class="gradient-dot" style="background: radial-gradient(circle, rgba(251,237,233,0.9) 0%, rgba(251,237,233,0.1) 70%), #F5F3EF;"></div>
+        <span class="gradient-label">radial-peach</span>
+      </div>
+      <div class="gradient-swatch">
+        <div class="gradient-dot" style="background: radial-gradient(circle, rgba(232,225,242,0.95) 0%, rgba(232,225,242,0.1) 75%), #F5F3EF;"></div>
+        <span class="gradient-label">radial-lavender</span>
+      </div>
+      <div class="gradient-swatch">
+        <div class="gradient-dot" style="background: radial-gradient(circle, rgba(223,232,250,0.9) 0%, rgba(223,232,250,0.1) 70%), #F5F3EF;"></div>
+        <span class="gradient-label">radial-blue</span>
+      </div>
+      <div class="gradient-swatch">
+        <div class="gradient-dot" style="background: radial-gradient(circle, rgba(221,245,238,0.85) 0%, rgba(221,245,238,0.1) 70%), #F5F3EF;"></div>
+        <span class="gradient-label">radial-mint</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <p class="section-label">Gradients — Linear</p>
+    <div class="gradient-grid">
+      <div class="gradient-swatch">
+        <div class="gradient-dot" style="background: linear-gradient(to top right, #ffffff, #FBEDE9, #E8E1F2);"></div>
+        <span class="gradient-label">linear-peach-lavender</span>
+      </div>
+      <div class="gradient-swatch">
+        <div class="gradient-dot" style="background: linear-gradient(to top right, #E8E1F2, #DFE8FA);"></div>
+        <span class="gradient-label">linear-lavender-blue</span>
+      </div>
+      <div class="gradient-swatch">
+        <div class="gradient-dot" style="background: linear-gradient(to top right, rgba(232,225,242,0.8), rgba(221,245,238,0.8)), #F5F3EF;"></div>
+        <span class="gradient-label">linear-lavender-mint</span>
+      </div>
+      <div class="gradient-swatch">
+        <div class="gradient-dot" style="background: linear-gradient(to bottom right, rgba(251,237,233,1), rgba(251,237,233,0.5), rgba(255,255,255,0.6));"></div>
+        <span class="gradient-label">linear-peach-fade</span>
+      </div>
+      <div class="gradient-swatch">
+        <div class="gradient-dot" style="background: linear-gradient(to bottom right, rgba(248,249,250,1), rgba(241,243,244,0.6)); border: 1px solid #e0e0e0;"></div>
+        <span class="gradient-label">linear-stone-fade</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Color Palette -->
+  <div class="section">
+    <p class="section-label">Color Palette</p>
+    <div class="color-grid">
+      <div class="color-swatch"><div class="color-dot" style="background:#8A79A5;"></div><span class="color-label">Lavender</span><span class="color-hex">#8A79A5</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#71608E;"></div><span class="color-label">Lav Deep</span><span class="color-hex">#71608E</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#E8E1F2;"></div><span class="color-label">Lav Tint</span><span class="color-hex">#E8E1F2</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#C8815A;"></div><span class="color-label">Peach</span><span class="color-hex">#C8815A</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#FBEDE9;"></div><span class="color-label">Peach Tint</span><span class="color-hex">#FBEDE9</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#6A9478;"></div><span class="color-label">Sage</span><span class="color-hex">#6A9478</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#DDF5EE;"></div><span class="color-label">Mint Tint</span><span class="color-hex">#DDF5EE</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#DFE8FA;"></div><span class="color-label">Blue Tint</span><span class="color-hex">#DFE8FA</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#2D3436;"></div><span class="color-label">Ink</span><span class="color-hex">#2D3436</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#44515A;"></div><span class="color-label">Stone 700</span><span class="color-hex">#44515A</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#78909C;"></div><span class="color-label">Stone 500</span><span class="color-hex">#78909C</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#CFD8DC;"></div><span class="color-label">Stone 200</span><span class="color-hex">#CFD8DC</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#F5F3EF; border:1px solid #e0ddd8;"></div><span class="color-label">Warm White</span><span class="color-hex">#F5F3EF</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#10B981;"></div><span class="color-label">Success</span><span class="color-hex">#10B981</span></div>
+      <div class="color-swatch"><div class="color-dot" style="background:#EF4444;"></div><span class="color-label">Error</span><span class="color-hex">#EF4444</span></div>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="section">
+    <p class="section-label">Buttons</p>
+    <div class="component-row">
+      <div class="component-block">
+        <span class="component-name">Primary (Submit)</span>
+        <button class="ds-btn-primary" aria-label="Submit">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+      <div class="component-block">
+        <span class="component-name">Voice (Mic)</span>
+        <button class="ds-btn-voice" aria-label="Voice input">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Switcher -->
+  <div class="section">
+    <p class="section-label">Tab Switcher</p>
+    <div class="ds-tabs">
+      <button class="ds-tab ds-tab--active">Consult AI Coach</button>
+      <button class="ds-tab ds-tab--inactive">Recovery &amp; Trends</button>
+    </div>
+  </div>
+
+  <!-- Soma Input Capsule -->
+  <div class="section">
+    <p class="section-label">Soma Input Capsule</p>
+    <div class="ds-soma">
+      <input class="ds-soma-field" type="text" placeholder="Tell PranaVeda how you're feeling..." />
+      <div class="ds-soma-actions">
+        <button class="ds-soma-mic" aria-label="Voice input">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+        <button class="ds-soma-submit" aria-label="Submit">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Suggestion Chips -->
+  <div class="section">
+    <p class="section-label">Suggestion Chips</p>
+    <div class="component-row">
+      <button class="ds-chip">I haven't been sleeping well lately</button>
+      <button class="ds-chip">I feel stressed and overwhelmed</button>
+      <button class="ds-chip">My lower back feels tight</button>
+    </div>
+  </div>
+
+  <!-- Glass Card -->
+  <div class="section">
+    <p class="section-label">Glass Card</p>
+    <div class="ds-card">
+      <p class="ds-card-eyebrow">Yoga Practice</p>
+      <h3 class="ds-card-title">Morning Grounding Flow</h3>
+      <p class="ds-card-body">A 10-minute stabilising sequence to root your awareness before the day begins.</p>
+    </div>
+  </div>
+
+  <!-- Toast Notifications -->
+  <div class="section">
+    <p class="section-label">Toast Notifications</p>
+    <div class="component-block" style="gap:12px;">
+      <div class="ds-toast ds-toast--success">
+        <svg class="ds-toast-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <p class="ds-toast-msg">Soma resonance synthesized. Your ritual is ready.</p>
+      </div>
+      <div class="ds-toast ds-toast--warn">
+        <svg class="ds-toast-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <p class="ds-toast-msg">Grounding connection fallback ritual activated.</p>
+      </div>
+      <div class="ds-toast ds-toast--info">
+        <svg class="ds-toast-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <p class="ds-toast-msg">PranaVeda is currently in high-demand centering mode.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Breathwork Timer -->
+  <div class="section">
+    <p class="section-label">Breathwork Timer</p>
+    <div class="ds-timer-card" style="display:inline-flex;">
+      <p class="ds-timer-name">Sama Vritti · Equal Breathing</p>
+      <div class="ds-timer-display">2:00</div>
+      <p class="ds-timer-meta">4 · 4 · 4 · 0 · 8 cycles</p>
+    </div>
+  </div>
+
+</body>
+</html>
