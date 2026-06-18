@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
-import { GoogleGenAI, Type } from '@google/genai';
+import Anthropic from '@anthropic-ai/sdk';
 import { createServer as createViteServer } from 'vite';
 
 dotenv.config();
@@ -11,24 +11,16 @@ app.use(express.json());
 
 const PORT = 3000;
 
-// Initialize GoogleGenAI SDK with named parameter and correct User-Agent metadata
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = new GoogleGenAI({
-  apiKey: apiKey,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
-});
+const apiKey = process.env.ANTHROPIC_API_KEY;
+const client = new Anthropic({ apiKey });
 
 // Daily insights fallback in case API key is missing or model fails
 const fallbacks = {
   insight: {
-    headline: "Prana is the bridge between the body and mind.",
-    quote: "By regulating your breathing, you can quiet the waves of the mind. Let today's actions flow from a space of deep presence.",
-    focus: "Sama Vritti (Equal Breathing)",
-    practice: "Try a 4-second inhale followed by a 4-second exhale for two minutes. This balances the nervous system and anchors your energy."
+    headline: "Prana bridges body and mind.",
+    quote: "Let your breath be the anchor of this moment.",
+    focus: "Sama Vritti",
+    tip: "Eat warm, cooked foods today to balance Vata energy."
   },
   recommendation: {
     summary: "Your energy feels slightly uneven, reflecting a classic Vata (wind) displacement. A grounding somatic ritual combines slow, intentional breath with stable postures to calm the nervous system and warm the core.",
@@ -77,7 +69,7 @@ const fallbacks = {
     },
     ayurvedicAdvice: {
       assessment: "Vata is balanced by warmth, heavy qualities, moisture, and consistent structure.",
-      doshaPrimary: "Vata" as any,
+      doshaPrimary: "Vata",
       dietaryTips: [
         "Prefer warm, cooked foods over raw salads and dry snacks.",
         "Include healthy warming spices like ginger, cardamom, and cinnamon.",
@@ -111,81 +103,99 @@ const fallbacks = {
   }
 };
 
-// Response schema definitions following the official SDK Types structure
+// JSON Schema for coaching response (Claude structured outputs format)
 const coachResponseSchema = {
-  type: Type.OBJECT,
+  type: "object",
   properties: {
-    summary: { 
-      type: Type.STRING, 
-      description: "A highly personal, wise, compassionate wellness overview based on what the user shared. Acknowledge their state and explain the somatic path forward." 
+    summary: {
+      type: "string",
+      description: "A highly personal, wise, compassionate wellness overview based on what the user shared. Acknowledge their state and explain the somatic path forward."
     },
-    doshaTendency: { 
-      type: Type.STRING, 
-      description: "Ayurvedic analysis of why this state is manifesting in terms of Vata, Pitta, or Kapha tendencies." 
+    doshaTendency: {
+      type: "string",
+      description: "Ayurvedic analysis of why this state is manifesting in terms of Vata, Pitta, or Kapha tendencies."
     },
-    primaryEnergy: { 
-      type: Type.STRING, 
-      description: "A beautiful, evocative two-word title for their current state, e.g. 'Scattered Wind', 'Flickering Hearth', 'Heavy Water', 'Fires of Autumn'." 
+    primaryEnergy: {
+      type: "string",
+      description: "A beautiful, evocative two-word title for their current state, e.g. 'Scattered Wind', 'Flickering Hearth', 'Heavy Water', 'Fires of Autumn'."
     },
     yogaPractice: {
-      type: Type.OBJECT,
+      type: "object",
       properties: {
-        title: { type: Type.STRING, description: "Calm title for the 10-minute yoga practice" },
-        description: { type: Type.STRING, description: "A few words outlining the goal of this sequence" },
+        title: { type: "string", description: "Calm title for the 10-minute yoga practice" },
+        description: { type: "string", description: "A few words outlining the goal of this sequence" },
         poses: {
-          type: Type.ARRAY,
+          type: "array",
           items: {
-            type: Type.OBJECT,
+            type: "object",
             properties: {
-              nameEnglish: { type: Type.STRING },
-              nameSanskrit: { type: Type.STRING },
-              duration: { type: Type.STRING, description: "e.g., '2 minutes' or '5 deep breaths'" },
-              benefits: { type: Type.STRING },
-              instructions: { type: Type.STRING }
+              nameEnglish: { type: "string" },
+              nameSanskrit: { type: "string" },
+              duration: { type: "string", description: "e.g., '2 minutes' or '5 deep breaths'" },
+              benefits: { type: "string" },
+              instructions: { type: "string" }
             },
-            required: ["nameEnglish", "nameSanskrit", "duration", "benefits", "instructions"]
+            required: ["nameEnglish", "nameSanskrit", "duration", "benefits", "instructions"],
+            additionalProperties: false
           }
         },
-        durationMinutes: { type: Type.INTEGER, description: "Total duration, must sum to exactly 10 minutes" }
+        durationMinutes: { type: "integer", description: "Total duration, must sum to exactly 10 minutes" }
       },
-      required: ["title", "description", "poses", "durationMinutes"]
+      required: ["title", "description", "poses", "durationMinutes"],
+      additionalProperties: false
     },
     ayurvedicAdvice: {
-      type: Type.OBJECT,
+      type: "object",
       properties: {
-        assessment: { type: Type.STRING, description: "Direct assessment of their energy from an Ayurvedic standpoint" },
-        doshaPrimary: { type: Type.STRING, description: "The most active dosha in this state: Vata, Pitta, Kapha, or Dual" },
-        dietaryTips: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 warm, highly actionable food recommendations" },
-        lifestyleTips: { type: Type.ARRAY, items: { type: Type.STRING }, description: "3 grounding self-care practices" },
-        recommendedHerbs: { type: Type.ARRAY, items: { type: Type.STRING }, description: "1-2 gentle Ayurvedic herbs or infusions suited for this state" }
+        assessment: { type: "string", description: "Direct assessment of their energy from an Ayurvedic standpoint" },
+        doshaPrimary: { type: "string", description: "The most active dosha in this state: Vata, Pitta, Kapha, or Dual" },
+        dietaryTips: { type: "array", items: { type: "string" }, description: "3 warm, highly actionable food recommendations" },
+        lifestyleTips: { type: "array", items: { type: "string" }, description: "3 grounding self-care practices" },
+        recommendedHerbs: { type: "array", items: { type: "string" }, description: "1-2 gentle Ayurvedic herbs or infusions suited for this state" }
       },
-      required: ["assessment", "doshaPrimary", "dietaryTips", "lifestyleTips", "recommendedHerbs"]
+      required: ["assessment", "doshaPrimary", "dietaryTips", "lifestyleTips", "recommendedHerbs"],
+      additionalProperties: false
     },
     breathwork: {
-      type: Type.OBJECT,
+      type: "object",
       properties: {
-        name: { type: Type.STRING, description: "English name of recommended breathing technique" },
-        sanskritName: { type: Type.STRING, description: "Sanskrit name of standard breathing technique (e.g. Nadi Shodhana, Sheetali, Bhastrika)" },
-        description: { type: Type.STRING },
-        inhale: { type: Type.INTEGER, description: "Exact inhale block duration in seconds (usually 4)" },
-        holdActive: { type: Type.INTEGER, description: "Exact hold duration after inhaling in seconds (or 0 for simple breath)" },
-        exhale: { type: Type.INTEGER, description: "Exact exhale duration in seconds (usually 4 to 6)" },
-        holdEmpty: { type: Type.INTEGER, description: "Exact hold duration on empty lungs in seconds (usually 0 to 4)" },
-        cycles: { type: Type.INTEGER, description: "Recommended cycle repetitions" },
-        benefits: { type: Type.STRING }
+        name: { type: "string", description: "English name of recommended breathing technique" },
+        sanskritName: { type: "string", description: "Sanskrit name of standard breathing technique (e.g. Nadi Shodhana, Sheetali, Bhastrika)" },
+        description: { type: "string" },
+        inhale: { type: "integer", description: "Exact inhale block duration in seconds (usually 4)" },
+        holdActive: { type: "integer", description: "Exact hold duration after inhaling in seconds (or 0 for simple breath)" },
+        exhale: { type: "integer", description: "Exact exhale duration in seconds (usually 4 to 6)" },
+        holdEmpty: { type: "integer", description: "Exact hold duration on empty lungs in seconds (usually 0 to 4)" },
+        cycles: { type: "integer", description: "Recommended cycle repetitions" },
+        benefits: { type: "string" }
       },
-      required: ["name", "sanskritName", "description", "inhale", "holdActive", "exhale", "holdEmpty", "cycles", "benefits"]
+      required: ["name", "sanskritName", "description", "inhale", "holdActive", "exhale", "holdEmpty", "cycles", "benefits"],
+      additionalProperties: false
     },
-    lifestyleTips: { type: Type.ARRAY, items: { type: Type.STRING }, description: "General daily tips" }
+    lifestyleTips: { type: "array", items: { type: "string" }, description: "General daily tips" }
   },
-  required: ["summary", "doshaTendency", "primaryEnergy", "yogaPractice", "ayurvedicAdvice", "breathwork", "lifestyleTips"]
+  required: ["summary", "doshaTendency", "primaryEnergy", "yogaPractice", "ayurvedicAdvice", "breathwork", "lifestyleTips"],
+  additionalProperties: false
+};
+
+// JSON Schema for insight response
+const insightResponseSchema = {
+  type: "object",
+  properties: {
+    headline: { type: "string", description: "Short poetic title, max 6 words" },
+    quote: { type: "string", description: "One evocative sentence, max 20 words" },
+    focus: { type: "string", description: "2-3 word practice name only, e.g. 'Sama Vritti' or 'Morning Grounding'" },
+    tip: { type: "string", description: "One brief Ayurvedic lifestyle tip for today, max 15 words. Not a breathing exercise." }
+  },
+  required: ["headline", "quote", "focus", "tip"],
+  additionalProperties: false
 };
 
 function enrichRecommendation(data: any): any {
   if (!data || !data.yogaPractice || !Array.isArray(data.yogaPractice.poses)) {
     return data;
   }
-  
+
   data.yogaPractice.poses = data.yogaPractice.poses.map((pose: any) => {
     const englishLower = (pose.nameEnglish || "").toLowerCase();
     const sanskritLower = (pose.nameSanskrit || "").toLowerCase();
@@ -237,78 +247,66 @@ function enrichRecommendation(data: any): any {
   return data;
 }
 
-// API Endpoint for coaching recommendation
-async function generateContentWithFallbackAndRetry(params: {
-  contents: string;
-  config: any;
+async function callClaude(params: {
+  system: string;
+  prompt: string;
+  schema: Record<string, unknown>;
   fallbackData: any;
   enricher?: (data: any) => any;
 }) {
-  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
-  let lastError = null;
-
-  for (const modelName of modelsToTry) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        console.log(`[Gemini] Requesting ${modelName} - attempt ${attempt}/2`);
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: params.contents,
-          config: params.config,
-        });
-
-        if (response && response.text) {
-          const parsed = JSON.parse(response.text.trim());
-          if (params.enricher) {
-            return params.enricher(parsed);
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      console.log(`[Claude] claude-opus-4-8 - attempt ${attempt}/2`);
+      const response = await client.messages.create({
+        model: "claude-opus-4-8",
+        max_tokens: 4096,
+        system: params.system,
+        messages: [{ role: "user", content: params.prompt }],
+        output_config: {
+          format: {
+            type: "json_schema",
+            schema: params.schema,
           }
-          return parsed;
-        } else {
-          throw new Error("Empty response payload from Gemini API");
         }
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[Gemini] ${modelName} attempt ${attempt} failed:`, err?.message || err);
-        
-        // If it's a JSON string parsing error, it means we got visual text instead of schema JSON
-        // but we'll try the next model just in case.
-        const errStr = String(err?.message || err || "");
-        if (errStr.includes("Unexpected token") || errStr.includes("JSON")) {
-          break;
-        }
+      } as any);
 
-        // Wait brief delay before retrying
+      const textBlock = response.content.find((b: any) => b.type === "text");
+      if (!textBlock || textBlock.type !== "text") {
+        throw new Error("No text block in Claude response");
+      }
+
+      const parsed = JSON.parse(textBlock.text.trim());
+      return params.enricher ? params.enricher(parsed) : parsed;
+    } catch (err: any) {
+      console.warn(`[Claude] attempt ${attempt} failed:`, err?.message || err);
+      if (attempt < 2) {
         await new Promise((resolve) => setTimeout(resolve, 600));
       }
     }
   }
 
-  console.error("[Gemini] All models and retries failed. Serving offline fallback content.", lastError);
-  const fallbackWithFlag = { ...params.fallbackData, _isFallback: true };
-  if (params.enricher) {
-    return params.enricher(fallbackWithFlag);
-  }
-  return fallbackWithFlag;
+  console.error("[Claude] All attempts failed. Serving offline fallback content.");
+  const withFlag = { ...params.fallbackData, _isFallback: true };
+  return params.enricher ? params.enricher(withFlag) : withFlag;
 }
 
-// API Endpoint for coaching recommendation
+// Coaching endpoint
 app.post('/api/coaching', async (req, res) => {
   const { feeling, timeOfDay } = req.body;
-  
+
   if (!feeling) {
     return res.status(400).json({ error: "Feeling description is required." });
   }
 
-  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-    console.info("Using local mock fallback coaching data since GEMINI_API_KEY is not configured.");
+  if (!apiKey) {
+    console.info("ANTHROPIC_API_KEY not set — serving fallback coaching data.");
     return res.json(enrichRecommendation({ ...fallbacks.recommendation, _isFallback: true }));
   }
 
   const prompt = `
-    You are PranaVeda, a compassionate AI wellness coach trained in standard Hatha yoga and classical Ayurveda.
     A user has shared how they are feeling right now: "${feeling}".
     The current time is: ${timeOfDay || new Date().toLocaleTimeString()}.
-    
+
     Generate a customized, restorative 10-minute daily wellness ritual.
     Always:
     - Customize recommendations based on their emotional, mental, and physical states.
@@ -320,14 +318,10 @@ app.post('/api/coaching', async (req, res) => {
     - Keep the tone grounded, encouraging, and deeply wise. Use humble and sophisticated language.
   `;
 
-  const result = await generateContentWithFallbackAndRetry({
-    contents: prompt,
-    config: {
-      systemInstruction: "You are PranaVeda, an ancient wise Ayurvedic mentor. Speak with extreme warmth, grace, and human empathy.",
-      responseMimeType: "application/json",
-      responseSchema: coachResponseSchema,
-      temperature: 0.7,
-    },
+  const result = await callClaude({
+    system: "You are PranaVeda, an ancient wise Ayurvedic mentor. Speak with extreme warmth, grace, and human empathy.",
+    prompt,
+    schema: coachResponseSchema,
     fallbackData: fallbacks.recommendation,
     enricher: enrichRecommendation,
   });
@@ -335,34 +329,23 @@ app.post('/api/coaching', async (req, res) => {
   return res.json(result);
 });
 
-// API Endpoint for Daily Insight
+// Daily Insight endpoint
 app.get('/api/insight', async (req, res) => {
-  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+  if (!apiKey) {
     return res.json(fallbacks.insight);
   }
 
-  const result = await generateContentWithFallbackAndRetry({
-    contents: "Generate a beautiful, brief morning Ayurvedic daily reflection and sama vritti breathing breathwork focus of the day in JSON format.",
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          headline: { type: Type.STRING },
-          quote: { type: Type.STRING },
-          focus: { type: Type.STRING },
-          practice: { type: Type.STRING }
-        },
-        required: ["headline", "quote", "focus", "practice"]
-      }
-    },
+  const result = await callClaude({
+    system: "You are PranaVeda, a concise Ayurvedic mentor. All responses must be extremely brief — follow word limits strictly.",
+    prompt: "Generate a brief morning Ayurvedic daily reflection. Be short. No breathing instructions — those belong elsewhere.",
+    schema: insightResponseSchema,
     fallbackData: fallbacks.insight,
   });
 
   return res.json(result);
 });
 
-// ElevenLabs TTS proxy — streams audio/mpeg back to the client
+// ElevenLabs TTS proxy
 app.post('/api/tts', async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'text is required' });
@@ -404,7 +387,6 @@ app.post('/api/tts', async (req, res) => {
   }
 });
 
-// Start server setup
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

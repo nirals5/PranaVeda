@@ -21,7 +21,7 @@ export default function WellnessInsight({
     headline: string;
     quote: string;
     focus: string;
-    practice: string;
+    tip: string;
   } | null>(null);
   
   const [loading, setLoading] = useState(false);
@@ -139,12 +139,12 @@ export default function WellnessInsight({
                 <p className="text-sm text-stone-600 leading-relaxed font-serif italic">
                   "{insight.quote}"
                 </p>
-                <div className="pt-3 border-t border-stone-200/50 mt-2">
-                  <div className="text-xs font-mono tracking-widest text-[#8A79A5] uppercase font-bold">
-                    FOCUS: {insight.focus}
-                  </div>
-                  <p className="text-xs text-stone-600 mt-1.5 leading-relaxed font-medium" title={insight.practice}>
-                    {insight.practice}
+                <div className="pt-3 border-t border-stone-200/50 mt-2 flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold">
+                    {insight.focus}
+                  </span>
+                  <p className="text-xs text-stone-500 leading-relaxed italic text-right">
+                    {insight.tip}
                   </p>
                 </div>
               </motion.div>
