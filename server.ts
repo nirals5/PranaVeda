@@ -258,8 +258,8 @@ async function callClaude(params: {
     try {
       console.log(`[Claude] claude-opus-4-8 - attempt ${attempt}/2`);
       const response = await client.messages.create({
-        model: "claude-opus-4-8",
-        max_tokens: 4096,
+        model: "claude-sonnet-4-6",
+        max_tokens: 2048,
         system: params.system,
         messages: [{ role: "user", content: params.prompt }],
         output_config: {
@@ -319,7 +319,7 @@ app.post('/api/coaching', async (req, res) => {
   `;
 
   const result = await callClaude({
-    system: "You are PranaVeda, an ancient wise Ayurvedic mentor. Speak with extreme warmth, grace, and human empathy.",
+    system: "You are Amrita, an ancient wise Ayurvedic mentor. Speak with extreme warmth, grace, and human empathy.",
     prompt,
     schema: coachResponseSchema,
     fallbackData: fallbacks.recommendation,
@@ -336,7 +336,7 @@ app.get('/api/insight', async (req, res) => {
   }
 
   const result = await callClaude({
-    system: "You are PranaVeda, a concise Ayurvedic mentor. All responses must be extremely brief — follow word limits strictly.",
+    system: "You are Amrita, a concise Ayurvedic mentor. All responses must be extremely brief — follow word limits strictly.",
     prompt: "Generate a brief morning Ayurvedic daily reflection. Be short. No breathing instructions — those belong elsewhere.",
     schema: insightResponseSchema,
     fallbackData: fallbacks.insight,

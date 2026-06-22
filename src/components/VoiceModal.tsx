@@ -98,7 +98,7 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
         currentWordIdx++;
       } else {
         clearInterval(interval);
-        setStatusText("Complete. Tapping complete below sends this to PranaVeda.");
+        setStatusText("Complete. Tapping complete below sends this to Amrita.");
       }
     }, 450);
 
@@ -156,7 +156,7 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
           {/* Header Controls */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="p-1 px-2.5 rounded-full text-[9px] font-mono tracking-widest font-semibold bg-[#E8E1F2] text-stone-700 uppercase flex items-center gap-1 shadow-sm">
+              <span className="p-1 px-2.5 rounded-full text-[12px] font-mono tracking-widest font-semibold bg-[#E8E1F2] text-stone-700 uppercase flex items-center gap-1 shadow-sm">
                 <Sparkles className="w-2.5 h-2.5 text-[#8A79A5] animate-pulse" /> VOICE CONSULTATION
               </span>
             </div>
@@ -230,14 +230,14 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
 
           {/* Live Transcript Panel */}
           <div className="bg-white/40 border border-white/80 rounded-2xl p-4 min-h-[90px] flex flex-col justify-between mb-2">
-            <span className="text-[9px] font-mono tracking-widest text-[#8A79A5] uppercase font-semibold mb-2 block">
+            <span className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-semibold mb-2 block">
               VOICE TRANSLATION
             </span>
             <p className="text-stone-700 text-xs font-serif italic leading-relaxed">
               {transcript || "Speak naturally... share physical aches, sleepless cycles, stress blockages, or energy priorities."}
             </p>
             {mediaError && (
-              <span className="text-[9px] text-[#865959]/75 font-mono block mt-2.5">
+              <span className="text-[12px] text-[#865959]/75 font-mono block mt-2.5">
                 * Simulated audio feed activated - your browser's mic permission is sandboxed.
               </span>
             )}

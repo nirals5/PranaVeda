@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Sparkles, Mic, ArrowRight, HelpCircle, Flame, Wind, Droplet, Star, Play, RotateCcw, CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import PranaBackground from './components/PranaBackground';
@@ -12,6 +12,24 @@ import RecoveryTrends from './components/RecoveryTrends';
 export default function App() {
   const prefersReducedMotion = useReducedMotion();
   const [currentView, setCurrentView] = useState<'coach' | 'recovery'>('coach');
+  const [showAmritaHint, setShowAmritaHint] = useState(true);
+  const hoverTimerRef = useRef<number | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setShowAmritaHint(false), 5000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const handleAmritaMouseEnter = () => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hoverTimerRef.current = window.setTimeout(() => setShowAmritaHint(true), 1000);
+  };
+
+  const handleAmritaMouseLeave = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hideTimerRef.current = window.setTimeout(() => setShowAmritaHint(false), 600);
+  };
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('Analyzing wellness patterns...');
@@ -103,11 +121,7 @@ export default function App() {
         setCurrentResult(data);
         // Create an active temporary practice ID in case they decide to save it
         setActivePracticeId(`temp_${Date.now()}`);
-        if (data._isFallback) {
-          showToast("PranaVeda is currently in high-demand centering mode. Beautiful offline wisdom has been delivered.", "info");
-        } else {
-          showToast("Soma resonance synthesized successfully. Your custom daily ritual is ready.", "success");
-        }
+        showToast("Your custom daily ritual is ready.", "success");
       } else {
         throw new Error("API call failed");
       }
@@ -231,23 +245,44 @@ export default function App() {
 
       {/* 2. Brand Header Panel */}
       <header className="w-full max-w-7xl mx-auto px-5 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 z-10 relative">
-        <Logo size="md" />
+        <button onClick={() => { setCurrentResult(null); setCurrentView('coach'); }} className="cursor-pointer" aria-label="Go to home">
+          <Logo size="md" />
+        </button>
         
         <div className="flex items-center gap-2 bg-white/40 p-1 rounded-2xl border border-white/60 shadow-xs w-full sm:w-auto max-w-[360px]">
-          <button
-            onClick={() => setCurrentView('coach')}
-            className={`flex-1 sm:flex-none py-2 px-3 sm:px-5 rounded-xl text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-              currentView === 'coach'
-                ? 'bg-[#8A79A5]/90 text-white shadow-sm'
-                : 'text-stone-550 hover:text-stone-900'
-            }`}
+          <div
+            className="relative"
+            onMouseEnter={handleAmritaMouseEnter}
+            onMouseLeave={handleAmritaMouseLeave}
           >
-            Consult AI Coach
-          </button>
+            <button
+              onClick={() => setCurrentView('coach')}
+              className={`flex-1 sm:flex-none py-2 px-3 sm:px-5 rounded-xl text-[12px] sm:text-[14px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                currentView === 'coach'
+                  ? 'bg-[#8A79A5]/90 text-white shadow-sm'
+                  : 'text-stone-550 hover:text-stone-900'
+              }`}
+            >
+              Ask Amrita
+            </button>
+            <AnimatePresence>
+              {showAmritaHint && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.4, ease: 'easeInOut' }}
+                  className="absolute top-full left-0 mt-2 whitespace-nowrap text-[12px] sm:text-[14px] font-sans text-[#8A79A5] pointer-events-none"
+                >
+                  Amrita is your AI wellness companion.
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
           
           <button
             onClick={() => setCurrentView('recovery')}
-            className={`flex-1 sm:flex-none py-2 px-3 sm:px-5 rounded-xl text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none py-2 px-3 sm:px-5 rounded-xl text-[12px] sm:text-[14px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
               currentView === 'recovery'
                 ? 'bg-[#8A79A5]/90 text-white shadow-sm'
                 : 'text-stone-550 hover:text-stone-900'
@@ -299,14 +334,23 @@ export default function App() {
               </div>
 
               <div className="space-y-3">
-                <h3 className="font-serif font-light text-stone-850 text-xl tracking-tight uppercase">
-                  Consulting PranaVeda AI
+                <h3 className="font-serif font-light text-stone-850 text-xl tracking-tight">
+                  Listening to what your body needs
                 </h3>
-                <p className={`text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold ${prefersReducedMotion ? '' : 'animate-pulse'}`}>
-                  {loadingText}
-                </p>
-                <p className="text-xs text-stone-500 font-serif italic max-w-xs mx-auto leading-relaxed">
-                  "Let your awareness expand. Your personal wellness goals are merging with Ayurvedic wisdom."
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={loadingText}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.5, ease: "easeInOut" }}
+                    className="text-[12px] tracking-widest text-[#8A79A5] font-bold"
+                  >
+                    {loadingText}
+                  </motion.p>
+                </AnimatePresence>
+                <p className="text-sm text-stone-500 font-serif italic max-w-xs mx-auto leading-relaxed">
+                  Let your awareness expand. Your personal wellness goals are merging with Ayurvedic wisdom.
                 </p>
               </div>
             </motion.div>
@@ -356,14 +400,14 @@ export default function App() {
               
               {/* Editorial Display Intro */}
               <div className="space-y-4 max-w-2xl mt-8 sm:mt-12">
-                <span className="p-1.5 px-4 rounded-full text-[10px] font-mono tracking-[0.2em] font-bold bg-[#E8E1F2]/80 text-stone-700 uppercase shadow-xs">
+                <span className="p-1.5 px-4 rounded-full text-[12px] font-mono tracking-[0.2em] font-bold bg-[#E8E1F2]/80 text-stone-700 uppercase shadow-xs">
                   Personalized yoga and Ayurvedic guidance, powered by AI.
                 </span>
                 
                 <h1 className="text-4xl sm:text-[54px] font-serif font-normal italic text-[#2D3436] tracking-tight leading-tight">
                   {getGreeting()}
                 </h1>
-                
+
                 <p className="text-base sm:text-lg font-light text-[#2D3436]/60 leading-relaxed max-w-xl mx-auto font-sans">
                   Tell me how you feel, and I'll suggest a practice that fits your body, energy, and goals.
                 </p>
@@ -371,7 +415,7 @@ export default function App() {
 
               {/* Major Input Area (The Soma Input Circle Container) */}
               <div className="w-full max-w-2xl space-y-5">
-                <div className="text-[11px] tracking-[0.15em] font-mono text-[#2D3436]/40 uppercase font-bold">
+                <div className="text-[12px] tracking-[0.15em] font-mono text-[#2D3436]/40 uppercase font-bold">
                   How are you feeling today?
                 </div>
 
@@ -386,8 +430,8 @@ export default function App() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleConsultCoach(inputValue);
                     }}
-                    placeholder="Tell PranaVeda how you're feeling..."
-                    aria-label="Tell PranaVeda how you're feeling"
+                    placeholder="Tell Amrita how you're feeling..."
+                    aria-label="Tell Amrita how you're feeling"
                     className="w-full min-w-0 bg-transparent border-none text-[#2D3436] placeholder-[#2D3436]/30 font-sans text-base sm:text-[18px] focus-visible:outline-none focus-visible:ring-0 mr-3 sm:mr-4 py-1"
                   />
 
@@ -461,8 +505,8 @@ export default function App() {
       />
 
       {/* 5. Minimal Human Footer */}
-      <footer className="w-full text-center py-6 text-[10px] font-mono tracking-widest text-[#8A79A5]/60 z-10 relative">
-        NAMASTE • AI-INTEGRATED WELLNESS SCIENCE © 2026
+      <footer className="w-full text-center py-6 text-[12px] font-mono tracking-widest text-[#8A79A5]/60 z-10 relative">
+        PRANAVEDA · ANCIENT WISDOM OF YOGA AND AYURVEDA PERSONALIZED FOR YOU · © 2026
       </footer>
 
       {/* 6. Custom Elegant Floating Glassmorphism Toast Notification */}

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PranaVeda — Time-Aware Background Mockup</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: #1a1a1a;
+      padding: 32px 24px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      color: #ccc;
+      font-size: 13px;
+      font-family: monospace;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .panel {
+      border-radius: 20px;
+      overflow: hidden;
+      position: relative;
+      aspect-ratio: 9 / 16;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px 16px;
+    }
+
+    .panel svg.blobs {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      filter: blur(60px);
+      opacity: 0.55;
+    }
+
+    .panel svg.lines {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.2;
+    }
+
+    .panel svg.lotus {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      width: 72px;
+      height: 72px;
+      opacity: 0.18;
+    }
+
+    .label {
+      position: relative;
+      z-index: 2;
+    }
+
+    .time {
+      font-family: monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .name {
+      font-size: 18px;
+      font-weight: 300;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+
+    .chip {
+      position: relative;
+      z-index: 2;
+      display: inline-block;
+      font-family: monospace;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.45);
+      border: 1px solid rgba(255,255,255,0.6);
+    }
+
+    /* ── DAWN ── */
+    .dawn {
+      background-color: #FFFBF5;
+      background-image:
+        radial-gradient(circle at 10% 10%, #FAD9C8 0%, transparent 50%),
+        radial-gradient(circle at 88% 12%, #FDE8C0 0%, transparent 50%),
+        radial-gradient(circle at 80% 85%, #FBDDC8 0%, transparent 50%),
+        radial-gradient(circle at 15% 80%, #FDE5CC 0%, transparent 50%);
+    }
+    .dawn .time { color: #B5714A; }
+    .dawn .name { color: #7A4A28; }
+    .dawn .chip { color: #9A5E3A; }
+    .dawn svg.lines path, .dawn svg.lines circle { stroke: #C8855A; fill: none; }
+    .dawn svg.lotus path, .dawn svg.lotus circle { stroke: #9A6040; fill: none; }
+
+    /* ── MORNING ── */
+    .morning {
+      background-color: #FAFEFF;
+      background-image:
+        radial-gradient(circle at 10% 10%, #DAEEF8 0%, transparent 50%),
+        radial-gradient(circle at 88% 12%, #E4E0F5 0%, transparent 50%),
+        radial-gradient(circle at 80% 85%, #D5F2EA 0%, transparent 50%),
+        radial-gradient(circle at 15% 80%, #DFF0FB 0%, transparent 50%);
+    }
+    .morning .time { color: #4A7E9E; }
+    .morning .name { color: #2A5A70; }
+    .morning .chip { color: #4A7E9E; }
+    .morning svg.lines path, .morning svg.lines circle { stroke: #6AAAC0; fill: none; }
+    .morning svg.lotus path, .morning svg.lotus circle { stroke: #5A8FA0; fill: none; }
+
+    /* ── AFTERNOON ── */
+    .afternoon {
+      background-color: #FDFAF5;
+      background-image:
+        radial-gradient(circle at 10% 10%, #FDE8CC 0%, transparent 50%),
+        radial-gradient(circle at 88% 12%, #E5EDD8 0%, transparent 50%),
+        radial-gradient(circle at 80% 85%, #F8E0D0 0%, transparent 50%),
+        radial-gradient(circle at 15% 80%, #EEE8D5 0%, transparent 50%);
+    }
+    .afternoon .time { color: #7A6A3A; }
+    .afternoon .name { color: #5A4A20; }
+    .afternoon .chip { color: #7A6A3A; }
+    .afternoon svg.lines path, .afternoon svg.lines circle { stroke: #A09050; fill: none; }
+    .afternoon svg.lotus path, .afternoon svg.lotus circle { stroke: #8A7040; fill: none; }
+
+    /* ── DUSK ── */
+    .dusk {
+      background-color: #FDF5F5;
+      background-image:
+        radial-gradient(circle at 10% 10%, #F5C8C8 0%, transparent 50%),
+        radial-gradient(circle at 88% 12%, #F5CCC0 0%, transparent 50%),
+        radial-gradient(circle at 80% 85%, #EAC8E5 0%, transparent 50%),
+        radial-gradient(circle at 15% 80%, #F0C8E0 0%, transparent 50%);
+    }
+    .dusk .time { color: #8A4A5A; }
+    .dusk .name { color: #6A2A3A; }
+    .dusk .chip { color: #8A4A5A; }
+    .dusk svg.lines path, .dusk svg.lines circle { stroke: #B06070; fill: none; }
+    .dusk svg.lotus path, .dusk svg.lotus circle { stroke: #904858; fill: none; }
+
+    /* ── NIGHT ── */
+    .night {
+      background-color: #EEEDF8;
+      background-image:
+        radial-gradient(circle at 10% 10%, #C8C5E8 0%, transparent 50%),
+        radial-gradient(circle at 88% 12%, #CCCAE8 0%, transparent 50%),
+        radial-gradient(circle at 80% 85%, #C0C5E5 0%, transparent 50%),
+        radial-gradient(circle at 15% 80%, #CCCAE8 0%, transparent 50%);
+    }
+    .night .time { color: #5A5A8A; }
+    .night .name { color: #3A3A6A; }
+    .night .chip { color: #5A5A8A; }
+    .night svg.lines path, .night svg.lines circle { stroke: #7878A8; fill: none; }
+    .night svg.lotus path, .night svg.lotus circle { stroke: #6060A0; fill: none; }
+  </style>
+</head>
+<body>
+  <h1>PranaVeda — Time-Aware Sanctuary · Background Mockup</h1>
+
+  <div class="grid">
+
+    <!-- DAWN -->
+    <div class="panel dawn">
+      <svg class="lines" viewBox="0 0 300 533" fill="none">
+        <path d="M -30 120 C 150 60, 350 200, 350 180" stroke-width="1.2" opacity="0.5"/>
+        <path d="M -30 280 C 120 220, 280 320, 360 290" stroke-width="0.9" opacity="0.35"/>
+        <circle cx="240" cy="80" r="55" opacity="0.08" fill="currentColor" stroke="none"/>
+      </svg>
+      <svg class="lotus" viewBox="0 0 100 100" fill="none" stroke-width="1.2" stroke-linecap="round">
+        <path d="M 30 75 C 38 82, 62 82, 70 75" stroke-width="1" stroke-dasharray="1 2"/>
+        <path d="M 50 75 C 25 65, 25 45, 36 38 C 42 50, 48 65, 50 75"/>
+        <path d="M 50 75 C 75 65, 75 45, 64 38 C 58 50, 52 65, 50 75"/>
+        <path d="M 50 75 C 33 60, 31 35, 43 25 C 47 42, 49 60, 50 75"/>
+        <path d="M 50 75 C 67 60, 69 35, 57 25 C 53 42, 51 60, 50 75"/>
+        <path d="M 50 75 C 43 50, 45 25, 50 15 C 55 25, 57 50, 50 75"/>
+      </svg>
+      <div class="label">
+        <div class="time">5 – 8 am</div>
+        <div class="name">Dawn</div>
+      </div>
+      <div class="chip">Warm Amber · Rose · Gold</div>
+    </div>
+
+    <!-- MORNING -->
+    <div class="panel morning">
+      <svg class="lines" viewBox="0 0 300 533" fill="none">
+        <path d="M -30 120 C 150 60, 350 200, 350 180" stroke-width="1.2" opacity="0.5"/>
+        <path d="M -30 280 C 120 220, 280 320, 360 290" stroke-width="0.9" opacity="0.35"/>
+        <circle cx="240" cy="80" r="55" opacity="0.08" fill="currentColor" stroke="none"/>
+      </svg>
+      <svg class="lotus" viewBox="0 0 100 100" fill="none" stroke-width="1.2" stroke-linecap="round">
+        <path d="M 30 75 C 38 82, 62 82, 70 75" stroke-width="1" stroke-dasharray="1 2"/>
+        <path d="M 50 75 C 25 65, 25 45, 36 38 C 42 50, 48 65, 50 75"/>
+        <path d="M 50 75 C 75 65, 75 45, 64 38 C 58 50, 52 65, 50 75"/>
+        <path d="M 50 75 C 33 60, 31 35, 43 25 C 47 42, 49 60, 50 75"/>
+        <path d="M 50 75 C 67 60, 69 35, 57 25 C 53 42, 51 60, 50 75"/>
+        <path d="M 50 75 C 43 50, 45 25, 50 15 C 55 25, 57 50, 50 75"/>
+      </svg>
+      <div class="label">
+        <div class="time">8 am – 12 pm</div>
+        <div class="name">Morning</div>
+      </div>
+      <div class="chip">Sky Blue · Mint · Lavender</div>
+    </div>
+
+    <!-- AFTERNOON -->
+    <div class="panel afternoon">
+      <svg class="lines" viewBox="0 0 300 533" fill="none">
+        <path d="M -30 120 C 150 60, 350 200, 350 180" stroke-width="1.2" opacity="0.5"/>
+        <path d="M -30 280 C 120 220, 280 320, 360 290" stroke-width="0.9" opacity="0.35"/>
+        <circle cx="240" cy="80" r="55" opacity="0.08" fill="currentColor" stroke="none"/>
+      </svg>
+      <svg class="lotus" viewBox="0 0 100 100" fill="none" stroke-width="1.2" stroke-linecap="round">
+        <path d="M 30 75 C 38 82, 62 82, 70 75" stroke-width="1" stroke-dasharray="1 2"/>
+        <path d="M 50 75 C 25 65, 25 45, 36 38 C 42 50, 48 65, 50 75"/>
+        <path d="M 50 75 C 75 65, 75 45, 64 38 C 58 50, 52 65, 50 75"/>
+        <path d="M 50 75 C 33 60, 31 35, 43 25 C 47 42, 49 60, 50 75"/>
+        <path d="M 50 75 C 67 60, 69 35, 57 25 C 53 42, 51 60, 50 75"/>
+        <path d="M 50 75 C 43 50, 45 25, 50 15 C 55 25, 57 50, 50 75"/>
+      </svg>
+      <div class="label">
+        <div class="time">12 – 4 pm</div>
+        <div class="name">Afternoon</div>
+      </div>
+      <div class="chip">Sand · Sage · Terracotta</div>
+    </div>
+
+    <!-- DUSK -->
+    <div class="panel dusk">
+      <svg class="lines" viewBox="0 0 300 533" fill="none">
+        <path d="M -30 120 C 150 60, 350 200, 350 180" stroke-width="1.2" opacity="0.5"/>
+        <path d="M -30 280 C 120 220, 280 320, 360 290" stroke-width="0.9" opacity="0.35"/>
+        <circle cx="240" cy="80" r="55" opacity="0.08" fill="currentColor" stroke="none"/>
+      </svg>
+      <svg class="lotus" viewBox="0 0 100 100" fill="none" stroke-width="1.2" stroke-linecap="round">
+        <path d="M 30 75 C 38 82, 62 82, 70 75" stroke-width="1" stroke-dasharray="1 2"/>
+        <path d="M 50 75 C 25 65, 25 45, 36 38 C 42 50, 48 65, 50 75"/>
+        <path d="M 50 75 C 75 65, 75 45, 64 38 C 58 50, 52 65, 50 75"/>
+        <path d="M 50 75 C 33 60, 31 35, 43 25 C 47 42, 49 60, 50 75"/>
+        <path d="M 50 75 C 67 60, 69 35, 57 25 C 53 42, 51 60, 50 75"/>
+        <path d="M 50 75 C 43 50, 45 25, 50 15 C 55 25, 57 50, 50 75"/>
+      </svg>
+      <div class="label">
+        <div class="time">4 – 7 pm</div>
+        <div class="name">Dusk</div>
+      </div>
+      <div class="chip">Rose · Mauve · Burnt Orange</div>
+    </div>
+
+    <!-- NIGHT -->
+    <div class="panel night">
+      <svg class="lines" viewBox="0 0 300 533" fill="none">
+        <path d="M -30 120 C 150 60, 350 200, 350 180" stroke-width="1.2" opacity="0.5"/>
+        <path d="M -30 280 C 120 220, 280 320, 360 290" stroke-width="0.9" opacity="0.35"/>
+        <circle cx="240" cy="80" r="55" opacity="0.08" fill="currentColor" stroke="none"/>
+      </svg>
+      <svg class="lotus" viewBox="0 0 100 100" fill="none" stroke-width="1.2" stroke-linecap="round">
+        <path d="M 30 75 C 38 82, 62 82, 70 75" stroke-width="1" stroke-dasharray="1 2"/>
+        <path d="M 50 75 C 25 65, 25 45, 36 38 C 42 50, 48 65, 50 75"/>
+        <path d="M 50 75 C 75 65, 75 45, 64 38 C 58 50, 52 65, 50 75"/>
+        <path d="M 50 75 C 33 60, 31 35, 43 25 C 47 42, 49 60, 50 75"/>
+        <path d="M 50 75 C 67 60, 69 35, 57 25 C 53 42, 51 60, 50 75"/>
+        <path d="M 50 75 C 43 50, 45 25, 50 15 C 55 25, 57 50, 50 75"/>
+      </svg>
+      <div class="label">
+        <div class="time">7 pm – 5 am</div>
+        <div class="name">Night</div>
+      </div>
+      <div class="chip">Indigo · Deep Lavender · Plum</div>
+    </div>
+
+  </div>
+</body>
+</html>

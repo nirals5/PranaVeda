@@ -53,6 +53,27 @@ interface CoachingDashboardProps {
 
 type TabType = 'Overview' | 'Yoga' | 'Ayurveda' | 'Breathwork';
 
+const cap = (text: string, max = 40) => {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= max) return text;
+
+  const candidate = words.slice(0, max).join(' ');
+
+  // Only cut at a true sentence end so the result always reads as a complete thought
+  const lastSentenceEnd = Math.max(
+    candidate.lastIndexOf('.'),
+    candidate.lastIndexOf('!'),
+    candidate.lastIndexOf('?'),
+  );
+
+  if (lastSentenceEnd > candidate.length * 0.5) {
+    return candidate.slice(0, lastSentenceEnd + 1) + '…';
+  }
+
+  // No sentence end — strip any trailing comma, hyphen, or colon before the ellipsis
+  return candidate.replace(/[-,;:]+$/, '').trimEnd() + '…';
+};
+
 export default function CoachingDashboard({
   result,
   onBack,
@@ -61,7 +82,8 @@ export default function CoachingDashboard({
   showNotification,
 }: CoachingDashboardProps) {
   const [activeTab, setActiveTab] = useState<TabType>('Overview');
-  
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
+
   // Yoga Flow Wizard State
   const [isYogaWizardActive, setIsYogaWizardActive] = useState(false);
   const [currentPoseIndex, setCurrentPoseIndex] = useState(0);
@@ -314,11 +336,11 @@ export default function CoachingDashboard({
           <div className="flex items-center gap-2.5">
             <Sparkles className="w-4 h-4 text-[#8A79A5] flex-shrink-0 animate-pulse" />
             <div>
-              <p className="font-mono font-bold uppercase tracking-wider text-[10px] text-[#8A79A5]">Centering Baseline Mode Active</p>
+              <p className="font-mono font-bold uppercase tracking-wider text-[12px] text-[#8A79A5]">Centering Baseline Mode Active</p>
               <p className="font-sans text-stone-600 font-medium sm:mt-0.5">The live synthesis engine is offline or overloaded. We have safely routed baseline consecrated Ayurvedic wisdom to support your practice.</p>
             </div>
           </div>
-          <span className="text-[9px] font-mono tracking-widest font-extrabold uppercase bg-white/70 border border-stone-200 p-1 px-2.5 rounded-lg text-[#8A79A5] self-start sm:self-auto flex-shrink-0">
+          <span className="text-[12px] font-mono tracking-widest font-extrabold uppercase bg-white/70 border border-stone-200 p-1 px-2.5 rounded-lg text-[#8A79A5] self-start sm:self-auto flex-shrink-0">
             SECURE FALLBACK
           </span>
         </motion.div>
@@ -332,10 +354,10 @@ export default function CoachingDashboard({
       >
         <div className="space-y-3.5 md:max-w-2xl">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="p-1 px-3 rounded-full text-[11px] font-mono tracking-wider font-bold bg-[#E8E1F2]/70 text-stone-700 uppercase flex items-center gap-1.5 shadow-xs">
+            <span className="p-1 px-3 rounded-full text-[12px] font-mono tracking-wider font-bold bg-[#E8E1F2]/70 text-stone-700 uppercase flex items-center gap-1.5 shadow-xs">
               {getEnergyIcon(result.primaryEnergy)} CORE ENERGY • {result.ayurvedicAdvice.doshaPrimary}
             </span>
-            <span className="p-1 px-3 rounded-full text-[11px] font-mono tracking-wider font-bold bg-white/80 text-stone-600 uppercase shadow-xs">
+            <span className="p-1 px-3 rounded-full text-[12px] font-mono tracking-wider font-bold bg-white/80 text-stone-600 uppercase shadow-xs">
               10-MIN DAILY FLOW
             </span>
           </div>
@@ -345,9 +367,31 @@ export default function CoachingDashboard({
           </h2>
           
           <div className="flex items-start gap-3">
-            <p className="text-sm md:text-base font-serif text-stone-700 leading-relaxed max-w-xl flex-1">
-              {result.summary}
-            </p>
+            <motion.div
+              layout
+              transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+              className="max-w-xl flex-1 overflow-hidden"
+            >
+              <p className="text-sm md:text-base font-serif text-stone-700 leading-relaxed">
+                {summaryExpanded ? result.summary : cap(result.summary)}
+                {!summaryExpanded && result.summary !== cap(result.summary) && (
+                  <button
+                    onClick={() => setSummaryExpanded(true)}
+                    className="ml-1.5 text-[12px] md:text-[14px] font-mono font-bold tracking-wider text-[#8A79A5] hover:text-[#6B5B8A] uppercase transition-colors cursor-pointer"
+                  >
+                    More
+                  </button>
+                )}
+                {summaryExpanded && (
+                  <button
+                    onClick={() => setSummaryExpanded(false)}
+                    className="ml-1.5 text-[12px] md:text-[14px] font-mono font-bold tracking-wider text-[#8A79A5] hover:text-[#6B5B8A] uppercase transition-colors cursor-pointer"
+                  >
+                    Less
+                  </button>
+                )}
+              </p>
+            </motion.div>
             <button
               onClick={() => speak(result.summary)}
               className="mt-1 p-2 rounded-full bg-white/60 border border-white/80 text-stone-400 hover:text-[#8A79A5] hover:bg-[#E8E1F2] transition-all flex-shrink-0 cursor-pointer shadow-sm"
@@ -360,7 +404,7 @@ export default function CoachingDashboard({
 
         {/* Dosha Circle Analysis Display */}
         <div className="bg-white/75 backdrop-blur-xs rounded-xl p-5 border border-stone-100 flex flex-col justify-center items-center h-full min-w-[170px] shadow-sm">
-          <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold text-center">
+          <span className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold text-center">
             DOSHA IMPRESSION
           </span>
           <span className="text-2xl font-serif font-bold text-stone-850 mt-2">
@@ -426,7 +470,7 @@ export default function CoachingDashboard({
                     <BookOpen className="w-4 h-4" /> Holistic Advice & Philosophy
                   </h3>
                   <p className="text-sm sm:text-base text-stone-750 leading-relaxed font-serif italic">
-                    "{result.ayurvedicAdvice.assessment}"
+                    "{cap(result.ayurvedicAdvice.assessment)}"
                   </p>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
@@ -459,7 +503,7 @@ export default function CoachingDashboard({
                     className="p-5 rounded-2xl bg-white/40 border border-white/60 hover:bg-white/70 transition-all cursor-pointer flex items-center justify-between group shadow-sm"
                   >
                     <div>
-                      <span className="text-[11px] uppercase font-mono tracking-wider text-[#8A79A5] font-bold">FLOW PRACTICE</span>
+                      <span className="text-[12px] uppercase font-mono tracking-wider text-[#8A79A5] font-bold">FLOW PRACTICE</span>
                       <h4 className="text-base font-serif font-semibold text-stone-800 mt-1">{result.yogaPractice.title}</h4>
                       <p className="text-xs text-stone-500 mt-1">10 Minutes • {result.yogaPractice.poses.length} postures</p>
                     </div>
@@ -471,7 +515,7 @@ export default function CoachingDashboard({
                     className="p-5 rounded-2xl bg-white/40 border border-white/60 hover:bg-white/70 transition-all cursor-pointer flex items-center justify-between group shadow-sm"
                   >
                     <div>
-                      <span className="text-[11px] uppercase font-mono tracking-wider text-[#8A79A5] font-bold">PRANAYAMA TIMERS</span>
+                      <span className="text-[12px] uppercase font-mono tracking-wider text-[#8A79A5] font-bold">PRANAYAMA TIMERS</span>
                       <h4 className="text-base font-serif font-semibold text-stone-800 mt-1">{result.breathwork.name}</h4>
                       <p className="text-xs text-stone-500 mt-1">Ratios: {result.breathwork.inhale}-{result.breathwork.holdActive}-{result.breathwork.exhale}-{result.breathwork.holdEmpty}</p>
                     </div>
@@ -498,7 +542,7 @@ export default function CoachingDashboard({
 
                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-stone-800">
                       <div>
-                        <span className="text-[11px] font-mono tracking-widest text-[#A294BF] font-semibold uppercase">
+                        <span className="text-[12px] font-mono tracking-widest text-[#A294BF] font-semibold uppercase">
                           ACTIVE YOGA SEQUENCE PLAYER
                         </span>
                         <h4 className="text-base font-serif font-light text-stone-300 mt-1">
@@ -542,7 +586,7 @@ export default function CoachingDashboard({
                               className="w-full h-full object-cover"
                             />
                           )}
-                          <div className="absolute bottom-3 right-3 bg-stone-950/80 backdrop-blur-xs text-[10px] font-mono p-1 px-2.5 rounded-md text-stone-300 font-bold border border-stone-800">
+                          <div className="absolute bottom-3 right-3 bg-stone-950/80 backdrop-blur-xs text-[12px] font-mono p-1 px-2.5 rounded-md text-stone-300 font-bold border border-stone-800">
                             {result.yogaPractice.poses[currentPoseIndex].videoUrl ? "Looping flow" : "Static guide"}
                           </div>
                         </div>
@@ -558,7 +602,7 @@ export default function CoachingDashboard({
 
                         <div className="border border-stone-850 bg-stone-950 p-4.5 rounded-xl space-y-1 pl-12 relative">
                           <Compass className="w-5 h-5 absolute top-4 left-4 text-orange-200 opacity-60" />
-                          <span className="text-[10px] font-mono text-stone-500 uppercase block font-bold">Instructions</span>
+                          <span className="text-[12px] font-mono text-stone-500 uppercase block font-bold">Instructions</span>
                           <p className="text-sm text-stone-300 leading-relaxed font-serif">
                             {result.yogaPractice.poses[currentPoseIndex].instructions}
                           </p>
@@ -585,7 +629,7 @@ export default function CoachingDashboard({
                             <span className="text-7xl font-mono font-extralight tracking-tight text-stone-100">
                               {formatTimerString(poseTimerInternal)}
                             </span>
-                            <span className="text-[11px] text-[#A294BF] font-mono uppercase tracking-wider mt-1 font-bold flex items-center gap-1">
+                            <span className="text-[12px] text-[#A294BF] font-mono uppercase tracking-wider mt-1 font-bold flex items-center gap-1">
                               <Clock className="w-2.5 h-2.5" /> {result.yogaPractice.poses[currentPoseIndex].duration} Focus
                             </span>
                           </div>
@@ -664,10 +708,10 @@ export default function CoachingDashboard({
                               referrerPolicy="no-referrer"
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                             />
-                            <div className="absolute top-4 left-4 p-1 px-3 text-[10px] uppercase font-mono tracking-wider font-bold bg-white/90 text-[#8A79A5] backdrop-blur-xs rounded-full shadow-xs">
+                            <div className="absolute top-4 left-4 p-1 px-3 text-[12px] uppercase font-mono tracking-wider font-bold bg-white/90 text-[#8A79A5] backdrop-blur-xs rounded-full shadow-xs">
                               Posture {(index + 1).toString().padStart(2, '0')}
                             </div>
-                            <span className="absolute top-4 right-4 p-1 px-2.5 text-[10px] uppercase font-mono tracking-wider font-bold bg-[#FBEDE9] text-[#A66C5E] backdrop-blur-xs rounded-md shadow-xs leading-none">
+                            <span className="absolute top-4 right-4 p-1 px-2.5 text-[12px] uppercase font-mono tracking-wider font-bold bg-[#FBEDE9] text-[#A66C5E] backdrop-blur-xs rounded-md shadow-xs leading-none">
                               {pose.duration}
                             </span>
                           </div>
@@ -689,7 +733,7 @@ export default function CoachingDashboard({
                             </div>
                             
                             <div className="pt-2 border-t border-stone-100/50">
-                              <span className="text-[10px] font-mono font-bold uppercase text-stone-400 tracking-wider block mb-1">
+                              <span className="text-[12px] font-mono font-bold uppercase text-stone-400 tracking-wider block mb-1">
                                 Instructions
                               </span>
                               <p className="text-xs sm:text-sm text-stone-605 leading-relaxed font-serif">
@@ -828,7 +872,7 @@ export default function CoachingDashboard({
                       </AnimatePresence>
 
                       <div className="absolute w-32 h-32 bg-white/90 backdrop-blur-md rounded-full border border-white/80 shadow-[0_8px_24px_rgba(138,121,165,0.1)] flex flex-col items-center justify-center p-4">
-                        <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold">
+                        <span className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold">
                           {isBreathingRunning ? 'ACTIVE CYCLE' : 'STANDBY'}
                         </span>
                         
@@ -885,19 +929,19 @@ export default function CoachingDashboard({
 
                     <div className="grid grid-cols-4 gap-2 pt-2 text-center">
                       <div className="p-2.5 bg-[#DFE8FA]/40 border border-white/70 rounded-xl">
-                        <span className="text-[10px] font-bold text-stone-400 block uppercase font-mono">Inhale</span>
+                        <span className="text-[12px] font-bold text-stone-400 block uppercase font-mono">Inhale</span>
                         <span className="text-base font-bold font-mono text-stone-800 block mt-1">{result.breathwork.inhale}s</span>
                       </div>
                       <div className="p-2.5 bg-[#E8E1F2]/40 border border-white/70 rounded-xl">
-                        <span className="text-[10px] font-bold text-stone-400 block uppercase font-mono">Hold Full</span>
+                        <span className="text-[12px] font-bold text-stone-400 block uppercase font-mono">Hold Full</span>
                         <span className="text-base font-bold font-mono text-stone-800 block mt-1">{result.breathwork.holdActive}s</span>
                       </div>
                       <div className="p-2.5 bg-[#FBEDE9]/40 border border-white/70 rounded-xl">
-                        <span className="text-[10px] font-bold text-stone-400 block uppercase font-mono">Exhale</span>
+                        <span className="text-[12px] font-bold text-stone-400 block uppercase font-mono">Exhale</span>
                         <span className="text-base font-bold font-mono text-stone-800 block mt-1">{result.breathwork.exhale}s</span>
                       </div>
                       <div className="p-2.5 bg-[#DDF5EE]/40 border border-white/70 rounded-xl">
-                        <span className="text-[10px] font-bold text-stone-400 block uppercase font-mono">Hold Empty</span>
+                        <span className="text-[12px] font-bold text-stone-400 block uppercase font-mono">Hold Empty</span>
                         <span className="text-base font-bold font-mono text-stone-800 block mt-1">{result.breathwork.holdEmpty}s</span>
                       </div>
                     </div>

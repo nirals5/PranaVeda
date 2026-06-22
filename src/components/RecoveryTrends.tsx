@@ -501,10 +501,10 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
       <div className="bg-white/45 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-white/70 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="space-y-2 max-w-xl">
           <div className="flex items-center gap-2">
-            <span className="p-1 px-3 text-[10px] uppercase font-mono tracking-widest bg-[#E8E1F2] text-[#8A79A5] font-bold rounded-full">
+            <span className="p-1 px-3 text-[12px] uppercase font-mono tracking-widest bg-[#E8E1F2] text-[#8A79A5] font-bold rounded-full">
               Soma Biometrics
             </span>
-            <span className="p-1 px-3 text-[10px] uppercase font-mono tracking-widest bg-stone-100 text-stone-500 font-bold rounded-full border border-stone-250/20">
+            <span className="p-1 px-3 text-[12px] uppercase font-mono tracking-widest bg-stone-100 text-stone-500 font-bold rounded-full border border-stone-250/20">
               Personalized Sync
             </span>
           </div>
@@ -571,7 +571,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
               
               {/* Score card */}
               <div className="bg-white/55 backdrop-blur-md border border-white/70 p-6 rounded-2xl shadow-xs space-y-4">
-                <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block">
+                <span className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block">
                   Today's Synthesis Score
                 </span>
                 
@@ -609,11 +609,11 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 font-mono text-xs">
                     <Flame className="w-4 h-4 text-[#C8815A] fill-[#C8815A]/60 animate-pulse" />
-                    <span className="text-[10px] font-mono tracking-widest text-[#C8815A] uppercase font-bold">
+                    <span className="text-[12px] font-mono tracking-widest text-[#C8815A] uppercase font-bold">
                       Habit Streak
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-[#8A79A5] bg-[#E8E1F2] p-0.5 px-2 rounded-md font-bold">
+                  <span className="text-[12px] font-mono text-[#8A79A5] bg-[#E8E1F2] p-0.5 px-2 rounded-md font-bold">
                     Posture Pro Active
                   </span>
                 </div>
@@ -631,8 +631,8 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                 <div className="p-3 bg-white/70 backdrop-blur-xs border border-[#C8815A]/20 rounded-xl flex gap-2.5">
                   <Award className="w-5 h-5 text-[#C8815A] flex-shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
-                    <span className="text-[9px] font-mono font-bold text-[#C8815A] uppercase block">Rewards Checklist</span>
-                    <p className="text-[11px] text-stone-700 font-medium">
+                    <span className="text-[12px] font-mono font-bold text-[#C8815A] uppercase block">Rewards Checklist</span>
+                    <p className="text-[12px] text-stone-700 font-medium">
                       {rewardClaimed ? `${rewardClaimed} 🎉` : "Complete today's 3 actions to unlock your organic elixir!"}
                     </p>
                   </div>
@@ -640,7 +640,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
 
                 {/* Interactive Action Items to complete the loop */}
                 <div className="pt-2 border-t border-[#C8815A]/20 space-y-2">
-                  <span className="text-[9px] font-mono text-stone-400 font-bold uppercase block">Daily Micro-Habits</span>
+                  <span className="text-[12px] font-mono text-stone-400 font-bold uppercase block">Daily Micro-Habits</span>
                   {[
                     { id: 'breath', label: '1. Complete Breathholding Test' },
                     { id: 'posture', label: '2. Complete posture check-in' },
@@ -666,7 +666,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                         }}
                         className="w-full flex items-center justify-between text-left p-2.5 bg-white/45 hover:bg-white/80 border border-stone-200/30 rounded-lg text-xs transition-colors cursor-pointer"
                       >
-                        <span className={`font-mono text-[11px] ${completed ? 'text-stone-400 line-through' : 'text-stone-700'}`}>
+                        <span className={`font-mono text-[12px] ${completed ? 'text-stone-400 line-through' : 'text-stone-700'}`}>
                           {habit.label}
                         </span>
                         <div className={`w-4 h-4 rounded-md border flex items-center justify-center ${completed ? 'bg-[#8A79A5] border-[#8A79A5] text-white' : 'border-stone-300 bg-white/60'}`}>
@@ -682,7 +682,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
               <div className={`border p-6 rounded-2xl shadow-xs space-y-3.5 ${doshaMeta.color}`}>
                 <div className="flex items-center gap-2">
                   <Layers className="w-4 h-4" />
-                  <span className="text-[10px] font-mono tracking-widest uppercase font-bold">
+                  <span className="text-[12px] font-mono tracking-widest uppercase font-bold">
                     Vital Dosha Balance
                   </span>
                 </div>
@@ -692,10 +692,10 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                 <p className="text-xs leading-relaxed font-sans font-normal opacity-85">
                   {doshaMeta.description}
                 </p>
-                <div className="flex gap-2 pt-1 font-mono text-[9px] uppercase font-bold">
+                <div className="flex gap-2 pt-1 font-mono text-[12px] uppercase font-bold">
                   <span className="p-1 px-2 bg-white/40 border border-white/20 rounded-md text-stone-700">Vata: {currentStatus.vata}%</span>
-                  <span className="p-1 px-2 bg-white/40 border border-white/20 rounded-md text-stone-700 font-semibold text-[8px]">Pitta: {currentStatus.pitta}%</span>
-                  <span className="p-1 px-2 bg-white/40 border border-white/20 rounded-md text-stone-700 font-semibold text-[8px]">Kapha: {currentStatus.kapha}%</span>
+                  <span className="p-1 px-2 bg-white/40 border border-white/20 rounded-md text-stone-700 font-semibold text-[12px]">Pitta: {currentStatus.pitta}%</span>
+                  <span className="p-1 px-2 bg-white/40 border border-white/20 rounded-md text-stone-700 font-semibold text-[12px]">Kapha: {currentStatus.kapha}%</span>
                 </div>
               </div>
 
@@ -717,7 +717,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
 
               {/* 1. Recovery Score Area Chart */}
               <div className="space-y-2">
-                <span className="text-[10px] uppercase tracking-wider font-mono text-stone-400 font-bold block">
+                <span className="text-[12px] uppercase tracking-wider font-mono text-stone-400 font-bold block">
                   1. Synthesis Index Recovery Score Trend (%)
                 </span>
                 <div className="h-60 min-h-60 min-w-0 w-full bg-white/50 rounded-xl p-2 border border-stone-100/50">
@@ -745,7 +745,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
               <div className="space-y-3 bg-gradient-to-br from-stone-50/40 to-stone-100/20 p-4 rounded-2xl border border-stone-100">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <span className="text-[10px] uppercase tracking-wider font-mono text-[#8A79A5] font-bold block">
+                    <span className="text-[12px] uppercase tracking-wider font-mono text-[#8A79A5] font-bold block">
                       2. Activity-Accomplishment Correlation (Mockup 2)
                     </span>
                     <h4 className="text-md font-serif font-bold text-stone-850 mt-0.5">
@@ -753,7 +753,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                     </h4>
                   </div>
                   {/* Toggle buttons to simulate behavior change */}
-                  <div className="flex bg-white border border-stone-200 p-1 rounded-xl text-[10px] font-mono gap-1">
+                  <div className="flex bg-white border border-stone-200 p-1 rounded-xl text-[12px] font-mono gap-1">
                     {[
                       { id: 'beginner', label: 'Gentle (1-2x/wk)' },
                       { id: 'steady', label: 'Steady (3-4x/wk)' },
@@ -806,7 +806,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                   <p className="text-xs text-[#A66C5E] font-medium font-serif italic">
                     "Sleep Quality: As you become more consistent with mindfulness activities (last 4 weeks), average quality of sleep increased as well."
                   </p>
-                  <p className="text-[11px] text-stone-500 font-sans">
+                  <p className="text-[12px] text-stone-500 font-sans">
                     Accomplishment Correlation Index: <strong className="text-green-600">Perfect Cohesion</strong>. Practicing steady pranayama and somatic postures aligns with parasympathetic dominance, boosting restorative delta-sleep waves.
                   </p>
                 </div>
@@ -818,7 +818,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                 {/* HRV Custom weekly bars */}
                 <div className="space-y-3 p-4 bg-stone-50/40 rounded-2xl border border-stone-100">
                   <div>
-                    <span className="text-[10px] uppercase tracking-wider font-mono text-[#A66C5E] font-bold block">
+                    <span className="text-[12px] uppercase tracking-wider font-mono text-[#A66C5E] font-bold block">
                       3. Recovery HRV Coherence (Mockup 1)
                     </span>
                     <h4 className="text-xs font-mono font-bold text-stone-600 mt-0.5">
@@ -841,7 +841,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                   </div>
 
                   <div className="p-2.5 bg-green-50/40 border border-green-100/30 rounded-lg">
-                    <p className="text-[11px] text-green-700 font-medium font-serif leading-relaxed">
+                    <p className="text-[12px] text-green-700 font-medium font-serif leading-relaxed">
                       "Recovery Statistics: 15% improvement in back and neck pain. Keep it up!"
                     </p>
                   </div>
@@ -850,7 +850,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                 {/* Combined Sleep & Breath Status Tracker (maintaining features) */}
                 <div className="space-y-3 p-4 bg-stone-50/40 rounded-2xl border border-stone-100">
                   <div>
-                    <span className="text-[10px] uppercase tracking-wider font-mono text-[#8A79A5] font-bold block">
+                    <span className="text-[12px] uppercase tracking-wider font-mono text-[#8A79A5] font-bold block">
                       4. Respiratory Capacity Tracker
                     </span>
                     <h4 className="text-xs font-mono font-bold text-stone-600 mt-0.5">
@@ -878,7 +878,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                     </ChartFrame>
                   </div>
 
-                  <p className="text-[10px] text-stone-500 font-mono text-center">
+                  <p className="text-[12px] text-stone-500 font-mono text-center">
                     Retention time registers vital lung elasticity (Chid-Akasha).
                   </p>
                 </div>
@@ -900,7 +900,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
           >
             {/* Left Educational Diagnostics Info */}
             <div className="bg-white/55 backdrop-blur-md border border-white/70 p-6 sm:p-8 rounded-3xl shadow-xs space-y-6">
-              <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block">
+              <span className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block">
                 Ayurvedic Sleep Science
               </span>
               
@@ -949,7 +949,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
             {/* Interactive sleep calculator / log display */}
             <div className="bg-white/45 backdrop-blur-md border border-white/70 p-6 sm:p-8 rounded-3xl shadow-xs space-y-6 flex flex-col justify-between">
               <div>
-                <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block mb-2">
+                <span className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block mb-2">
                   Sleep Diagnostics Form
                 </span>
                 <h3 className="text-lg sm:text-xl font-serif font-bold text-stone-850">
@@ -972,7 +972,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                     onChange={(e) => setSleepHours(Number(e.target.value))}
                     className="w-full accent-[#8A79A5]"
                   />
-                  <div className="flex justify-between text-[10px] font-mono text-stone-400">
+                  <div className="flex justify-between text-[12px] font-mono text-stone-400">
                     <span>4 Hours (Vata Spiked)</span>
                     <span>8 Hours (Optimal Rest)</span>
                     <span>11 Hours (Kapha Spiked)</span>
@@ -993,7 +993,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                     onChange={(e) => setSleepQuality(Number(e.target.value))}
                     className="w-full accent-[#8A79A5]"
                   />
-                  <div className="flex justify-between text-[10px] font-mono text-stone-400">
+                  <div className="flex justify-between text-[12px] font-mono text-stone-400">
                     <span>1 (Highly Restless)</span>
                     <span>5 (Average)</span>
                     <span>10 (Pure Bliss/Samadhi)</span>
@@ -1043,7 +1043,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
             {/* Test Console */}
             <div className="bg-white/45 backdrop-blur-md border border-white/70 p-6 sm:p-8 rounded-3xl shadow-xs flex flex-col justify-between min-h-[400px]">
               <div className="space-y-2">
-                <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block">
+                <span className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block">
                   Capacity Diagnostics
                 </span>
                 <h3 className="text-xl sm:text-2xl font-serif font-light text-stone-850">
@@ -1075,7 +1075,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                   )}
 
                   <div className="w-28 h-28 rounded-full bg-white border border-stone-200 shadow-lg flex flex-col items-center justify-center z-10 text-center space-y-1">
-                    <span className="text-[10px] font-mono uppercase text-stone-400 font-bold">
+                    <span className="text-[12px] font-mono uppercase text-stone-400 font-bold">
                       {breathState.toUpperCase()}
                     </span>
                     <span className="text-3xl font-serif font-light text-[#8A79A5]">
@@ -1084,7 +1084,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                   </div>
                 </div>
 
-                <p className="text-[11px] font-mono text-stone-450 uppercase font-semibold text-center italic max-w-xs">
+                <p className="text-[12px] font-mono text-stone-450 uppercase font-semibold text-center italic max-w-xs">
                   {breathState === 'idle' && "Press 'Start' & inhale deeply for 4 seconds"}
                   {breathState === 'inhale' && "Breathing In deeply... Fill the lungs."}
                   {breathState === 'hold' && "Holding. Keep shoulders loose, observe your pulse."}
@@ -1114,7 +1114,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
 
             {/* Capacity Diagnostic Results context */}
             <div className="bg-white/55 backdrop-blur-md border border-white/70 p-6 sm:p-8 rounded-3xl shadow-xs space-y-6">
-              <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block">
+              <span className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block">
                 Breathing Vitals Report
               </span>
               <h3 className="text-xl sm:text-2xl font-serif font-light text-stone-850">
@@ -1168,7 +1168,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
             {/* Live Camera Scanner Box */}
             <div className="bg-stone-950 text-white p-6 sm:p-8 rounded-3xl shadow-xl flex flex-col justify-between relative min-h-[460px] overflow-hidden">
               <div className="z-10 absolute top-5 left-5 space-y-1">
-                <span className="p-1 px-3 text-[9px] uppercase font-mono tracking-widest bg-stone-800/80 border border-stone-700/50 text-[#C49A76] rounded-full font-bold">
+                <span className="p-1 px-3 text-[12px] uppercase font-mono tracking-widest bg-stone-800/80 border border-stone-700/50 text-[#C49A76] rounded-full font-bold">
                   Camera Lens Assessment
                 </span>
                 <h3 className="text-lg font-mono text-stone-200">
@@ -1231,7 +1231,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
             {/* Analysis Diagnostics Outcome */}
             <div className="bg-white/45 backdrop-blur-md border border-white/70 p-6 sm:p-8 rounded-3xl shadow-xs space-y-6 flex flex-col justify-between">
               <div>
-                <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block mb-2">
+                <span className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block mb-2">
                   Computer Vision Assessment
                 </span>
                 <h3 className="text-xl sm:text-2xl font-serif font-light text-stone-850">
@@ -1294,7 +1294,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
             {/* Interactive Pulse Sensor Tap */}
             <div className="bg-white/45 backdrop-blur-md border border-white/70 p-6 sm:p-8 rounded-3xl shadow-xs flex flex-col justify-between min-h-[400px]">
               <div className="space-y-2">
-                <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block">
+                <span className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block">
                   Vital Heart Veda
                 </span>
                 <h3 className="text-xl sm:text-2xl font-serif font-light text-stone-850">
@@ -1323,7 +1323,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                   }`}
                 >
                   <Heart className={`w-10 h-10 ${pulseReading ? "text-red-500" : "text-stone-400"}`} />
-                  <span className="text-[9px] font-mono font-bold tracking-widest uppercase mt-4 text-stone-500">
+                  <span className="text-[12px] font-mono font-bold tracking-widest uppercase mt-4 text-stone-500">
                     {pulseReading ? `RESONATING ${pulseProgress}%` : "TAP TO SCAN"}
                   </span>
                 </button>
@@ -1339,7 +1339,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
             {/* Pulse reflection outcome report */}
             <div className="bg-white/55 backdrop-blur-md border border-white/70 p-6 sm:p-8 rounded-3xl shadow-xs space-y-6 flex flex-col justify-between">
               <div>
-                <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block mb-2">
+                <span className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold block mb-2">
                   Pulse Reflection
                 </span>
                 <h3 className="text-xl sm:text-2xl font-serif font-light text-stone-850">
@@ -1353,7 +1353,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
               {pulsePattern ? (
                 <div className="space-y-4 p-5 bg-white rounded-2xl border border-[#E8E1F2] shadow-xs">
                   <div className="flex items-center justify-between">
-                    <span className="p-1 px-3 text-[10px] uppercase font-mono tracking-wider font-bold bg-[#E8E1F2] text-[#8A79A5] rounded-md">
+                    <span className="p-1 px-3 text-[12px] uppercase font-mono tracking-wider font-bold bg-[#E8E1F2] text-[#8A79A5] rounded-md">
                       {pulsePattern} Wave Detected
                     </span>
                     <span className="font-mono text-sm font-bold text-stone-700">{pulseRate} BPM</span>
@@ -1446,7 +1446,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono tracking-wider text-stone-500 uppercase font-bold">Sleep (Hours)</label>
+                  <label className="text-[12px] font-mono tracking-wider text-stone-500 uppercase font-bold">Sleep (Hours)</label>
                   <input 
                     type="number" 
                     step="0.1"
@@ -1459,7 +1459,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono tracking-wider text-stone-500 uppercase font-bold">Sleep Quality [1-10]</label>
+                  <label className="text-[12px] font-mono tracking-wider text-stone-500 uppercase font-bold">Sleep Quality [1-10]</label>
                   <input 
                     type="number" 
                     min="1"
@@ -1472,7 +1472,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-mono tracking-wider text-stone-500 uppercase font-bold">Breath Retention Capacity (Seconds)</label>
+                <label className="text-[12px] font-mono tracking-wider text-stone-500 uppercase font-bold">Breath Retention Capacity (Seconds)</label>
                 <input 
                   type="number" 
                   min="0"
@@ -1484,10 +1484,10 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-mono tracking-wider text-stone-500 uppercase font-bold block">Estimated Dosha Vitals (%)</label>
+                <label className="text-[12px] font-mono tracking-wider text-stone-500 uppercase font-bold block">Estimated Dosha Vitals (%)</label>
                 <div className="grid grid-cols-3 gap-2.5 text-center">
                   <div className="space-y-1">
-                    <span className="text-[9px] font-mono font-semibold text-sky-600 block">VATA</span>
+                    <span className="text-[12px] font-mono font-semibold text-sky-600 block">VATA</span>
                     <input 
                       type="number" 
                       min="10"
@@ -1498,7 +1498,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                     />
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[9px] font-mono font-semibold text-orange-600 block">PITTA</span>
+                    <span className="text-[12px] font-mono font-semibold text-orange-600 block">PITTA</span>
                     <input 
                       type="number" 
                       min="10"
@@ -1509,7 +1509,7 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                     />
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[9px] font-mono font-semibold text-stone-500 block">KAPHA</span>
+                    <span className="text-[12px] font-mono font-semibold text-stone-500 block">KAPHA</span>
                     <input 
                       type="number" 
                       min="10"

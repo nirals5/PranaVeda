@@ -140,7 +140,7 @@ export default function WellnessInsight({
                   "{insight.quote}"
                 </p>
                 <div className="pt-3 border-t border-stone-200/50 mt-2 flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold">
+                  <span className="text-[12px] font-mono tracking-widest text-[#8A79A5] uppercase font-bold">
                     {insight.focus}
                   </span>
                   <p className="text-xs text-stone-500 leading-relaxed italic text-right">
@@ -180,7 +180,7 @@ export default function WellnessInsight({
                   No bookmarked rituals.
                 </p>
                 <p className="text-xs text-stone-500 mt-1.5 max-w-[200px] leading-relaxed">
-                  Ask PranaVeda to create a grounding ritual to get started.
+                  Ask Amrita to create a grounding ritual to get started.
                 </p>
               </div>
             ) : (
@@ -222,7 +222,7 @@ export default function WellnessInsight({
         <div>
           {savedPractices.length > 0 ? (
             <div className="pt-2.5 border-t border-stone-200/40 flex items-center justify-between text-xs">
-              <span className="text-stone-500 font-mono text-[10px] uppercase tracking-wider font-semibold">
+              <span className="text-stone-500 font-mono text-[12px] uppercase tracking-wider font-semibold">
                 {savedPractices.length} items logged
               </span>
               <button 
