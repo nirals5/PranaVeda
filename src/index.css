@@ -5,7 +5,7 @@
   --color-ink: #2D3436;
   --font-serif: "Playfair Display", Georgia, serif;
   --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
-  --color-brand-purple: #8A79A5;
+  --color-brand-amber: #C4982A;
   --color-peach: #C8815A;
   --color-sage: #6A9478;
 }
@@ -13,14 +13,14 @@
 @layer base {
   button:focus-visible,
   [role="button"]:focus-visible {
-    outline: 2px solid #8A79A5;
+    outline: 2px solid #C4982A;
     outline-offset: 3px;
   }
 
   input:focus-visible,
   textarea:focus-visible,
   select:focus-visible {
-    outline: 2px solid #8A79A5;
+    outline: 2px solid #C4982A;
     outline-offset: 1px;
   }
 }
