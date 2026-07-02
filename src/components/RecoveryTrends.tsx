@@ -913,8 +913,8 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
               </p>
 
               <div className="space-y-4 pt-2">
-                <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-100/30 flex gap-3.5">
-                  <Moon className="w-5 h-5 text-[#C4982A] flex-shrink-0 mt-0.5" />
+                <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-100/30 flex gap-3.5">
+                  <Moon className="w-5 h-5 text-[#8A79A5] flex-shrink-0 mt-0.5" />
                   <div>
                     <h5 className="font-serif font-bold text-xs sm:text-sm text-stone-850 leading-tight">
                       Kapha Rest Cycle (10:00 PM – 2:00 AM)

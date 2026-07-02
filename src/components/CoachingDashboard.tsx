@@ -331,7 +331,7 @@ export default function CoachingDashboard({
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-[#FEF3C7]/60 backdrop-blur-xs border border-amber-200/65 p-4 px-5 rounded-2xl mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-950 text-xs shadow-xs"
+          className="bg-[#E8E1F2]/60 backdrop-blur-xs border border-purple-200/65 p-4 px-5 rounded-2xl mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-purple-950 text-xs shadow-xs"
         >
           <div className="flex items-center gap-2.5">
             <Sparkles className="w-4 h-4 text-[#8A79A5] flex-shrink-0 animate-pulse" />
@@ -846,7 +846,7 @@ export default function CoachingDashboard({
                             height: '100%',
                             background: {
                               inhale: 'radial-gradient(circle, rgba(223,232,250,0.4) 0%, rgba(223,232,250,0.05) 70%)',
-                              holdFull: 'radial-gradient(circle, rgba(190,210,248,0.5) 0%, rgba(190,210,248,0.05) 75%)',
+                              holdFull: 'radial-gradient(circle, rgba(232,225,242,0.45) 0%, rgba(232,225,242,0.05) 75%)',
                               exhale: 'radial-gradient(circle, rgba(251,237,233,0.3) 0%, rgba(251,237,233,0.05) 70%)',
                               holdEmpty: 'radial-gradient(circle, rgba(221,245,238,0.3) 0%, rgba(221,245,238,0.05) 70%)',
                             }[breathingPhase]
