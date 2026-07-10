@@ -1007,10 +1007,15 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       send(res, { type: 'done' });
     } catch (err: any) {
       console.error('[chat] stream failed:', err?.message || err);
-      send(res, {
-        type: 'error',
-        message: 'The connection to Amrita faltered mid-thought. Please send that again in a moment.',
-      });
+      const detail = String(err?.message || '');
+      let message = 'The connection to Amrita faltered mid-thought. Please send that again in a moment.';
+      if (detail.includes('credit balance')) {
+        message =
+          'Amrita cannot reach her deeper guidance — the Anthropic API account is out of credits. Your conversation is safe; top up at console.anthropic.com (Plans & Billing) and resend your last message to continue right where you left off.';
+      } else if (detail.includes('rate_limit')) {
+        message = 'Amrita needs a brief pause — too many requests at once. Wait a moment, then resend your last message.';
+      }
+      send(res, { type: 'error', message });
     }
     res.end();
   });
