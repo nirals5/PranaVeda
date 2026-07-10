@@ -62,3 +62,30 @@ export interface Message {
   text: string;
   timestamp: string;
 }
+
+// --- Conversational Amrita ---
+
+export interface WellnessProfile {
+  name?: string;
+  prakriti?: string;
+  vikriti?: string;
+  prakritiConfidence?: 'low' | 'medium' | 'high';
+  goals?: string[];
+  conditions?: string[];
+  preferences?: string[];
+  observations?: { date: string; note: string }[];
+  practiceHistory?: { date: string; title: string; kind: 'ritual' | 'breathwork' }[];
+}
+
+export type ChatCard =
+  | { kind: 'ritual'; result: RecommendationResult }
+  | { kind: 'breathwork'; note?: string; pattern: BreathworkPattern };
+
+export interface ChatItem {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  cards: ChatCard[];
+  streaming?: boolean;
+  error?: boolean;
+}

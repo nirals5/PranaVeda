@@ -6,6 +6,8 @@ import Logo from './components/Logo';
 import VoiceModal from './components/VoiceModal';
 import WellnessInsight from './components/WellnessInsight';
 import CoachingDashboard from './components/CoachingDashboard';
+import AmritaChat from './components/AmritaChat';
+import { useAmritaChat } from './hooks/useAmritaChat';
 import { RecommendationResult, SavedPractice } from './types';
 import RecoveryTrends from './components/RecoveryTrends';
 
@@ -31,9 +33,8 @@ export default function App() {
     hideTimerRef.current = window.setTimeout(() => setShowAmritaHint(false), 600);
   };
   const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingText, setLoadingText] = useState('Analyzing wellness patterns...');
   const [currentResult, setCurrentResult] = useState<RecommendationResult | null>(null);
+  const { items: chatItems, isStreaming, sendMessage, resetConversation } = useAmritaChat();
   const [savedPractices, setSavedPractices] = useState<SavedPractice[]>([]);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   
@@ -67,29 +68,6 @@ export default function App() {
     }
   }, []);
 
-  // Cycle meditative loading messages
-  useEffect(() => {
-    let interval: number;
-    if (isLoading) {
-      const messages = [
-        "Analyzing wellness patterns...",
-        "Evaluating planetary circadian rhythms...",
-        "Identifying Vata-Imbalance indicators...",
-        "Formulating equal-breath ratios...",
-        "Optimizing 10-minute Hatha sequences...",
-        "Infusing compassionate Ayurvedic advice..."
-      ];
-      let idx = 0;
-      interval = window.setInterval(() => {
-        idx = (idx + 1) % messages.length;
-        setLoadingText(messages[idx]);
-      }, 2500);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isLoading]);
-
   // Determine time of day greeting
   const getGreeting = () => {
     const hours = new Date().getHours();
@@ -98,88 +76,19 @@ export default function App() {
     return "Good evening, peaceful traveler.";
   };
 
-  // Submit trigger to Express + Gemini Backend
-  const handleConsultCoach = async (text: string) => {
+  // Every consultation flows through the Amrita conversation. Structured
+  // rituals arrive as in-line cards; opening one shows the full dashboard.
+  const handleConsultCoach = (text: string) => {
     if (!text.trim()) return;
-    setIsLoading(true);
-    setLoadingText("Analyzing wellness patterns...");
-    
-    try {
-      const response = await fetch('/api/coaching', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          feeling: text,
-          timeOfDay: new Date().toLocaleTimeString()
-        })
-      });
+    setCurrentResult(null);
+    setCurrentView('coach');
+    sendMessage(text);
+    setInputValue('');
+  };
 
-      if (response.ok) {
-        const data: RecommendationResult = await response.json();
-        setCurrentResult(data);
-        // Create an active temporary practice ID in case they decide to save it
-        setActivePracticeId(`temp_${Date.now()}`);
-        showToast("Your custom daily ritual is ready.", "success");
-      } else {
-        throw new Error("API call failed");
-      }
-    } catch (err) {
-      console.error("Consultation failed:", err);
-      // Serve direct front-end fallback state in case server is completely down
-      const fallbackResult: RecommendationResult = {
-        summary: "A transient connection wind disrupted live synthesis. We have served your grounded baseline ritual to center your prana.",
-        doshaTendency: "Elevated Vata due to environment noise.",
-        primaryEnergy: "Restful Baseline",
-        yogaPractice: {
-          title: "Centered Baseline Flow",
-          description: "A stabilizing 10-minute ritual to ground attention in the present moment.",
-          poses: [
-            {
-              nameEnglish: "Child's Pose",
-              nameSanskrit: "Balasana",
-              duration: "3 minutes",
-              benefits: "Instantly calms the brain and down-regulates stress.",
-              instructions: "Kneel, sit on your heels, fold forward over your thighs, and rest your forehead on the ground while extending arms."
-            },
-            {
-              nameEnglish: "Corpse Pose",
-              nameSanskrit: "Savasana",
-              duration: "7 minutes",
-              benefits: "Absorbs physical inputs and resets nervous system.",
-              instructions: "Lie flat on your back, palms facing up, eyes resting closed. Completely sink your skeletal weight into gravity."
-            }
-          ],
-          durationMinutes: 10
-        },
-        ayurvedicAdvice: {
-          assessment: "Stabilize scattered focus with immediate physical contact.",
-          doshaPrimary: "Vata",
-          dietaryTips: ["Sip hot ginger tea", "Eat warm, mushy foods", "Avoid dry elements"],
-          lifestyleTips: ["Rest in quiet warmth", "Dim overhead screen lighting", "Focus on slow breathing"],
-          recommendedHerbs: ["Chamomile", "Ginger infusion"]
-        },
-        breathwork: {
-          name: "Sama Vritti",
-          sanskritName: "Equal Breathing",
-          description: "Balances dual breath inflows and outflows.",
-          inhale: 4,
-          holdActive: 4,
-          exhale: 4,
-          holdEmpty: 0,
-          cycles: 8,
-          benefits: "Induces profound neurological stability."
-        },
-        lifestyleTips: ["Rest offline", "Hydrate with warm tea"],
-        _isFallback: true
-      };
-      setCurrentResult(fallbackResult);
-      setActivePracticeId(`temp_${Date.now()}`);
-      showToast("Grounding connection fallback ritual activated.", "warn");
-    } finally {
-      setIsLoading(false);
-    }
+  const handleOpenRitual = (result: RecommendationResult) => {
+    setCurrentResult(result);
+    setActivePracticeId(`temp_${Date.now()}`);
   };
 
   // Handle Bookmarks Management
@@ -296,68 +205,9 @@ export default function App() {
       {/* 3. Main Central App Area */}
       <main className="flex-1 flex flex-col items-center justify-center w-full max-w-7xl mx-auto z-10 relative">
         <AnimatePresence mode="wait">
-          
-          {/* LOADER OVERLAY (Deeply atmospheric breathing lotus) */}
-          {isLoading && (
-            <motion.div
-              key="loader"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center space-y-10 py-20 px-8 text-center max-w-md mx-auto"
-            >
-              {/* Giant breathing lotus capsule */}
-              <div className="relative w-40 h-40 flex items-center justify-center">
-                {/* Micro outer expansion rings */}
-                <motion.div
-                  animate={prefersReducedMotion ? {} : {
-                    scale: [1, 1.45, 1],
-                    opacity: [0.18, 0, 0.18],
-                  }}
-                  transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute inset-0 border-2 border-[#8A79A5] rounded-full blur-[1px]"
-                />
-                
-                <div className="w-28 h-28 rounded-full bg-white/70 border border-white/90 shadow-xl flex items-center justify-center">
-                  <svg
-                    viewBox="0 0 100 100"
-                    className="w-16 h-16 text-[#8A79A5]"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                  >
-                    <path d="M 50 80 C 20 60, 20 35, 38 25 C 47 45, 49 65, 50 80" />
-                    <path d="M 50 80 C 80 60, 80 35, 62 25 C 53 45, 51 65, 50 80" />
-                    <path d="M 50 80 C 42 50, 45 20, 50 10 C 55 20, 58 50, 50 80" />
-                  </svg>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h3 className="font-serif font-light text-stone-850 text-xl tracking-tight">
-                  Listening to what your body needs
-                </h3>
-                <AnimatePresence mode="wait">
-                  <motion.p
-                    key={loadingText}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.5, ease: "easeInOut" }}
-                    className="text-[12px] tracking-widest text-[#8A79A5] font-bold"
-                  >
-                    {loadingText}
-                  </motion.p>
-                </AnimatePresence>
-                <p className="text-sm text-stone-500 font-serif italic max-w-xs mx-auto leading-relaxed">
-                  Let your awareness expand. Your personal wellness goals are merging with Ayurvedic wisdom.
-                </p>
-              </div>
-            </motion.div>
-          )}
 
           {/* RECOVERY DASHBOARD SCREEN */}
-          {!isLoading && currentView === 'recovery' && (
+          {currentView === 'recovery' && (
             <motion.div
               key="recovery-dashboard"
               initial={{ opacity: 0, y: 15 }}
@@ -370,7 +220,7 @@ export default function App() {
           )}
  
           {/* RESULTS DASHBOARD SCREEN */}
-          {!isLoading && currentView === 'coach' && currentResult && (
+          {currentView === 'coach' && currentResult && (
             <motion.div
               key="dashboard"
               initial={{ opacity: 0, y: 15 }}
@@ -388,8 +238,28 @@ export default function App() {
             </motion.div>
           )}
 
+          {/* AMRITA CONVERSATION THREAD */}
+          {currentView === 'coach' && !currentResult && chatItems.length > 0 && (
+            <motion.div
+              key="chat"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="w-full"
+            >
+              <AmritaChat
+                items={chatItems}
+                isStreaming={isStreaming}
+                onSend={sendMessage}
+                onOpenRitual={handleOpenRitual}
+                onOpenVoice={() => setShowVoiceModal(true)}
+                onReset={resetConversation}
+              />
+            </motion.div>
+          )}
+
           {/* INITIAL WELCOME SCREEN (Soma Input Console) */}
-          {!isLoading && currentView === 'coach' && !currentResult && (
+          {currentView === 'coach' && !currentResult && chatItems.length === 0 && (
             <motion.div
               key="welcome"
               initial={{ opacity: 0, scale: 0.98 }}
