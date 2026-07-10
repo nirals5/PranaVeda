@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
-import { Mic, ArrowRight, Sparkles, RotateCcw, Wind, Play, Clock } from 'lucide-react';
+import { Mic, ArrowRight, Sparkles, RotateCcw, Wind, Play, Clock, Volume2, VolumeX } from 'lucide-react';
 import { ChatItem, ChatCard, RecommendationResult, BreathworkPattern } from '../types';
 
 interface AmritaChatProps {
@@ -11,6 +11,8 @@ interface AmritaChatProps {
   onOpenRitual: (result: RecommendationResult) => void;
   onOpenVoice: () => void;
   onReset: () => void;
+  voiceMuted: boolean;
+  onToggleVoiceMuted: () => void;
 }
 
 const markdownComponents = {
@@ -126,7 +128,7 @@ function CardBlock({ card, onOpenRitual }: { card: ChatCard; onOpenRitual: (r: R
   return <BreathworkCard pattern={card.pattern} note={card.note} />;
 }
 
-export default function AmritaChat({ items, isStreaming, onSend, onOpenRitual, onOpenVoice, onReset }: AmritaChatProps) {
+export default function AmritaChat({ items, isStreaming, onSend, onOpenRitual, onOpenVoice, onReset, voiceMuted, onToggleVoiceMuted }: AmritaChatProps) {
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -148,13 +150,23 @@ export default function AmritaChat({ items, isStreaming, onSend, onOpenRitual, o
         <span className="p-1 px-3 rounded-full text-[11px] font-mono tracking-widest font-semibold bg-[#E8E1F2]/70 text-stone-600 uppercase flex items-center gap-1.5">
           <Sparkles className="w-3 h-3 text-[#8A79A5]" /> In conversation with Amrita
         </span>
-        <button
-          onClick={onReset}
-          title="Begin a new conversation (your wellness profile is kept)"
-          className="flex items-center gap-1.5 py-1.5 px-3 rounded-full text-[11px] font-mono uppercase tracking-wider text-stone-500 hover:text-stone-800 hover:bg-white/60 border border-transparent hover:border-white/80 transition-all cursor-pointer"
-        >
-          <RotateCcw className="w-3 h-3" /> New
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onToggleVoiceMuted}
+            title={voiceMuted ? 'Voice replies are off — click to unmute Amrita' : 'Voice replies are on for spoken messages — click to mute'}
+            aria-label={voiceMuted ? 'Unmute voice replies' : 'Mute voice replies'}
+            className="flex items-center gap-1.5 py-1.5 px-3 rounded-full text-[11px] font-mono uppercase tracking-wider text-stone-500 hover:text-stone-800 hover:bg-white/60 border border-transparent hover:border-white/80 transition-all cursor-pointer"
+          >
+            {voiceMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3 text-[#8A79A5]" />}
+          </button>
+          <button
+            onClick={onReset}
+            title="Begin a new conversation (your wellness profile is kept)"
+            className="flex items-center gap-1.5 py-1.5 px-3 rounded-full text-[11px] font-mono uppercase tracking-wider text-stone-500 hover:text-stone-800 hover:bg-white/60 border border-transparent hover:border-white/80 transition-all cursor-pointer"
+          >
+            <RotateCcw className="w-3 h-3" /> New
+          </button>
+        </div>
       </div>
 
       {/* Message thread */}

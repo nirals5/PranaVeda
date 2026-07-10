@@ -1,8 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChatCard, ChatItem, WellnessProfile } from '../types';
+import { useSpeech } from './useSpeech';
 
 const CHAT_KEY = 'pranaveda_chat';
 const PROFILE_KEY = 'pranaveda_profile';
+const MUTED_KEY = 'pranaveda_voice_muted';
+
+// Reduce Amrita's markdown to plain speakable prose for TTS.
+function toSpeakable(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[*_#`>]+/g, '')
+    .replace(/^\s*[-•]\s+/gm, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 function loadJson<T>(key: string, fallback: T): T {
   try {
@@ -20,7 +33,20 @@ export function useAmritaChat() {
   const [items, setItems] = useState<ChatItem[]>(() => loadJson<ChatItem[]>(CHAT_KEY, []));
   const [profile, setProfile] = useState<WellnessProfile>(() => loadJson<WellnessProfile>(PROFILE_KEY, {}));
   const [isStreaming, setIsStreaming] = useState(false);
+  const [voiceMuted, setVoiceMuted] = useState<boolean>(() => loadJson<boolean>(MUTED_KEY, false));
   const abortRef = useRef<AbortController | null>(null);
+  const { speak, stop: stopSpeaking } = useSpeech();
+
+  const toggleVoiceMuted = useCallback(() => {
+    setVoiceMuted((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(MUTED_KEY, JSON.stringify(next));
+      } catch {}
+      if (next) stopSpeaking();
+      return next;
+    });
+  }, [stopSpeaking]);
 
   useEffect(() => {
     try {
@@ -35,9 +61,11 @@ export function useAmritaChat() {
   }, [profile]);
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, opts?: { inputMode?: 'voice' | 'text' }) => {
       const trimmed = text.trim();
       if (!trimmed || isStreaming) return;
+      const inputMode = opts?.inputMode ?? 'text';
+      stopSpeaking();
 
       const userItem: ChatItem = { id: `u_${Date.now()}`, role: 'user', text: trimmed, cards: [] };
       const assistantId = `a_${Date.now()}`;
@@ -71,7 +99,7 @@ export function useAmritaChat() {
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: history, profile, localTime: new Date().toLocaleString() }),
+          body: JSON.stringify({ messages: history, profile, localTime: new Date().toLocaleString(), inputMode }),
           signal: controller.signal,
         });
         if (!response.ok || !response.body) throw new Error(`Chat request failed (${response.status})`);
@@ -79,6 +107,7 @@ export function useAmritaChat() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        let spokenText = '';
 
         while (true) {
           const { done, value } = await reader.read();
@@ -97,6 +126,7 @@ export function useAmritaChat() {
               continue;
             }
             if (event.type === 'text') {
+              spokenText += event.delta;
               patchAssistant((m) => ({ ...m, text: m.text + event.delta }));
             } else if (event.type === 'card') {
               patchAssistant((m) => ({ ...m, cards: [...m.cards, event.card as ChatCard] }));
@@ -110,6 +140,13 @@ export function useAmritaChat() {
               }));
             }
           }
+        }
+
+        // Speak in kind: a voice-initiated turn gets a spoken reply. Cards
+        // stay silent — Amrita's own closing sentence introduces them.
+        if (inputMode === 'voice' && !voiceMuted) {
+          const speakable = toSpeakable(spokenText);
+          if (speakable) speak(speakable);
         }
       } catch (err) {
         console.error('Amrita chat failed:', err);
@@ -126,14 +163,15 @@ export function useAmritaChat() {
         abortRef.current = null;
       }
     },
-    [items, profile, isStreaming]
+    [items, profile, isStreaming, voiceMuted, speak, stopSpeaking]
   );
 
   const resetConversation = useCallback(() => {
     abortRef.current?.abort();
+    stopSpeaking();
     setItems([]);
     setIsStreaming(false);
-  }, []);
+  }, [stopSpeaking]);
 
-  return { items, profile, isStreaming, sendMessage, resetConversation };
+  return { items, profile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted, stopSpeaking };
 }

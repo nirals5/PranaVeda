@@ -86,20 +86,29 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
   }, [isOpen]);
 
   const runSimulatedSpeech = () => {
+    // Guard against double-mount (React StrictMode runs the effect twice):
+    // clear any interval a previous invocation left running.
+    if ((recognitionRef as any).currentSimInterval) {
+      clearInterval((recognitionRef as any).currentSimInterval);
+    }
     setStatusText("I am listening. (Simulated Mode - microphone blocked or unsupported)");
+    setTranscript('');
     const simulationPhrases = [
       "I ", "feel ", "very ", "stressed ", "lately, ", "and ", "my ", "lower ", "back ", "is ", "stiff ", "from ", "long ", "hours ", "of ", "sitting ", "at ", "my ", "office ", "desk."
     ];
-    
+
     let currentWordIdx = 0;
     const interval = setInterval(() => {
-      if (currentWordIdx < simulationPhrases.length) {
-        setTranscript(prev => prev + simulationPhrases[currentWordIdx]);
-        currentWordIdx++;
-      } else {
+      if (currentWordIdx >= simulationPhrases.length) {
         clearInterval(interval);
         setStatusText("Complete. Tapping complete below sends this to Amrita.");
+        return;
       }
+      // Capture the word before updating state so the updater stays pure —
+      // reading the shared index inside it appends stale/undefined words.
+      const word = simulationPhrases[currentWordIdx];
+      currentWordIdx++;
+      setTranscript(prev => prev + word);
     }, 450);
 
     (recognitionRef as any).currentSimInterval = interval;

@@ -20,10 +20,19 @@ export interface WellnessProfile {
   practiceHistory?: { date: string; title: string; kind: 'ritual' | 'breathwork' }[];
 }
 
-export function buildSystemPrompt(profile: WellnessProfile | undefined, localTime: string): string {
+export function buildSystemPrompt(
+  profile: WellnessProfile | undefined,
+  localTime: string,
+  inputMode?: 'voice' | 'text'
+): string {
   const profileBlock = profile && Object.keys(profile).length
     ? JSON.stringify(profile, null, 1)
     : '(empty — this may be a first conversation)';
+
+  const voiceBlock =
+    inputMode === 'voice'
+      ? `\n# Voice mode\n\nThe user SPOKE this message and will HEAR your reply read aloud. Write for the ear: short, warm, natural spoken sentences. No markdown, no lists, no headings, no parentheses. Keep it to a few sentences unless teaching something essential.\n`
+      : '';
 
   return `You are Amrita, PranaVeda's wellness companion — an experienced yoga therapist and Ayurvedic practitioner rooted in Yoga and Ayurveda.
 
@@ -56,6 +65,7 @@ Your purpose is not to generate wellness plans. Your purpose is to build a long-
 - You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time.
 - You CANNOT (yet): see the user's camera or posture, read wearables/sleep data, access their calendar, control smart-home devices, or set reminders. If asked, say warmly that this isn't available yet — never pretend.
 
+${voiceBlock}
 # Context
 
 Local time for the user: ${localTime}

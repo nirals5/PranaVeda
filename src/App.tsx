@@ -34,7 +34,7 @@ export default function App() {
   };
   const [inputValue, setInputValue] = useState('');
   const [currentResult, setCurrentResult] = useState<RecommendationResult | null>(null);
-  const { items: chatItems, isStreaming, sendMessage, resetConversation } = useAmritaChat();
+  const { items: chatItems, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat();
   const [savedPractices, setSavedPractices] = useState<SavedPractice[]>([]);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   
@@ -78,11 +78,11 @@ export default function App() {
 
   // Every consultation flows through the Amrita conversation. Structured
   // rituals arrive as in-line cards; opening one shows the full dashboard.
-  const handleConsultCoach = (text: string) => {
+  const handleConsultCoach = (text: string, opts?: { inputMode?: 'voice' | 'text' }) => {
     if (!text.trim()) return;
     setCurrentResult(null);
     setCurrentView('coach');
-    sendMessage(text);
+    sendMessage(text, opts);
     setInputValue('');
   };
 
@@ -254,6 +254,8 @@ export default function App() {
                 onOpenRitual={handleOpenRitual}
                 onOpenVoice={() => setShowVoiceModal(true)}
                 onReset={resetConversation}
+                voiceMuted={voiceMuted}
+                onToggleVoiceMuted={toggleVoiceMuted}
               />
             </motion.div>
           )}
@@ -370,7 +372,7 @@ export default function App() {
         onClose={() => setShowVoiceModal(false)}
         onSubmitPrompt={(text) => {
           setInputValue(text);
-          handleConsultCoach(text);
+          handleConsultCoach(text, { inputMode: 'voice' });
         }}
       />
 

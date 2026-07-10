@@ -250,7 +250,7 @@ function buildBreathworkCard(input: any, profile: WellnessProfile): { error?: st
 
 export function registerChatRoute(app: import('express').Express, client: Anthropic, apiKey: string | undefined) {
   app.post('/api/chat', async (req: Request, res: Response) => {
-    const { messages, profile: rawProfile, localTime } = req.body ?? {};
+    const { messages, profile: rawProfile, localTime, inputMode } = req.body ?? {};
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages array is required' });
     }
@@ -279,7 +279,11 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       .slice(-30)
       .map((m: any) => ({ role: m.role, content: m.content }));
 
-    const system = buildSystemPrompt(profile, localTime || new Date().toLocaleString());
+    const system = buildSystemPrompt(
+      profile,
+      localTime || new Date().toLocaleString(),
+      inputMode === 'voice' ? 'voice' : 'text'
+    );
 
     try {
       for (let loop = 0; loop < MAX_LOOPS; loop++) {
