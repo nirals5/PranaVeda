@@ -300,7 +300,7 @@ export default function CoachingDashboard({
           className="flex items-center gap-1.5 text-stone-600 hover:text-stone-900 group font-mono text-xs cursor-pointer uppercase tracking-wider bg-white/50 backdrop-blur-sm p-2 px-4 rounded-xl border border-white/60 shadow-sm"
         >
           <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
-          BACK TO COACH
+          BACK
         </button>
 
         <div className="flex items-center gap-3">

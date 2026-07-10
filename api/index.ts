@@ -1,11 +1,17 @@
 import express from 'express';
 import Anthropic from '@anthropic-ai/sdk';
+import { registerChatRoute } from './_lib/chat';
+
+// Allow Vercel to stream the /api/chat SSE response instead of buffering it.
+export const config = { supportsResponseStreaming: true };
 
 const app = express();
 app.use(express.json());
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
 const client = new Anthropic({ apiKey });
+
+registerChatRoute(app, client, apiKey);
 
 const fallbacks = {
   insight: {
