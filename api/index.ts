@@ -1194,11 +1194,11 @@ function enrichRecommendation(data: any): any {
   return data;
 }
 
-async function callClaude(params: { system: string; prompt: string; schema: Record<string, unknown>; fallbackData: any; enricher?: (data: any) => any; }) {
+async function callClaude(params: { system: string; prompt: string; schema: Record<string, unknown>; fallbackData: any; enricher?: (data: any) => any; model?: string; }) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const response = await client.messages.create({
-        model: "claude-sonnet-4-6",
+        model: params.model ?? "claude-sonnet-4-6",
         max_tokens: 2048,
         system: params.system,
         messages: [{ role: "user", content: params.prompt }],
@@ -1262,6 +1262,9 @@ async function handleInsight(req: Request, res: Response) {
     prompt: `${contextLines.join('\n')}\n\nGenerate a brief Ayurvedic daily reflection for this moment of their day. Be short. No breathing instructions — those belong elsewhere.`,
     schema: insightResponseSchema,
     fallbackData: fallbacks.insight,
+    // The daily insight is a lightweight 4-field snippet — Haiku handles it
+    // well at a fraction of Sonnet's cost.
+    model: 'claude-haiku-4-5-20251001',
   });
   return res.json(result);
 }

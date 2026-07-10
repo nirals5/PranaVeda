@@ -33,6 +33,17 @@ export default function WellnessInsight({
 
   useEffect(() => {
     async function fetchInsight() {
+      // A daily insight should hold steady for the day — cache per calendar
+      // date so reloads don't regenerate (or re-bill) it.
+      const today = new Date().toDateString();
+      try {
+        const cached = JSON.parse(localStorage.getItem('pranaveda_insight') || 'null');
+        if (cached && cached.date === today && cached.insight) {
+          setInsight(cached.insight);
+          return;
+        }
+      } catch {}
+
       setLoading(true);
       try {
         // Send the on-device wellness profile so the reflection is personal.
@@ -48,6 +59,11 @@ export default function WellnessInsight({
         if (response.ok) {
           const data = await response.json();
           setInsight(data);
+          if (!data._isFallback) {
+            try {
+              localStorage.setItem('pranaveda_insight', JSON.stringify({ date: today, insight: data }));
+            } catch {}
+          }
         } else {
           setError(true);
         }
