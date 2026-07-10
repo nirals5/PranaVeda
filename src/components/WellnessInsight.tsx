@@ -10,6 +10,11 @@ interface WellnessInsightProps {
   onSelectSuggestion: (text: string) => void;
 }
 
+// One insight per browser session (Niral's call: fresh on each return visit,
+// steady within a session). Module-level in-flight promise dedupes React
+// StrictMode's double-mounted effect.
+let insightInflight: Promise<any> | null = null;
+
 export default function WellnessInsight({
   savedPractices,
   onSelectPractice,
@@ -32,49 +37,54 @@ export default function WellnessInsight({
   const [breathDuration, setBreathDuration] = useState(4);
 
   useEffect(() => {
+    let cancelled = false;
     async function fetchInsight() {
-      // A daily insight should hold steady for the day — cache per calendar
-      // date so reloads don't regenerate (or re-bill) it.
-      const today = new Date().toDateString();
       try {
-        const cached = JSON.parse(localStorage.getItem('pranaveda_insight') || 'null');
-        if (cached && cached.date === today && cached.insight) {
-          setInsight(cached.insight);
+        const cached = JSON.parse(sessionStorage.getItem('pranaveda_insight') || 'null');
+        if (cached) {
+          setInsight(cached);
           return;
         }
       } catch {}
 
       setLoading(true);
       try {
-        // Send the on-device wellness profile so the reflection is personal.
-        let profile = {};
-        try {
-          profile = JSON.parse(localStorage.getItem('pranaveda_profile') || '{}');
-        } catch {}
-        const response = await fetch('/api/insight', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profile, localTime: new Date().toLocaleString() }),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setInsight(data);
-          if (!data._isFallback) {
+        if (!insightInflight) {
+          insightInflight = (async () => {
+            // Send the on-device wellness profile so the reflection is personal.
+            let profile = {};
             try {
-              localStorage.setItem('pranaveda_insight', JSON.stringify({ date: today, insight: data }));
+              profile = JSON.parse(localStorage.getItem('pranaveda_profile') || '{}');
             } catch {}
-          }
-        } else {
-          setError(true);
+            const response = await fetch('/api/insight', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ profile, localTime: new Date().toLocaleString() }),
+            });
+            if (!response.ok) throw new Error(`insight ${response.status}`);
+            const data = await response.json();
+            if (!data._isFallback) {
+              try {
+                sessionStorage.setItem('pranaveda_insight', JSON.stringify(data));
+              } catch {}
+            }
+            return data;
+          })();
         }
+        const data = await insightInflight;
+        if (!cancelled) setInsight(data);
       } catch (err) {
         console.error("Error loading insight:", err);
-        setError(true);
+        insightInflight = null;
+        if (!cancelled) setError(true);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     fetchInsight();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Breath pacing timer

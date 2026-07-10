@@ -525,11 +525,24 @@ export interface WellnessProfile {
 export function buildSystemPrompt(
   profile: WellnessProfile | undefined,
   localTime: string,
-  inputMode?: 'voice' | 'text'
+  inputMode?: 'voice' | 'text',
+  previousSession?: { role: string; content: string }[]
 ): string {
   const profileBlock = profile && Object.keys(profile).length
     ? JSON.stringify(profile, null, 1)
     : '(empty — this may be a first conversation)';
+
+  const previousBlock = previousSession?.length
+    ? `\n# Previous conversation
+
+How your last conversation with this person ended (it may be hours or days old):
+${previousSession
+  .slice(-10)
+  .map((m) => `${m.role === 'user' ? 'They said' : 'You said'}: ${String(m.content).slice(0, 300)}`)
+  .join('\n')}
+
+Weave continuity naturally: if you gave a practice, you may ask how it went; if something meaningful was left unfinished (a dosha discovery mid-way, an unanswered question), gently offer to pick it up. One light touch — never recap at length, never force it.\n`
+    : '';
 
   const voiceBlock =
     inputMode === 'voice'
@@ -582,7 +595,7 @@ Your purpose is not to generate wellness plans. Your purpose is to build a long-
 - You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time.
 - You CANNOT (yet): see the user's camera or posture, read wearables/sleep data, access their calendar, control smart-home devices, or set reminders. If asked, say warmly that this isn't available yet — never pretend.
 
-${voiceBlock}
+${previousBlock}${voiceBlock}
 # Context
 
 Local time for the user: ${localTime}
@@ -899,7 +912,7 @@ function buildBreathworkCard(input: any, profile: WellnessProfile): { error?: st
 
 export function registerChatRoute(app: import('express').Express, client: Anthropic, apiKey: string | undefined) {
   app.post('/api/chat', async (req: Request, res: Response) => {
-    const { messages, profile: rawProfile, localTime, inputMode } = req.body ?? {};
+    const { messages, profile: rawProfile, localTime, inputMode, previousSession } = req.body ?? {};
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages array is required' });
     }
@@ -931,7 +944,10 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
     const system = buildSystemPrompt(
       profile,
       localTime || new Date().toLocaleString(),
-      inputMode === 'voice' ? 'voice' : 'text'
+      inputMode === 'voice' ? 'voice' : 'text',
+      Array.isArray(previousSession)
+        ? previousSession.filter((m: any) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant'))
+        : undefined
     );
 
     try {
