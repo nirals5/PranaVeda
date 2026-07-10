@@ -1,9 +1,950 @@
 import express from 'express';
+import type { Request, Response } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
-import { registerChatRoute } from './_lib/chat';
+
+// IMPORTANT: this file must stay fully self-contained (no imports from other
+// project files). Cross-file imports crash Vercel's ESM runtime with
+// ERR_MODULE_NOT_FOUND — see commit 761fe05. Everything the API needs lives
+// here, in sections: catalog → system prompt → chat → legacy endpoints.
 
 // Allow Vercel to stream the /api/chat SSE response instead of buffering it.
 export const config = { supportsResponseStreaming: true };
+
+// ============================== Practice catalog ==============================
+
+// PranaVeda curated practice catalog.
+//
+// Amrita composes rituals FROM this catalog (by id) rather than free-generating
+// poses, so every recommendation is vetted, has consistent assets, and can be
+// safety-filtered against the user's wellness profile.
+//
+// Structure follows Niral's three-layer pose schema (Teaching Content +
+// Ayurvedic Layer; the CV Geometry layer ships to the client when live
+// practice is built). Dosha tags and cues are DRAFT content seeded from the
+// pose-library sheet and standard Ayurvedic sequencing references — Niral
+// reviews and owns this content.
+
+export type ConditionTag =
+  | 'knee_injury'
+  | 'wrist_injury'
+  | 'shoulder_injury'
+  | 'neck_injury'
+  | 'lower_back_injury'
+  | 'hamstring_injury'
+  | 'pregnancy'
+  | 'hypertension'
+  | 'low_blood_pressure'
+  | 'glaucoma'
+  | 'heart_condition'
+  | 'recent_surgery'
+  | 'vertigo'
+  | 'asthma';
+
+export interface CatalogPose {
+  id: string;
+  nameSanskrit: string;
+  nameEnglish: string;
+  level: 'Beginner' | 'Intermediate' | 'Advanced';
+  bodyFocus: string;
+  cues: string[];
+  commonMistakes: string[];
+  benefits: string;
+  modifications: string;
+  contraindications: ConditionTag[];
+  dosha: { vata: string; pitta: string; kapha: string };
+  bestTime: string;
+  counterPoseId?: string;
+  defaultDurationMin: number;
+  poseImageUrl: string;
+  videoUrl?: string;
+}
+
+export interface CatalogBreathwork {
+  id: string;
+  name: string;
+  sanskritName: string;
+  description: string;
+  inhale: number;
+  holdActive: number;
+  exhale: number;
+  holdEmpty: number;
+  cycles: number;
+  benefits: string;
+  doshaSuitability: string;
+  contraindications: ConditionTag[];
+  bestTime: string;
+}
+
+const img = {
+  child: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800&auto=format&fit=crop',
+  flow: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=800&auto=format&fit=crop',
+  backbend: 'https://images.unsplash.com/photo-1512438248247-f0f2a5a8b7f0?q=80&w=800&auto=format&fit=crop',
+  fold: 'https://images.unsplash.com/photo-1508672019048-805c876b67e2?q=80&w=800&auto=format&fit=crop',
+  rest: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?q=80&w=800&auto=format&fit=crop',
+};
+
+const vid = 'https://assets.mixkit.co/videos/preview/mixkit-woman-doing-yoga-on-a-wooden-dock-42289-large.mp4';
+
+export const POSES: CatalogPose[] = [
+  {
+    id: 'mountain',
+    nameSanskrit: 'Tadasana',
+    nameEnglish: 'Mountain Pose',
+    level: 'Beginner',
+    bodyFocus: 'Posture / Grounding',
+    cues: ['Root down through all four corners of the feet', 'Lengthen the crown toward the sky', 'Soften the shoulders away from the ears'],
+    commonMistakes: ['Locking the knees', 'Letting the ribs flare forward'],
+    benefits: 'Establishes steady, aligned standing posture and quiet attention; the foundation for all standing poses.',
+    modifications: 'Stand with feet hip-width for more stability; practice against a wall to feel alignment.',
+    contraindications: [],
+    dosha: { vata: 'Grounding and steadying', pitta: 'Neutral', kapha: 'Mildly energizing when held with intention' },
+    bestTime: 'Anytime',
+    defaultDurationMin: 1,
+    poseImageUrl: img.flow,
+  },
+  {
+    id: 'childs_pose',
+    nameSanskrit: 'Balasana',
+    nameEnglish: "Child's Pose",
+    level: 'Beginner',
+    bodyFocus: 'Low back / Hips / Rest',
+    cues: ['Sink hips toward heels', 'Let the forehead rest down', 'Breathe into the back body'],
+    commonMistakes: ['Forcing hips lower than is comfortable', 'Holding tension in the shoulders'],
+    benefits: 'Gentle release for the low back and hips; deeply calming and restorative for the nervous system.',
+    modifications: 'Place a cushion between heels and hips for knee sensitivity; rest the head on stacked fists.',
+    contraindications: ['knee_injury', 'pregnancy'],
+    dosha: { vata: 'Deeply grounding and calming — ideal for vata', pitta: 'Cooling and soothing', kapha: 'Can increase heaviness if held too long' },
+    bestTime: 'Evening, or anytime as a reset',
+    defaultDurationMin: 2,
+    poseImageUrl: img.child,
+    videoUrl: vid,
+  },
+  {
+    id: 'cat_cow',
+    nameSanskrit: 'Marjariasana–Bitilasana',
+    nameEnglish: 'Cat–Cow Flow',
+    level: 'Beginner',
+    bodyFocus: 'Spine / Breath coordination',
+    cues: ['Move with the breath — inhale to arch, exhale to round', 'Press the floor away through the palms', 'Let the movement start from the tailbone'],
+    commonMistakes: ['Rushing faster than the breath', 'Collapsing into the wrists'],
+    benefits: 'Articulates the whole spine, coordinates breath with movement, and gently warms the core.',
+    modifications: 'Pad the knees; make fists if wrists are sensitive.',
+    contraindications: ['wrist_injury', 'neck_injury'],
+    dosha: { vata: 'Soothing when slow and rhythmic', pitta: 'Neutral', kapha: 'Awakening — good morning starter' },
+    bestTime: 'Morning',
+    counterPoseId: 'childs_pose',
+    defaultDurationMin: 3,
+    poseImageUrl: img.flow,
+    videoUrl: vid,
+  },
+  {
+    id: 'downward_dog',
+    nameSanskrit: 'Adho Mukha Svanasana',
+    nameEnglish: 'Downward-Facing Dog',
+    level: 'Intermediate',
+    bodyFocus: 'Shoulders / Hamstrings / Full body',
+    cues: ['Press the floor away through the palms', 'Lengthen the tailbone up and back', 'Bend the knees if the hamstrings are tight'],
+    commonMistakes: ['Rounding the upper back', 'Collapsing into the shoulders', 'Locking the elbows hard'],
+    benefits: 'Lengthens the spine and hamstrings, strengthens arms and shoulders, relieves mild back tension, and calms the mind.',
+    modifications: 'Shorten the stance and bend knees generously; practice with hands on a chair seat.',
+    contraindications: ['wrist_injury', 'shoulder_injury', 'hypertension', 'glaucoma'],
+    dosha: { vata: 'Grounding through hands and feet, calming', pitta: 'Mild inversion may aggravate excess pitta — keep brief', kapha: 'Energizing, stimulates circulation' },
+    bestTime: 'Morning or midday',
+    counterPoseId: 'childs_pose',
+    defaultDurationMin: 2,
+    poseImageUrl: img.child,
+    videoUrl: vid,
+  },
+  {
+    id: 'standing_forward_fold',
+    nameSanskrit: 'Uttanasana',
+    nameEnglish: 'Standing Forward Fold',
+    level: 'Beginner',
+    bodyFocus: 'Hamstrings / Spine / Calm',
+    cues: ['Hinge from the hips, not the waist', 'Let the head hang heavy', 'Keep a soft bend in the knees'],
+    commonMistakes: ['Rounding from the low back with straight legs', 'Gripping the neck'],
+    benefits: 'Releases the hamstrings and spine, quiets the senses, and gently soothes an overactive mind.',
+    modifications: 'Rest hands on blocks or shins; take feet wider apart.',
+    contraindications: ['lower_back_injury', 'hamstring_injury', 'hypertension', 'glaucoma', 'vertigo'],
+    dosha: { vata: 'Calming if supported and unhurried', pitta: 'Cooling — head below heart soothes heat', kapha: 'Neutral' },
+    bestTime: 'Morning or evening',
+    counterPoseId: 'mountain',
+    defaultDurationMin: 1,
+    poseImageUrl: img.fold,
+  },
+  {
+    id: 'warrior_1',
+    nameSanskrit: 'Virabhadrasana I',
+    nameEnglish: 'Warrior I',
+    level: 'Beginner',
+    bodyFocus: 'Legs / Hips / Chest',
+    cues: ['Ground the back heel at a 45° angle', 'Square the hips gently toward the front', 'Reach up through both arms without lifting the shoulders'],
+    commonMistakes: ['Front knee drifting past the ankle', 'Overarching the low back'],
+    benefits: 'Builds leg strength and stamina, opens the chest and hip flexors, and cultivates focused determination.',
+    modifications: 'Shorten the stance; keep hands at the heart if shoulders are tight.',
+    contraindications: ['knee_injury', 'hypertension', 'heart_condition'],
+    dosha: { vata: 'Grounding when held steadily', pitta: 'Heating — keep holds moderate', kapha: 'Excellent — builds warmth and energy' },
+    bestTime: 'Morning',
+    counterPoseId: 'standing_forward_fold',
+    defaultDurationMin: 2,
+    poseImageUrl: img.flow,
+  },
+  {
+    id: 'warrior_2',
+    nameSanskrit: 'Virabhadrasana II',
+    nameEnglish: 'Warrior II',
+    level: 'Beginner',
+    bodyFocus: 'Legs / Hips / Focus',
+    cues: ['Stack the front knee over the ankle', 'Reach equally through both fingertips', 'Gaze softly over the front hand'],
+    commonMistakes: ['Knee collapsing inward', 'Leaning the torso forward', 'Back foot turning out too far'],
+    benefits: 'Builds leg strength, opens the hips, and improves steady focus.',
+    modifications: 'Narrow the stance or reduce the bend with knee sensitivity; rest hands on hips.',
+    contraindications: ['knee_injury', 'hypertension'],
+    dosha: { vata: 'Grounding — good for vata imbalance', pitta: 'Heating — pair with cooling breath', kapha: 'Energizing — good for sluggishness' },
+    bestTime: 'Morning',
+    counterPoseId: 'childs_pose',
+    defaultDurationMin: 2,
+    poseImageUrl: img.flow,
+  },
+  {
+    id: 'triangle',
+    nameSanskrit: 'Trikonasana',
+    nameEnglish: 'Triangle Pose',
+    level: 'Beginner',
+    bodyFocus: 'Side body / Hamstrings / Balance',
+    cues: ['Lengthen both sides of the waist evenly', 'Reach out before reaching down', 'Stack the top shoulder over the bottom'],
+    commonMistakes: ['Collapsing into the bottom hand', 'Hyperextending the front knee'],
+    benefits: 'Stretches the side body and hamstrings, strengthens the legs, and improves digestion and balance.',
+    modifications: 'Rest the bottom hand on a block or the shin; shorten the stance.',
+    contraindications: ['neck_injury', 'low_blood_pressure', 'vertigo'],
+    dosha: { vata: 'Steadying when unhurried', pitta: 'Neutral to mildly cooling', kapha: 'Stimulating — supports digestion' },
+    bestTime: 'Morning or midday',
+    counterPoseId: 'mountain',
+    defaultDurationMin: 2,
+    poseImageUrl: img.flow,
+  },
+  {
+    id: 'tree_pose',
+    nameSanskrit: 'Vrksasana',
+    nameEnglish: 'Tree Pose',
+    level: 'Beginner',
+    bodyFocus: 'Balance / Hips / Focus',
+    cues: ['Root down through the standing foot', 'Press foot and inner thigh together', 'Soften the gaze to one steady point'],
+    commonMistakes: ['Foot pressing directly on the knee joint', 'Hips tilting to one side', 'Holding the breath'],
+    benefits: 'Improves balance and ankle stability, builds quiet focus and calm confidence.',
+    modifications: 'Use a wall for support; keep the toes on the floor with the heel at the ankle.',
+    contraindications: ['vertigo'],
+    dosha: { vata: 'Calming if steady; pace slowly to avoid scattering energy', pitta: 'Neutral to mildly cooling', kapha: 'Energizing, builds focus' },
+    bestTime: 'Anytime, especially morning',
+    counterPoseId: 'mountain',
+    defaultDurationMin: 2,
+    poseImageUrl: img.flow,
+  },
+  {
+    id: 'bridge',
+    nameSanskrit: 'Setu Bandha Sarvangasana',
+    nameEnglish: 'Bridge Pose',
+    level: 'Beginner',
+    bodyFocus: 'Back body / Chest / Hips',
+    cues: ['Press evenly through both feet', 'Lift from the hips, not the low back', 'Keep the knees tracking over the ankles'],
+    commonMistakes: ['Squeezing the glutes so hard the knees splay', 'Turning the head while lifted'],
+    benefits: 'Strengthens the back body, opens the chest and hip flexors, and gently energizes without strain.',
+    modifications: 'Place a block under the sacrum for a supported, restorative version.',
+    contraindications: ['neck_injury', 'lower_back_injury'],
+    dosha: { vata: 'Grounding in its supported form', pitta: 'Neutral', kapha: 'Uplifting — opens the chest' },
+    bestTime: 'Morning or early evening',
+    counterPoseId: 'supine_twist',
+    defaultDurationMin: 2,
+    poseImageUrl: img.backbend,
+  },
+  {
+    id: 'cobra',
+    nameSanskrit: 'Bhujangasana',
+    nameEnglish: 'Cobra Pose',
+    level: 'Beginner',
+    bodyFocus: 'Spine / Chest',
+    cues: ['Lift from the strength of the back, not the arms', 'Keep the elbows hugging the ribs', 'Lengthen forward before lifting up'],
+    commonMistakes: ['Pushing into a deep backbend with the arms', 'Crunching the neck to look up'],
+    benefits: 'Strengthens the spine, opens the chest and lungs, and counteracts long hours of sitting.',
+    modifications: 'Practice baby cobra with forearms down (Sphinx) for sensitivity.',
+    contraindications: ['lower_back_injury', 'wrist_injury', 'pregnancy'],
+    dosha: { vata: 'Warming and enlivening in small doses', pitta: 'Heating — keep gentle', kapha: 'Excellent — opens the chest and lifts energy' },
+    bestTime: 'Morning',
+    counterPoseId: 'childs_pose',
+    defaultDurationMin: 2,
+    poseImageUrl: img.backbend,
+  },
+  {
+    id: 'sphinx',
+    nameSanskrit: 'Salamba Bhujangasana',
+    nameEnglish: 'Sphinx Pose',
+    level: 'Beginner',
+    bodyFocus: 'Low back / Chest',
+    cues: ['Stack elbows under the shoulders', 'Draw the chest gently forward and up', 'Keep the legs heavy and relaxed'],
+    commonMistakes: ['Shrugging the shoulders toward the ears', 'Clenching the low back'],
+    benefits: 'A gentle, supported backbend that restores the natural lumbar curve and opens the heart softly.',
+    modifications: 'Slide the elbows further forward to reduce the arch.',
+    contraindications: ['lower_back_injury', 'pregnancy'],
+    dosha: { vata: 'Grounding and gently warming — very vata-friendly', pitta: 'Mild', kapha: 'Gently stimulating' },
+    bestTime: 'Anytime',
+    counterPoseId: 'childs_pose',
+    defaultDurationMin: 2,
+    poseImageUrl: img.backbend,
+  },
+  {
+    id: 'seated_forward_bend',
+    nameSanskrit: 'Paschimottanasana',
+    nameEnglish: 'Seated Forward Bend',
+    level: 'Beginner',
+    bodyFocus: 'Hamstrings / Spine / Introspection',
+    cues: ['Inhale to lengthen the spine, exhale to fold from the hips', 'Reach for shins or feet without forcing', 'Let the breath do the deepening'],
+    commonMistakes: ['Rounding hard to grab the feet', 'Straining the hamstrings'],
+    benefits: 'Grounds the pelvis, stretches the spine and hamstrings, and turns attention inward.',
+    modifications: 'Sit on a folded blanket; loop a strap around the feet; bend the knees.',
+    contraindications: ['lower_back_injury', 'hamstring_injury', 'pregnancy'],
+    dosha: { vata: 'Deeply calming when supported', pitta: 'Cooling and quieting', kapha: 'Can be dulling — keep the spine active' },
+    bestTime: 'Evening',
+    counterPoseId: 'bridge',
+    defaultDurationMin: 2,
+    poseImageUrl: img.fold,
+  },
+  {
+    id: 'butterfly',
+    nameSanskrit: 'Baddha Konasana',
+    nameEnglish: 'Bound Angle (Butterfly) Pose',
+    level: 'Beginner',
+    bodyFocus: 'Hips / Inner thighs',
+    cues: ['Bring the soles of the feet together', 'Let the knees release toward the floor without pressing', 'Lengthen up through the spine'],
+    commonMistakes: ['Bouncing the knees', 'Rounding the back to lean forward'],
+    benefits: 'Opens the hips and inner thighs, eases restlessness, and supports healthy circulation in the pelvis.',
+    modifications: 'Sit on a blanket; support the knees with cushions for a restorative hold.',
+    contraindications: ['knee_injury'],
+    dosha: { vata: 'Calming with support under the knees', pitta: 'Cooling', kapha: 'Neutral' },
+    bestTime: 'Evening',
+    defaultDurationMin: 2,
+    poseImageUrl: img.fold,
+  },
+  {
+    id: 'supine_twist',
+    nameSanskrit: 'Supta Matsyendrasana',
+    nameEnglish: 'Supine Spinal Twist',
+    level: 'Beginner',
+    bodyFocus: 'Spine / Digestion / Release',
+    cues: ['Keep both shoulders heavy on the floor', 'Let the knees fall with gravity', 'Soften the belly with each exhale'],
+    commonMistakes: ['Forcing the knees to the floor', 'Lifting the opposite shoulder'],
+    benefits: 'Releases the spine and low back, aids digestion, and signals deep rest to the nervous system.',
+    modifications: 'Place a cushion between or under the knees.',
+    contraindications: ['lower_back_injury', 'pregnancy'],
+    dosha: { vata: 'Settling and integrating', pitta: 'Cooling — wrings out heat and irritation', kapha: 'Gently stimulating for digestion' },
+    bestTime: 'Evening, or to close any practice',
+    counterPoseId: 'corpse_pose',
+    defaultDurationMin: 2,
+    poseImageUrl: img.rest,
+  },
+  {
+    id: 'legs_up_the_wall',
+    nameSanskrit: 'Viparita Karani',
+    nameEnglish: 'Legs-Up-the-Wall',
+    level: 'Beginner',
+    bodyFocus: 'Rest / Circulation / Sleep',
+    cues: ['Scoot the sitting bones close to the wall', 'Let the legs rest completely on the wall', 'Rest the hands on the belly or by the sides'],
+    commonMistakes: ['Holding the legs actively', 'Placing the hips too far from the wall'],
+    benefits: 'Drains tired legs, lowers arousal, and is one of the most reliable preparations for sleep.',
+    modifications: 'Place a folded blanket under the hips; bend the knees if the hamstrings protest.',
+    contraindications: ['glaucoma', 'hypertension'],
+    dosha: { vata: 'Profoundly calming — a vata remedy', pitta: 'Cooling and soothing', kapha: 'Restful — keep to shorter holds in the morning' },
+    bestTime: 'Evening / before sleep',
+    counterPoseId: 'corpse_pose',
+    defaultDurationMin: 5,
+    poseImageUrl: img.rest,
+  },
+  {
+    id: 'easy_pose',
+    nameSanskrit: 'Sukhasana',
+    nameEnglish: 'Easy Seat',
+    level: 'Beginner',
+    bodyFocus: 'Meditation / Breath',
+    cues: ['Sit tall on the front edge of a cushion', 'Let the hands rest on the knees', 'Relax the jaw and the space between the eyebrows'],
+    commonMistakes: ['Slumping through the low back', 'Forcing the knees down'],
+    benefits: 'A steady, comfortable seat for breathwork and meditation; settles body and mind for inner work.',
+    modifications: 'Sit on a cushion or against a wall; sit in a chair with feet grounded.',
+    contraindications: [],
+    dosha: { vata: 'Stabilizing seat for calming breath', pitta: 'Neutral', kapha: 'Neutral' },
+    bestTime: 'Anytime',
+    defaultDurationMin: 3,
+    poseImageUrl: img.rest,
+  },
+  {
+    id: 'corpse_pose',
+    nameSanskrit: 'Savasana',
+    nameEnglish: 'Corpse Pose',
+    level: 'Beginner',
+    bodyFocus: 'Integration / Deep rest',
+    cues: ['Let the feet fall open and the palms turn up', 'Release the weight of the body into the floor', 'Let the breath return to its natural rhythm'],
+    commonMistakes: ['Skipping it', 'Fidgeting instead of committing to stillness'],
+    benefits: 'Integrates the whole practice, resets the nervous system, and teaches complete surrender.',
+    modifications: 'Place a bolster under the knees for the low back; cover the eyes.',
+    contraindications: [],
+    dosha: { vata: 'Essential — cover with a blanket to stay warm', pitta: 'Deeply cooling and releasing', kapha: 'Keep brief in the morning to avoid drowsiness' },
+    bestTime: 'End of any practice',
+    defaultDurationMin: 3,
+    poseImageUrl: img.rest,
+  },
+];
+
+export const BREATHWORK: CatalogBreathwork[] = [
+  {
+    id: 'nadi_shodhana',
+    name: 'Alternate Nostril Breathing',
+    sanskritName: 'Nadi Shodhana',
+    description: 'A restorative technique that balances the left and right energy channels and dissolves anxiety.',
+    inhale: 4, holdActive: 4, exhale: 6, holdEmpty: 0, cycles: 10,
+    benefits: 'Balances dual energies, steadies the heart rhythm, and settles mental chatter.',
+    doshaSuitability: 'Tridoshic — especially balancing for vata',
+    contraindications: [],
+    bestTime: 'Morning or before meditation',
+  },
+  {
+    id: 'sama_vritti',
+    name: 'Equal Breathing',
+    sanskritName: 'Sama Vritti',
+    description: 'Inhale, hold, exhale, and rest for equal counts — a perfectly symmetrical, steadying rhythm.',
+    inhale: 4, holdActive: 4, exhale: 4, holdEmpty: 4, cycles: 8,
+    benefits: 'Induces calm equilibrium; a reliable anchor for a scattered or anxious mind.',
+    doshaSuitability: 'Tridoshic — the safest default',
+    contraindications: [],
+    bestTime: 'Anytime',
+  },
+  {
+    id: 'ujjayi',
+    name: 'Ocean Breath',
+    sanskritName: 'Ujjayi',
+    description: 'A soft oceanic sound created at the back of the throat, giving the breath texture to follow.',
+    inhale: 4, holdActive: 0, exhale: 6, holdEmpty: 0, cycles: 12,
+    benefits: 'Focuses attention, gently warms the body, and pairs beautifully with slow movement.',
+    doshaSuitability: 'Warming — good for vata and kapha; moderate for pitta',
+    contraindications: [],
+    bestTime: 'During practice or morning',
+  },
+  {
+    id: 'bhramari',
+    name: 'Humming Bee Breath',
+    sanskritName: 'Bhramari',
+    description: 'Exhale with a soft humming sound, letting the vibration quiet the mind from the inside.',
+    inhale: 4, holdActive: 0, exhale: 8, holdEmpty: 0, cycles: 7,
+    benefits: 'Immediately soothes the nervous system; wonderful for insomnia, anger, and anxious loops.',
+    doshaSuitability: 'Calming for vata and pitta',
+    contraindications: [],
+    bestTime: 'Evening / before sleep',
+  },
+  {
+    id: 'sheetali',
+    name: 'Cooling Breath',
+    sanskritName: 'Sheetali',
+    description: 'Inhale through a curled tongue (or pursed lips) as if sipping cool air, exhale through the nose.',
+    inhale: 4, holdActive: 2, exhale: 6, holdEmpty: 0, cycles: 9,
+    benefits: 'Cools the body and temper, eases heat, irritability, and inflammation.',
+    doshaSuitability: 'The classic pitta remedy; use sparingly for vata and kapha',
+    contraindications: ['asthma', 'low_blood_pressure'],
+    bestTime: 'Midday or when overheated',
+  },
+  {
+    id: 'bhastrika',
+    name: 'Bellows Breath',
+    sanskritName: 'Bhastrika',
+    description: 'Vigorous, even inhales and exhales that stoke inner fire — practiced gently and briefly.',
+    inhale: 2, holdActive: 0, exhale: 2, holdEmpty: 0, cycles: 15,
+    benefits: 'Builds heat and alertness, clears heaviness and morning fog.',
+    doshaSuitability: 'The kapha awakener; avoid with elevated pitta or anxious vata',
+    contraindications: ['pregnancy', 'hypertension', 'heart_condition', 'vertigo', 'glaucoma'],
+    bestTime: 'Morning',
+  },
+  {
+    id: 'chandra_bhedana',
+    name: 'Moon-Piercing Breath',
+    sanskritName: 'Chandra Bhedana',
+    description: 'Inhale through the left nostril only, exhale through the right — drawing in lunar, cooling energy.',
+    inhale: 4, holdActive: 2, exhale: 6, holdEmpty: 0, cycles: 9,
+    benefits: 'Quiets an overheated or agitated system and prepares the body for rest.',
+    doshaSuitability: 'Cooling — for pitta and restless evenings',
+    contraindications: ['low_blood_pressure'],
+    bestTime: 'Evening',
+  },
+];
+
+export const poseById = new Map(POSES.map((p) => [p.id, p]));
+export const breathworkById = new Map(BREATHWORK.map((b) => [b.id, b]));
+
+// Compact catalog summaries injected into Amrita's system prompt so she can
+// select by id without seeing every field.
+export function catalogPromptSummary(): string {
+  const poses = POSES.map(
+    (p) =>
+      `- ${p.id} (${p.nameEnglish} / ${p.nameSanskrit}) — ${p.bodyFocus}. Vata: ${p.dosha.vata}. Pitta: ${p.dosha.pitta}. Kapha: ${p.dosha.kapha}. Best: ${p.bestTime}.${p.contraindications.length ? ' Avoid with: ' + p.contraindications.join(', ') + '.' : ''}`
+  ).join('\n');
+  const breaths = BREATHWORK.map(
+    (b) =>
+      `- ${b.id} (${b.name} / ${b.sanskritName}) — ${b.doshaSuitability}. ${b.inhale}-${b.holdActive}-${b.exhale}-${b.holdEmpty} × ${b.cycles}. Best: ${b.bestTime}.${b.contraindications.length ? ' Avoid with: ' + b.contraindications.join(', ') + '.' : ''}`
+  ).join('\n');
+  return `## Pose catalog (recommend ONLY these, by id)\n${poses}\n\n## Breathwork catalog (recommend ONLY these, by id)\n${breaths}`;
+}
+
+// ============================ Amrita system prompt ============================
+
+// Amrita's shipping system prompt.
+//
+// Derived from AMRITA.md (Niral's north-star purpose document). This version is
+// scoped to what the app can actually do TODAY: multi-turn conversation, the
+// curated practice catalog, a client-held wellness profile, and time of day.
+// It deliberately omits computer vision, wearables, calendar, and smart-home
+// capabilities — promote those sections from AMRITA.md only when they ship.
+
+
+export interface WellnessProfile {
+  name?: string;
+  prakriti?: string;
+  vikriti?: string;
+  prakritiConfidence?: 'low' | 'medium' | 'high';
+  goals?: string[];
+  conditions?: string[];
+  preferences?: string[];
+  observations?: { date: string; note: string }[];
+  practiceHistory?: { date: string; title: string; kind: 'ritual' | 'breathwork' }[];
+}
+
+export function buildSystemPrompt(
+  profile: WellnessProfile | undefined,
+  localTime: string,
+  inputMode?: 'voice' | 'text'
+): string {
+  const profileBlock = profile && Object.keys(profile).length
+    ? JSON.stringify(profile, null, 1)
+    : '(empty — this may be a first conversation)';
+
+  const voiceBlock =
+    inputMode === 'voice'
+      ? `\n# Voice mode — STRICT
+
+The user SPOKE this message and every word you write will be READ ALOUD to them. This overrides all other style guidance:
+- HARD LIMIT: at most 3 short sentences (about 45 words) across your ENTIRE turn — including any text before and after a tool call combined.
+- Write for the ear: warm, natural spoken sentences. No markdown, no lists, no headings, no parentheses, no Sanskrit terms without a gloss.
+- If you create a card, one sentence to introduce it is enough — never describe its contents aloud.
+- If a topic truly needs depth, give the one-sentence heart of it and offer to say more.\n`
+      : '';
+
+  return `You are Amrita, PranaVeda's wellness companion — an experienced yoga therapist and Ayurvedic practitioner rooted in Yoga and Ayurveda.
+
+Your purpose is not to generate wellness plans. Your purpose is to build a long-term relationship that gradually helps this person become healthier, calmer, stronger, and more self-aware. Never behave like a questionnaire followed by a static report. Behave like an evolving wellness coach.
+
+# How you converse
+
+- This is a conversation, not a workflow, form, or wizard. Speak with warmth, grace, and human empathy; humble and sophisticated language; usually 2-5 sentences unless teaching something.
+- Before responding, silently consider: What do I already know from the profile and this conversation? Has anything changed ("I slept terribly", "my shoulder hurts", "I only have five minutes")? What is the minimum effective intervention?
+- Instead of immediately producing a full practice, consider whether to first: ask ONE thoughtful clarifying question, check in about a previous practice, celebrate progress, answer their question, or simply encourage. Sometimes the right answer is a single breathing exercise, one pose, one cup of herbal tea, or education — not a complete program.
+- Ask a clarifying question only when the answer would meaningfully improve personalization (e.g. "How much time do you have?", "Calming or energizing?", "Is today's pain different from yesterday?"). One question at a time; don't interrogate.
+- Explain WHY you suggest things, tying them to what you know: "Because your sleep has been inconsistent...", "Since this is late evening...", "Since your constitution leans Vata...".
+- Never pretend certainty. Distinguish traditional Ayurvedic knowledge and yoga philosophy from modern evidence, and both from your inferences about the user. When classical guidance differs from modern medical advice, acknowledge the distinction. You are not a medical provider; for pain that is sharp, worsening, or unexplained, gently suggest professional care.
+- Favor compassionate, sattvic, vegetarian dietary guidance while respecting individual preferences and medical needs. Primary Ayurvedic reference: Kalyanakarakam of Ugraditya; secondary: Charaka Samhita.
+
+# Tools — when structure genuinely helps
+
+- Use create_ritual ONLY when a full guided practice genuinely serves them better than conversation — typically when they've asked for a practice, or you've understood their state and they're ready to move. Compose 3-5 poses from the catalog by id, honoring counter-poses and their available time.
+- Use suggest_breathwork when a single breathing exercise is the minimum effective intervention.
+- Use update_wellness_profile whenever you learn something durable: goals, injuries or conditions (use the condition tags when applicable), preferences, constitution insights, or a meaningful observation. Update silently — never announce "I've updated your profile"; just weave remembering into how you speak. Do not store trivia, only what improves future guidance.
+- After a tool returns, continue naturally in one or two sentences (e.g. why this sequence, what to notice) — do not restate the card's contents.
+
+# Safety
+
+- NEVER include a pose or breath whose contraindications match the user's known conditions; choose alternatives and, if relevant, briefly say why you steered away.
+- If the profile mentions pregnancy or a heart condition, keep everything gentle and explicitly invite professional guidance.
+
+# What you can and cannot do
+
+- You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time.
+- You CANNOT (yet): see the user's camera or posture, read wearables/sleep data, access their calendar, control smart-home devices, or set reminders. If asked, say warmly that this isn't available yet — never pretend.
+
+${voiceBlock}
+# Context
+
+Local time for the user: ${localTime}
+
+Wellness profile (accumulated across conversations, stored on the user's device):
+${profileBlock}
+
+${catalogPromptSummary()}`;
+}
+
+// ========================= Conversational chat (SSE) ==========================
+
+// Conversational Amrita: streaming chat with tool use.
+//
+// The client sends the conversation history plus the on-device wellness
+// profile; the server streams back SSE events:
+//   {type:'text', delta}        — Amrita's words, as they generate
+//   {type:'card', card}         — a structured ritual/breathwork card
+//   {type:'profile', profile}   — updated wellness profile (client persists it)
+//   {type:'done'} / {type:'error', message}
+//
+// Claude decides WHEN to reach for structure (create_ritual /
+// suggest_breathwork) and composes only from the curated catalog by id. The
+// server joins catalog data and hard-rejects any pick whose contraindications
+// match the user's known conditions, so safety does not depend on the model
+// reading prose.
+
+
+const MODEL = 'claude-sonnet-5';
+const MAX_LOOPS = 5;
+
+const tools: Anthropic.Tool[] = [
+  {
+    name: 'create_ritual',
+    description:
+      'Present a full guided practice as a structured card. Use only when a complete practice genuinely serves the user better than conversation. Compose poses from the catalog by id; the app renders images, cues, and timers from the catalog.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Calm title for the practice' },
+        description: { type: 'string', description: 'One line on the goal of this sequence' },
+        summary: { type: 'string', description: 'Personal, compassionate overview tying the practice to what they shared' },
+        doshaTendency: { type: 'string', description: 'Why this state maps to a dosha tendency, in one or two sentences' },
+        primaryEnergy: { type: 'string', description: "Evocative two-word title for their current state, e.g. 'Scattered Wind'" },
+        poses: {
+          type: 'array',
+          minItems: 2,
+          maxItems: 6,
+          items: {
+            type: 'object',
+            properties: {
+              poseId: { type: 'string', description: 'Catalog pose id' },
+              durationMinutes: { type: 'number', description: 'Minutes for this pose' },
+              note: { type: 'string', description: 'Optional personal note for this pose in their sequence' },
+            },
+            required: ['poseId', 'durationMinutes'],
+            additionalProperties: false,
+          },
+        },
+        breathworkId: { type: 'string', description: 'Catalog breathwork id to close or open the practice' },
+        breathworkCycles: { type: 'integer', description: 'Override cycle count if needed' },
+        ayurvedic: {
+          type: 'object',
+          properties: {
+            assessment: { type: 'string' },
+            doshaPrimary: { type: 'string', description: 'Vata, Pitta, Kapha, or Dual' },
+            dietaryTips: { type: 'array', items: { type: 'string' } },
+            lifestyleTips: { type: 'array', items: { type: 'string' } },
+            recommendedHerbs: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['assessment', 'doshaPrimary', 'dietaryTips', 'lifestyleTips', 'recommendedHerbs'],
+          additionalProperties: false,
+        },
+        lifestyleTips: { type: 'array', items: { type: 'string' }, description: 'One or two general daily tips' },
+      },
+      required: ['title', 'description', 'summary', 'doshaTendency', 'primaryEnergy', 'poses', 'breathworkId', 'ayurvedic', 'lifestyleTips'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'suggest_breathwork',
+    description:
+      'Present a single breathing exercise as a card with a live timer — the minimum effective intervention when a full practice would be too much.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        breathworkId: { type: 'string', description: 'Catalog breathwork id' },
+        cycles: { type: 'integer', description: 'Override cycle count if needed' },
+        note: { type: 'string', description: 'One personal line about why this breath, for this moment' },
+      },
+      required: ['breathworkId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_wellness_profile',
+    description:
+      'Silently record durable learnings about the user. Use whenever you learn goals, injuries/conditions, preferences, constitution insights, or meaningful observations. Never announce it.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        set: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            prakriti: { type: 'string', description: 'Dominant (and secondary) constitution, e.g. "Vata-Pitta"' },
+            vikriti: { type: 'string', description: 'Current imbalance, if assessed' },
+            prakritiConfidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+          },
+          additionalProperties: false,
+        },
+        addGoals: { type: 'array', items: { type: 'string' } },
+        removeGoals: { type: 'array', items: { type: 'string' } },
+        addConditions: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Injuries/conditions. Use catalog tags when applicable: knee_injury, wrist_injury, shoulder_injury, neck_injury, lower_back_injury, hamstring_injury, pregnancy, hypertension, low_blood_pressure, glaucoma, heart_condition, recent_surgery, vertigo, asthma. Free text allowed for others.',
+        },
+        removeConditions: { type: 'array', items: { type: 'string' } },
+        addPreferences: { type: 'array', items: { type: 'string' }, description: 'e.g. "prefers evening practice", "dislikes fast flows"' },
+        removePreferences: { type: 'array', items: { type: 'string' } },
+        addObservation: { type: 'string', description: 'One meaningful longitudinal observation, e.g. "slept poorly three nights running"' },
+      },
+      additionalProperties: false,
+    },
+  },
+];
+
+type SseEvent =
+  | { type: 'text'; delta: string }
+  | { type: 'card'; card: unknown }
+  | { type: 'profile'; profile: WellnessProfile }
+  | { type: 'done' }
+  | { type: 'error'; message: string };
+
+function send(res: Response, event: SseEvent) {
+  res.write(`data: ${JSON.stringify(event)}\n\n`);
+}
+
+function todayStamp() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function conditionConflicts(contraindications: string[], conditions: string[] | undefined): string[] {
+  if (!conditions?.length) return [];
+  const normalized = conditions.map((c) => c.toLowerCase().replace(/\s+/g, '_'));
+  return contraindications.filter((tag) => normalized.some((c) => c.includes(tag) || tag.includes(c)));
+}
+
+function applyProfileUpdate(profile: WellnessProfile, input: any): WellnessProfile {
+  const next: WellnessProfile = { ...profile };
+  const uniq = (arr: string[]) => [...new Set(arr.filter(Boolean))];
+  // The model occasionally sends a bare string where the schema wants an
+  // array — coerce instead of spreading a string into characters.
+  const asList = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x) => typeof x === 'string') : typeof v === 'string' && v.trim() ? [v] : [];
+  if (input.set) {
+    for (const k of ['name', 'prakriti', 'vikriti', 'prakritiConfidence'] as const) {
+      if (input.set[k] !== undefined) (next as any)[k] = input.set[k];
+    }
+  }
+  const merge = (key: 'goals' | 'conditions' | 'preferences', addRaw?: unknown, removeRaw?: unknown) => {
+    const add = asList(addRaw);
+    const remove = asList(removeRaw);
+    let list = next[key] ?? [];
+    if (add.length) list = uniq([...list, ...add]);
+    if (remove.length) list = list.filter((x) => !remove.some((r) => x.toLowerCase() === r.toLowerCase()));
+    next[key] = list;
+  };
+  merge('goals', input.addGoals, input.removeGoals);
+  merge('conditions', input.addConditions, input.removeConditions);
+  merge('preferences', input.addPreferences, input.removePreferences);
+  if (input.addObservation) {
+    next.observations = [...(next.observations ?? []), { date: todayStamp(), note: input.addObservation }].slice(-30);
+  }
+  return next;
+}
+
+function buildRitual(input: any, profile: WellnessProfile): { error?: string; card?: any } {
+  const conflicts: string[] = [];
+  const poses: any[] = [];
+  for (const p of input.poses ?? []) {
+    const pose = poseById.get(p.poseId);
+    if (!pose) return { error: `Unknown poseId "${p.poseId}". Choose ids from the catalog.` };
+    const bad = conditionConflicts(pose.contraindications, profile.conditions);
+    if (bad.length) conflicts.push(`${pose.id} (contraindicated for ${bad.join(', ')})`);
+    const mins = Math.max(1, Math.round(p.durationMinutes));
+    poses.push({
+      nameEnglish: pose.nameEnglish,
+      nameSanskrit: pose.nameSanskrit,
+      duration: `${mins} minute${mins === 1 ? '' : 's'}`,
+      benefits: pose.benefits,
+      instructions: pose.cues.join('. ') + '.' + (p.note ? ` ${p.note}` : ''),
+      poseImageUrl: pose.poseImageUrl,
+      videoUrl: pose.videoUrl,
+    });
+  }
+  const breath = breathworkById.get(input.breathworkId);
+  if (!breath) return { error: `Unknown breathworkId "${input.breathworkId}". Choose ids from the catalog.` };
+  const badBreath = conditionConflicts(breath.contraindications, profile.conditions);
+  if (badBreath.length) conflicts.push(`${breath.id} (contraindicated for ${badBreath.join(', ')})`);
+  if (conflicts.length) {
+    return { error: `Rejected for safety — the user's conditions conflict with: ${conflicts.join('; ')}. Pick alternatives from the catalog.` };
+  }
+  const durationMinutes = (input.poses ?? []).reduce((s: number, p: any) => s + Math.max(1, Math.round(p.durationMinutes)), 0);
+  return {
+    card: {
+      kind: 'ritual',
+      result: {
+        summary: input.summary,
+        doshaTendency: input.doshaTendency,
+        primaryEnergy: input.primaryEnergy,
+        yogaPractice: { title: input.title, description: input.description, poses, durationMinutes },
+        ayurvedicAdvice: input.ayurvedic,
+        breathwork: {
+          name: breath.name,
+          sanskritName: breath.sanskritName,
+          description: breath.description,
+          inhale: breath.inhale,
+          holdActive: breath.holdActive,
+          exhale: breath.exhale,
+          holdEmpty: breath.holdEmpty,
+          cycles: input.breathworkCycles ?? breath.cycles,
+          benefits: breath.benefits,
+        },
+        lifestyleTips: input.lifestyleTips ?? [],
+      },
+    },
+  };
+}
+
+function buildBreathworkCard(input: any, profile: WellnessProfile): { error?: string; card?: any } {
+  const breath = breathworkById.get(input.breathworkId);
+  if (!breath) return { error: `Unknown breathworkId "${input.breathworkId}". Choose ids from the catalog.` };
+  const bad = conditionConflicts(breath.contraindications, profile.conditions);
+  if (bad.length) {
+    return { error: `Rejected for safety — ${breath.id} is contraindicated for ${bad.join(', ')}. Pick an alternative.` };
+  }
+  return {
+    card: {
+      kind: 'breathwork',
+      note: input.note,
+      pattern: {
+        name: breath.name,
+        sanskritName: breath.sanskritName,
+        description: breath.description,
+        inhale: breath.inhale,
+        holdActive: breath.holdActive,
+        exhale: breath.exhale,
+        holdEmpty: breath.holdEmpty,
+        cycles: input.cycles ?? breath.cycles,
+        benefits: breath.benefits,
+      },
+    },
+  };
+}
+
+export function registerChatRoute(app: import('express').Express, client: Anthropic, apiKey: string | undefined) {
+  app.post('/api/chat', async (req: Request, res: Response) => {
+    const { messages, profile: rawProfile, localTime, inputMode } = req.body ?? {};
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'messages array is required' });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    if (!apiKey) {
+      // Honest fallback: no fake personalization when Amrita can't actually think.
+      send(res, {
+        type: 'text',
+        delta:
+          "I'm resting right now — my connection to deeper guidance isn't available (the server is missing its API key). While I recharge, a simple Equal Breathing rhythm — in for 4, hold 4, out 4, rest 4 — is always a safe place to return to.",
+      });
+      send(res, { type: 'done' });
+      return res.end();
+    }
+
+    let profile: WellnessProfile = rawProfile && typeof rawProfile === 'object' ? rawProfile : {};
+    let profileChanged = false;
+
+    const history: Anthropic.MessageParam[] = messages
+      .filter((m: any) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+      .slice(-30)
+      .map((m: any) => ({ role: m.role, content: m.content }));
+
+    const system = buildSystemPrompt(
+      profile,
+      localTime || new Date().toLocaleString(),
+      inputMode === 'voice' ? 'voice' : 'text'
+    );
+
+    try {
+      for (let loop = 0; loop < MAX_LOOPS; loop++) {
+        const stream = client.messages.stream({
+          model: MODEL,
+          max_tokens: 3000,
+          system,
+          messages: history,
+          tools,
+        });
+
+        stream.on('text', (delta) => send(res, { type: 'text', delta }));
+
+        const message = await stream.finalMessage();
+
+        if (message.stop_reason !== 'tool_use') break;
+
+        const toolResults: Anthropic.ToolResultBlockParam[] = [];
+        for (const block of message.content) {
+          if (block.type !== 'tool_use') continue;
+          let resultText = 'ok';
+          let isError = false;
+
+          if (block.name === 'update_wellness_profile') {
+            profile = applyProfileUpdate(profile, block.input);
+            profileChanged = true;
+            resultText = 'Profile updated.';
+          } else if (block.name === 'create_ritual') {
+            const { error, card } = buildRitual(block.input, profile);
+            if (error) {
+              resultText = error;
+              isError = true;
+            } else {
+              send(res, { type: 'card', card });
+              profile = {
+                ...profile,
+                practiceHistory: [
+                  ...(profile.practiceHistory ?? []),
+                  { date: todayStamp(), title: (block.input as any).title, kind: 'ritual' as const },
+                ].slice(-30),
+              };
+              profileChanged = true;
+              resultText = 'Ritual card shown to the user. Continue with one or two warm sentences; do not restate its contents.';
+            }
+          } else if (block.name === 'suggest_breathwork') {
+            const { error, card } = buildBreathworkCard(block.input, profile);
+            if (error) {
+              resultText = error;
+              isError = true;
+            } else {
+              send(res, { type: 'card', card });
+              profile = {
+                ...profile,
+                practiceHistory: [
+                  ...(profile.practiceHistory ?? []),
+                  { date: todayStamp(), title: (card as any).pattern.name, kind: 'breathwork' as const },
+                ].slice(-30),
+              };
+              profileChanged = true;
+              resultText = 'Breathwork card shown to the user. Continue with one warm sentence; do not restate its contents.';
+            }
+          } else {
+            resultText = `Unknown tool ${block.name}`;
+            isError = true;
+          }
+
+          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultText, is_error: isError });
+        }
+
+        history.push({ role: 'assistant', content: message.content });
+        history.push({ role: 'user', content: toolResults });
+      }
+
+      if (profileChanged) send(res, { type: 'profile', profile });
+      send(res, { type: 'done' });
+    } catch (err: any) {
+      console.error('[chat] stream failed:', err?.message || err);
+      send(res, {
+        type: 'error',
+        message: 'The connection to Amrita faltered mid-thought. Please send that again in a moment.',
+      });
+    }
+    res.end();
+  });
+}
+
+// ============================== App + endpoints ===============================
 
 const app = express();
 app.use(express.json());
