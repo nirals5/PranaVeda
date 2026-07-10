@@ -85,7 +85,9 @@ export function useAmritaChat() {
                       ? c.result.yogaPractice.title
                       : c.kind === 'dosha_profile'
                         ? `Prakriti profile (${c.primary})`
-                        : c.pattern.name
+                        : c.kind === 'options'
+                          ? `answer options: ${c.options.map((o) => o.label).join(' / ')}`
+                          : c.pattern.name
                   )
                   .join(', ')}]`
               : ''),

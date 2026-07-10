@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { Mic, ArrowRight, Sparkles, RotateCcw, Wind, Play, Clock, Volume2, VolumeX, Flame, Droplet } from 'lucide-react';
-import { ChatItem, ChatCard, RecommendationResult, BreathworkPattern, DoshaProfileResult } from '../types';
+import { ChatItem, ChatCard, RecommendationResult, BreathworkPattern, DoshaProfileResult, AnswerOption } from '../types';
 import pranavedaIcon from '../assets/pranaveda_icon.svg';
 
 interface AmritaChatProps {
@@ -184,9 +184,47 @@ function DoshaProfileCard({ profile }: { profile: DoshaProfileResult }) {
   );
 }
 
-function CardBlock({ card, onOpenRitual }: { card: ChatCard; onOpenRitual: (r: RecommendationResult) => void }) {
+// Visual answer tiles: designed illustrations load from /dosha/{imageId}.png
+// when they exist; until then the emoji carries the visual.
+function OptionTiles({ options, active, onAnswer }: { options: AnswerOption[]; active: boolean; onAnswer: (label: string) => void }) {
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+  return (
+    <div className={`grid gap-2.5 max-w-md ${options.length <= 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-' + Math.min(options.length, 4)}`}>
+      {options.map((opt) => (
+        <button
+          key={opt.label}
+          disabled={!active}
+          onClick={() => onAnswer(opt.label)}
+          className={`flex flex-col items-center text-center gap-1.5 p-3.5 rounded-[20px] bg-white/60 backdrop-blur-md border border-white/80 shadow-[0_8px_24px_rgba(138,121,165,0.10)] transition-all ${
+            active
+              ? 'cursor-pointer hover:bg-white hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(138,121,165,0.2)]'
+              : 'opacity-55 cursor-default'
+          }`}
+        >
+          {opt.imageId && !failedImages[opt.imageId] ? (
+            <img
+              src={`/dosha/${opt.imageId}.png`}
+              alt=""
+              className="w-14 h-14 object-contain rounded-xl"
+              onError={() => setFailedImages((f) => ({ ...f, [opt.imageId as string]: true }))}
+            />
+          ) : (
+            <span className="text-3xl leading-none py-1.5" aria-hidden>
+              {opt.emoji || '·'}
+            </span>
+          )}
+          <span className="text-[13px] font-sans font-medium text-stone-800 leading-snug">{opt.label}</span>
+          {opt.description && <span className="text-[11.5px] text-stone-500 leading-snug">{opt.description}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CardBlock({ card, active, onOpenRitual, onAnswer }: { card: ChatCard; active: boolean; onOpenRitual: (r: RecommendationResult) => void; onAnswer: (label: string) => void }) {
   if (card.kind === 'ritual') return <RitualCard result={card.result} onOpen={() => onOpenRitual(card.result)} />;
   if (card.kind === 'dosha_profile') return <DoshaProfileCard profile={card} />;
+  if (card.kind === 'options') return <OptionTiles options={card.options} active={active} onAnswer={onAnswer} />;
   return <BreathworkCard pattern={card.pattern} note={card.note} />;
 }
 
@@ -259,7 +297,13 @@ export default function AmritaChat({ items, isStreaming, onSend, onOpenRitual, o
                   </div>
                 ) : null}
                 {item.cards.map((card, i) => (
-                  <CardBlock key={i} card={card} onOpenRitual={onOpenRitual} />
+                  <CardBlock
+                    key={i}
+                    card={card}
+                    active={item.id === items[items.length - 1]?.id && !isStreaming}
+                    onOpenRitual={onOpenRitual}
+                    onAnswer={onSend}
+                  />
                 ))}
               </div>
             </div>

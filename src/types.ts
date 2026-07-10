@@ -70,11 +70,19 @@ export interface WellnessProfile {
   prakriti?: string;
   vikriti?: string;
   prakritiConfidence?: 'low' | 'medium' | 'high';
+  doshaProfile?: DoshaProfileResult & { assessedDate?: string };
   goals?: string[];
   conditions?: string[];
   preferences?: string[];
   observations?: { date: string; note: string }[];
   practiceHistory?: { date: string; title: string; kind: 'ritual' | 'breathwork' }[];
+}
+
+export interface AnswerOption {
+  label: string;
+  emoji?: string;
+  imageId?: string;
+  description?: string;
 }
 
 export interface DoshaProfileResult {
@@ -90,7 +98,8 @@ export interface DoshaProfileResult {
 export type ChatCard =
   | { kind: 'ritual'; result: RecommendationResult }
   | { kind: 'breathwork'; note?: string; pattern: BreathworkPattern }
-  | ({ kind: 'dosha_profile' } & DoshaProfileResult);
+  | ({ kind: 'dosha_profile' } & DoshaProfileResult)
+  | { kind: 'options'; options: AnswerOption[] };
 
 export interface ChatItem {
   id: string;

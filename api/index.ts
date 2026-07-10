@@ -505,6 +505,16 @@ export interface WellnessProfile {
   prakriti?: string;
   vikriti?: string;
   prakritiConfidence?: 'low' | 'medium' | 'high';
+  doshaProfile?: {
+    primary: string;
+    secondary?: string;
+    balance: { vata: number; pitta: number; kapha: number };
+    essence: string;
+    explanation: string;
+    guidance: string[];
+    confidence: string;
+    assessedDate?: string;
+  };
   goals?: string[];
   conditions?: string[];
   preferences?: string[];
@@ -557,6 +567,7 @@ Your purpose is not to generate wellness plans. Your purpose is to build a long-
 
 - When the user wants to discover their constitution — or the profile has no prakriti and a natural moment arises — you may offer a short discovery conversation. Offer at most once; never push.
 - Conduct it as conversation, NEVER as a quiz: one question at a time, adapted to what they've already told you. Draw from lived experience — body frame and how it's always been, skin and hair, appetite and digestion, sleep patterns, how they respond to stress, weather they thrive or wilt in, energy through the day. 5-8 questions is usually enough; skip what you already know from the profile or conversation.
+- For questions with a few concrete answers (body frame, appetite, sleep, weather, energy pattern), call show_answer_options after asking, so they can answer with one tap — pick an expressive emoji per option and a kebab-case imageId (e.g. frame-light, appetite-sharp) for future illustrations. Then wait for their answer. Skip the tiles for open, reflective questions.
 - Reflect back what you're noticing as you go, so it feels like being seen rather than measured.
 - When you have enough signal, briefly explain the difference between Prakriti (their nature) and Vikriti (their current state), then call present_dosha_profile. Be honest in the confidence field — one conversation is usually 'medium' at best.
 - Frame the result as traditional Ayurvedic self-knowledge, not a medical or scientific diagnosis.
@@ -663,6 +674,34 @@ const tools: Anthropic.Tool[] = [
         note: { type: 'string', description: 'One personal line about why this breath, for this moment' },
       },
       required: ['breathworkId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'show_answer_options',
+    description:
+      'Attach 2-4 tappable visual answer tiles to the question you just asked, so the user can answer with one tap instead of typing. Use during the dosha discovery (and anywhere a small set of concrete options helps). Always ask the question in your text first; the tiles supplement it. The user may still type a free-form answer instead.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        options: {
+          type: 'array',
+          minItems: 2,
+          maxItems: 4,
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string', description: "Short answer text, e.g. 'Slender and light' — this is sent as the user's reply when tapped" },
+              emoji: { type: 'string', description: 'One expressive emoji as the visual, e.g. 🪶 🔥 🌊 🌙' },
+              imageId: { type: 'string', description: 'Optional kebab-case id for a designed illustration, e.g. "frame-light". If the asset exists at /dosha/{imageId}.png it is shown; otherwise the emoji is.' },
+              description: { type: 'string', description: 'Optional one-line elaboration under the label' },
+            },
+            required: ['label', 'emoji'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['options'],
       additionalProperties: false,
     },
   },
@@ -921,6 +960,17 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
             profile = applyProfileUpdate(profile, block.input);
             profileChanged = true;
             resultText = 'Profile updated.';
+          } else if (block.name === 'show_answer_options') {
+            const input: any = block.input;
+            const options = (input.options ?? []).filter((o: any) => o && o.label).slice(0, 4);
+            if (!options.length) {
+              resultText = 'No valid options provided.';
+              isError = true;
+            } else {
+              send(res, { type: 'card', card: { kind: 'options', options } });
+              resultText =
+                'Option tiles shown beneath your question. End your turn now and wait for their answer — do not answer for them.';
+            }
           } else if (block.name === 'present_dosha_profile') {
             const input: any = block.input;
             const bal = input.balance ?? {};
@@ -952,10 +1002,20 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
                 ...profile,
                 prakriti: input.secondary ? `${input.primary}-${input.secondary}` : input.primary,
                 prakritiConfidence: input.confidence,
+                doshaProfile: {
+                  primary: input.primary,
+                  secondary: input.secondary,
+                  balance,
+                  essence: input.essence,
+                  explanation: input.explanation,
+                  guidance: input.guidance ?? [],
+                  confidence: input.confidence,
+                  assessedDate: todayStamp(),
+                },
               };
               profileChanged = true;
               resultText =
-                'Dosha profile card shown and recorded. Close with one or two warm sentences — do not restate the card.';
+                'Dosha profile card shown and recorded. The full result now lives in their "Dosha Profile" tab, with balancing guidance — you may mention that. Close with one or two warm sentences; do not restate the card.';
             }
           } else if (block.name === 'create_ritual') {
             const { error, card } = buildRitual(block.input, profile);
