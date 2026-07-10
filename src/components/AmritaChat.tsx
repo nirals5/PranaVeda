@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { Mic, ArrowRight, Sparkles, RotateCcw, Wind, Play, Clock, Volume2, VolumeX } from 'lucide-react';
 import { ChatItem, ChatCard, RecommendationResult, BreathworkPattern } from '../types';
+import pranavedaIcon from '../assets/pranaveda_icon.svg';
 
 interface AmritaChatProps {
   items: ChatItem[];
@@ -24,14 +25,12 @@ const markdownComponents = {
   li: (props: any) => <li className="leading-relaxed" {...props} />,
 };
 
+// TODO(Niral): design a dedicated Amrita mark — something fluid, animated
+// while she speaks. Until then, the PranaVeda brand icon stands in.
 function AmritaMark() {
   return (
     <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-white via-[#FBEDE9] to-[#E8E1F2] border border-white shadow-sm flex items-center justify-center flex-shrink-0">
-      <svg viewBox="0 0 100 100" className="w-4.5 h-4.5 text-[#8A79A5]" fill="none" stroke="currentColor" strokeWidth="6">
-        <path d="M 50 80 C 20 60, 20 35, 38 25 C 47 45, 49 65, 50 80" />
-        <path d="M 50 80 C 80 60, 80 35, 62 25 C 53 45, 51 65, 50 80" />
-        <path d="M 50 80 C 42 50, 45 20, 50 10 C 55 20, 58 50, 50 80" />
-      </svg>
+      <img src={pranavedaIcon} alt="Amrita" className="w-5 h-auto" />
     </div>
   );
 }

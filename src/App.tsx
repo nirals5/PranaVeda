@@ -34,6 +34,9 @@ export default function App() {
   };
   const [inputValue, setInputValue] = useState('');
   const [currentResult, setCurrentResult] = useState<RecommendationResult | null>(null);
+  // Logo always leads home (welcome screen), even mid-conversation; the
+  // conversation itself is kept and resumable.
+  const [showHome, setShowHome] = useState(false);
   const { items: chatItems, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat();
   const [savedPractices, setSavedPractices] = useState<SavedPractice[]>([]);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
@@ -82,6 +85,7 @@ export default function App() {
     if (!text.trim()) return;
     setCurrentResult(null);
     setCurrentView('coach');
+    setShowHome(false);
     sendMessage(text, opts);
     setInputValue('');
   };
@@ -154,7 +158,7 @@ export default function App() {
 
       {/* 2. Brand Header Panel */}
       <header className="w-full max-w-7xl mx-auto px-5 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 z-10 relative">
-        <button onClick={() => { setCurrentResult(null); setCurrentView('coach'); }} className="cursor-pointer" aria-label="Go to home">
+        <button onClick={() => { setCurrentResult(null); setCurrentView('coach'); setShowHome(true); }} className="cursor-pointer" aria-label="Go to home">
           <Logo size="md" />
         </button>
         
@@ -165,7 +169,7 @@ export default function App() {
             onMouseLeave={handleAmritaMouseLeave}
           >
             <button
-              onClick={() => setCurrentView('coach')}
+              onClick={() => { setCurrentView('coach'); setShowHome(false); }}
               className={`flex-1 sm:flex-none py-2 px-3 sm:px-5 rounded-xl text-[12px] sm:text-[14px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 currentView === 'coach'
                   ? 'bg-[#8A79A5]/90 text-white shadow-sm'
@@ -239,7 +243,7 @@ export default function App() {
           )}
 
           {/* AMRITA CONVERSATION THREAD */}
-          {currentView === 'coach' && !currentResult && chatItems.length > 0 && (
+          {currentView === 'coach' && !currentResult && !showHome && chatItems.length > 0 && (
             <motion.div
               key="chat"
               initial={{ opacity: 0, y: 15 }}
@@ -261,7 +265,7 @@ export default function App() {
           )}
 
           {/* INITIAL WELCOME SCREEN (Soma Input Console) */}
-          {currentView === 'coach' && !currentResult && chatItems.length === 0 && (
+          {currentView === 'coach' && !currentResult && (chatItems.length === 0 || showHome) && (
             <motion.div
               key="welcome"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -337,9 +341,7 @@ export default function App() {
                   {[
                     "I haven't been sleeping well lately",
                     "I feel stressed and overwhelmed",
-                    "My lower back feels tight",
-                    "Help me create a morning yoga practice",
-                    "What does Ayurveda suggest for low energy?"
+                    "Help me create a morning yoga practice"
                   ].map((chip) => (
                     <button
                       key={chip}
@@ -350,6 +352,16 @@ export default function App() {
                     </button>
                   ))}
                 </div>
+
+                {/* Resume an ongoing conversation when arriving home mid-chat */}
+                {chatItems.length > 0 && (
+                  <button
+                    onClick={() => setShowHome(false)}
+                    className="mx-auto flex items-center gap-1.5 text-[12px] font-mono uppercase tracking-widest text-[#8A79A5] hover:text-[#72618F] transition-colors cursor-pointer"
+                  >
+                    Continue your conversation with Amrita <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
               {/* Secondary elements (Daily details, saved archives) */}

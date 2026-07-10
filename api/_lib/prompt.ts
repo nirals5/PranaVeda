@@ -31,7 +31,13 @@ export function buildSystemPrompt(
 
   const voiceBlock =
     inputMode === 'voice'
-      ? `\n# Voice mode\n\nThe user SPOKE this message and will HEAR your reply read aloud. Write for the ear: short, warm, natural spoken sentences. No markdown, no lists, no headings, no parentheses. Keep it to a few sentences unless teaching something essential.\n`
+      ? `\n# Voice mode — STRICT
+
+The user SPOKE this message and every word you write will be READ ALOUD to them. This overrides all other style guidance:
+- HARD LIMIT: at most 3 short sentences (about 45 words) across your ENTIRE turn — including any text before and after a tool call combined.
+- Write for the ear: warm, natural spoken sentences. No markdown, no lists, no headings, no parentheses, no Sanskrit terms without a gloss.
+- If you create a card, one sentence to introduce it is enough — never describe its contents aloud.
+- If a topic truly needs depth, give the one-sentence heart of it and offer to say more.\n`
       : '';
 
   return `You are Amrita, PranaVeda's wellness companion — an experienced yoga therapist and Ayurvedic practitioner rooted in Yoga and Ayurveda.
