@@ -80,7 +80,13 @@ export function useAmritaChat() {
             m.text ||
             (m.cards.length
               ? `[Presented: ${m.cards
-                  .map((c) => (c.kind === 'ritual' ? c.result.yogaPractice.title : c.pattern.name))
+                  .map((c) =>
+                    c.kind === 'ritual'
+                      ? c.result.yogaPractice.title
+                      : c.kind === 'dosha_profile'
+                        ? `Prakriti profile (${c.primary})`
+                        : c.pattern.name
+                  )
                   .join(', ')}]`
               : ''),
         }))

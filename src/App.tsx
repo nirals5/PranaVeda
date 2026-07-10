@@ -37,7 +37,7 @@ export default function App() {
   // Logo always leads home (welcome screen), even mid-conversation; the
   // conversation itself is kept and resumable.
   const [showHome, setShowHome] = useState(false);
-  const { items: chatItems, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat();
+  const { items: chatItems, profile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat();
   const [savedPractices, setSavedPractices] = useState<SavedPractice[]>([]);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   
@@ -341,7 +341,8 @@ export default function App() {
                   {[
                     "I haven't been sleeping well lately",
                     "I feel stressed and overwhelmed",
-                    "Help me create a morning yoga practice"
+                    // Until a constitution is on file, invite the discovery journey
+                    profile.prakriti ? "Help me create a morning yoga practice" : "Help me discover my dosha profile"
                   ].map((chip) => (
                     <button
                       key={chip}

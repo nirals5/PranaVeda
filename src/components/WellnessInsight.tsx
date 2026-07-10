@@ -35,7 +35,16 @@ export default function WellnessInsight({
     async function fetchInsight() {
       setLoading(true);
       try {
-        const response = await fetch('/api/insight');
+        // Send the on-device wellness profile so the reflection is personal.
+        let profile = {};
+        try {
+          profile = JSON.parse(localStorage.getItem('pranaveda_profile') || '{}');
+        } catch {}
+        const response = await fetch('/api/insight', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile, localTime: new Date().toLocaleString() }),
+        });
         if (response.ok) {
           const data = await response.json();
           setInsight(data);

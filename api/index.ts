@@ -553,6 +553,14 @@ Your purpose is not to generate wellness plans. Your purpose is to build a long-
 - Use update_wellness_profile whenever you learn something durable: goals, injuries or conditions (use the condition tags when applicable), preferences, constitution insights, or a meaningful observation. Update silently — never announce "I've updated your profile"; just weave remembering into how you speak. Do not store trivia, only what improves future guidance.
 - After a tool returns, continue naturally in one or two sentences (e.g. why this sequence, what to notice) — do not restate the card's contents.
 
+# Dosha discovery (Prakriti assessment)
+
+- When the user wants to discover their constitution — or the profile has no prakriti and a natural moment arises — you may offer a short discovery conversation. Offer at most once; never push.
+- Conduct it as conversation, NEVER as a quiz: one question at a time, adapted to what they've already told you. Draw from lived experience — body frame and how it's always been, skin and hair, appetite and digestion, sleep patterns, how they respond to stress, weather they thrive or wilt in, energy through the day. 5-8 questions is usually enough; skip what you already know from the profile or conversation.
+- Reflect back what you're noticing as you go, so it feels like being seen rather than measured.
+- When you have enough signal, briefly explain the difference between Prakriti (their nature) and Vikriti (their current state), then call present_dosha_profile. Be honest in the confidence field — one conversation is usually 'medium' at best.
+- Frame the result as traditional Ayurvedic self-knowledge, not a medical or scientific diagnosis.
+
 # Safety
 
 - NEVER include a pose or breath whose contraindications match the user's known conditions; choose alternatives and, if relevant, briefly say why you steered away.
@@ -655,6 +663,34 @@ const tools: Anthropic.Tool[] = [
         note: { type: 'string', description: 'One personal line about why this breath, for this moment' },
       },
       required: ['breathworkId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'present_dosha_profile',
+    description:
+      'Present the result of a Prakriti (constitution) discovery conversation as a beautiful card, and record it to the wellness profile. Use ONLY after a genuine assessment conversation has given you enough signal — never from a single message.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        primary: { type: 'string', enum: ['Vata', 'Pitta', 'Kapha'], description: 'Dominant dosha' },
+        secondary: { type: 'string', enum: ['Vata', 'Pitta', 'Kapha'], description: 'Secondary dosha, if clearly present' },
+        balance: {
+          type: 'object',
+          properties: {
+            vata: { type: 'integer', description: 'Approximate percentage 0-100' },
+            pitta: { type: 'integer', description: 'Approximate percentage 0-100' },
+            kapha: { type: 'integer', description: 'Approximate percentage 0-100' },
+          },
+          required: ['vata', 'pitta', 'kapha'],
+          additionalProperties: false,
+        },
+        essence: { type: 'string', description: "One poetic line capturing their constitution, e.g. 'Wind dancing over a steady flame'" },
+        explanation: { type: 'string', description: '2-3 sentences explaining what this constitution means for them, referencing what they shared' },
+        guidance: { type: 'array', items: { type: 'string' }, description: '2-3 short starting points suited to this constitution' },
+        confidence: { type: 'string', enum: ['low', 'medium', 'high'], description: 'How confident this reading is from the conversation so far' },
+      },
+      required: ['primary', 'balance', 'essence', 'explanation', 'guidance', 'confidence'],
       additionalProperties: false,
     },
   },
@@ -885,6 +921,42 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
             profile = applyProfileUpdate(profile, block.input);
             profileChanged = true;
             resultText = 'Profile updated.';
+          } else if (block.name === 'present_dosha_profile') {
+            const input: any = block.input;
+            const bal = input.balance ?? {};
+            const total = (bal.vata ?? 0) + (bal.pitta ?? 0) + (bal.kapha ?? 0);
+            if (!total) {
+              resultText = 'balance percentages missing — provide vata/pitta/kapha estimates.';
+              isError = true;
+            } else {
+              // Normalize so the card's bars always sum to 100.
+              const balance = {
+                vata: Math.round(((bal.vata ?? 0) / total) * 100),
+                pitta: Math.round(((bal.pitta ?? 0) / total) * 100),
+                kapha: Math.round(((bal.kapha ?? 0) / total) * 100),
+              };
+              send(res, {
+                type: 'card',
+                card: {
+                  kind: 'dosha_profile',
+                  primary: input.primary,
+                  secondary: input.secondary,
+                  balance,
+                  essence: input.essence,
+                  explanation: input.explanation,
+                  guidance: input.guidance ?? [],
+                  confidence: input.confidence,
+                },
+              });
+              profile = {
+                ...profile,
+                prakriti: input.secondary ? `${input.primary}-${input.secondary}` : input.primary,
+                prakritiConfidence: input.confidence,
+              };
+              profileChanged = true;
+              resultText =
+                'Dosha profile card shown and recorded. Close with one or two warm sentences — do not restate the card.';
+            }
           } else if (block.name === 'create_ritual') {
             const { error, card } = buildRitual(block.input, profile);
             if (error) {
@@ -1158,11 +1230,38 @@ app.post('/api/coaching', async (req, res) => {
   return res.json(result);
 });
 
-app.get('/api/insight', async (req, res) => {
+// Daily insight. POST carries the on-device wellness profile + local time so
+// the reflection is personal; GET stays for backward compatibility (generic).
+async function handleInsight(req: Request, res: Response) {
   if (!apiKey) return res.json(fallbacks.insight);
-  const result = await callClaude({ system: "You are Amrita, a concise Ayurvedic mentor. All responses must be extremely brief — follow word limits strictly.", prompt: "Generate a brief morning Ayurvedic daily reflection. Be short. No breathing instructions — those belong elsewhere.", schema: insightResponseSchema, fallbackData: fallbacks.insight });
+
+  const { profile, localTime } = (req.method === 'POST' ? req.body : {}) ?? {};
+  const now = new Date();
+  const seasons = ['deep winter', 'late winter', 'early spring', 'spring', 'late spring', 'early summer', 'summer', 'late summer', 'early autumn', 'autumn', 'late autumn', 'early winter'];
+  const season = seasons[now.getMonth()];
+
+  const contextLines = [
+    `Local time for the user: ${localTime || now.toLocaleString()}.`,
+    `Season (northern hemisphere): ${season} — let Ritucharya (seasonal wisdom) quietly inform the tip.`,
+  ];
+  if (profile && typeof profile === 'object' && Object.keys(profile).length) {
+    contextLines.push(`Wellness profile: ${JSON.stringify(profile)}`);
+    contextLines.push(
+      'Ground the reflection in AT MOST one or two specifics from the profile (constitution, a recent observation, a recent practice, a goal) — chosen for what serves them today. Never mention the profile itself.'
+    );
+  }
+
+  const result = await callClaude({
+    system:
+      'You are Amrita, a concise Ayurvedic mentor. All responses must be extremely brief — follow word limits strictly. Vary your angle day to day; avoid stock phrases.',
+    prompt: `${contextLines.join('\n')}\n\nGenerate a brief Ayurvedic daily reflection for this moment of their day. Be short. No breathing instructions — those belong elsewhere.`,
+    schema: insightResponseSchema,
+    fallbackData: fallbacks.insight,
+  });
   return res.json(result);
-});
+}
+app.get('/api/insight', handleInsight);
+app.post('/api/insight', handleInsight);
 
 app.post('/api/tts', async (req, res) => {
   const { text } = req.body;

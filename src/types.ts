@@ -77,9 +77,20 @@ export interface WellnessProfile {
   practiceHistory?: { date: string; title: string; kind: 'ritual' | 'breathwork' }[];
 }
 
+export interface DoshaProfileResult {
+  primary: 'Vata' | 'Pitta' | 'Kapha';
+  secondary?: 'Vata' | 'Pitta' | 'Kapha';
+  balance: { vata: number; pitta: number; kapha: number };
+  essence: string;
+  explanation: string;
+  guidance: string[];
+  confidence: 'low' | 'medium' | 'high';
+}
+
 export type ChatCard =
   | { kind: 'ritual'; result: RecommendationResult }
-  | { kind: 'breathwork'; note?: string; pattern: BreathworkPattern };
+  | { kind: 'breathwork'; note?: string; pattern: BreathworkPattern }
+  | ({ kind: 'dosha_profile' } & DoshaProfileResult);
 
 export interface ChatItem {
   id: string;
