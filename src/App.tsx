@@ -7,13 +7,14 @@ import VoiceModal from './components/VoiceModal';
 import WellnessInsight from './components/WellnessInsight';
 import CoachingDashboard from './components/CoachingDashboard';
 import AmritaChat from './components/AmritaChat';
+import DoshaProfileView from './components/DoshaProfileView';
 import { useAmritaChat } from './hooks/useAmritaChat';
 import { RecommendationResult, SavedPractice } from './types';
 import RecoveryTrends from './components/RecoveryTrends';
 
 export default function App() {
   const prefersReducedMotion = useReducedMotion();
-  const [currentView, setCurrentView] = useState<'coach' | 'recovery'>('coach');
+  const [currentView, setCurrentView] = useState<'coach' | 'dosha' | 'recovery'>('coach');
   const [showAmritaHint, setShowAmritaHint] = useState(true);
   const hoverTimerRef = useRef<number | null>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -37,7 +38,7 @@ export default function App() {
   // Logo always leads home (welcome screen), even mid-conversation; the
   // conversation itself is kept and resumable.
   const [showHome, setShowHome] = useState(false);
-  const { items: chatItems, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat();
+  const { items: chatItems, profile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat();
   const [savedPractices, setSavedPractices] = useState<SavedPractice[]>([]);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   
@@ -162,7 +163,7 @@ export default function App() {
           <Logo size="md" />
         </button>
         
-        <div className="flex items-center gap-2 bg-white/40 p-1 rounded-2xl border border-white/60 shadow-xs w-full sm:w-auto max-w-[360px]">
+        <div className="flex items-center gap-2 bg-white/40 p-1 rounded-2xl border border-white/60 shadow-xs w-full sm:w-auto max-w-full sm:max-w-none overflow-x-auto">
           <div
             className="relative"
             onMouseEnter={handleAmritaMouseEnter}
@@ -194,6 +195,17 @@ export default function App() {
           </div>
           
           <button
+            onClick={() => setCurrentView('dosha')}
+            className={`flex-1 sm:flex-none py-2 px-3 sm:px-5 rounded-xl text-[12px] sm:text-[14px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              currentView === 'dosha'
+                ? 'bg-[#8A79A5]/90 text-white shadow-sm'
+                : 'text-stone-550 hover:text-stone-900'
+            }`}
+          >
+            Dosha Profile
+          </button>
+
+          <button
             onClick={() => setCurrentView('recovery')}
             className={`flex-1 sm:flex-none py-2 px-3 sm:px-5 rounded-xl text-[12px] sm:text-[14px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
               currentView === 'recovery'
@@ -209,6 +221,28 @@ export default function App() {
       {/* 3. Main Central App Area */}
       <main className="flex-1 flex flex-col items-center justify-center w-full max-w-7xl mx-auto z-10 relative">
         <AnimatePresence mode="wait">
+
+          {/* DOSHA PROFILE SCREEN */}
+          {currentView === 'dosha' && (
+            <motion.div
+              key="dosha-profile"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="w-full"
+            >
+              <DoshaProfileView
+                profile={profile}
+                onStartDiscovery={() =>
+                  handleConsultCoach(
+                    profile.prakriti
+                      ? "I'd like to revisit my dosha profile with you"
+                      : 'Help me discover my dosha profile'
+                  )
+                }
+              />
+            </motion.div>
+          )}
 
           {/* RECOVERY DASHBOARD SCREEN */}
           {currentView === 'recovery' && (
@@ -341,7 +375,8 @@ export default function App() {
                   {[
                     "I haven't been sleeping well lately",
                     "I feel stressed and overwhelmed",
-                    "Help me create a morning yoga practice"
+                    // Until a constitution is on file, invite the discovery journey
+                    profile.prakriti ? "Help me create a morning yoga practice" : "Help me discover my dosha profile"
                   ].map((chip) => (
                     <button
                       key={chip}

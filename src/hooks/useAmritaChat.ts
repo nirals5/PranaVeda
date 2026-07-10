@@ -3,8 +3,46 @@ import { ChatCard, ChatItem, WellnessProfile } from '../types';
 import { useSpeech } from './useSpeech';
 
 const CHAT_KEY = 'pranaveda_chat';
+const CHAT_TS_KEY = 'pranaveda_chat_ts';
+const LAST_SESSION_KEY = 'pranaveda_last_session';
 const PROFILE_KEY = 'pranaveda_profile';
 const MUTED_KEY = 'pranaveda_voice_muted';
+
+// A conversation left quiet this long is a finished "session": the next visit
+// starts fresh, with the tail of the old session carried as context so Amrita
+// can check in on it (or resume something unfinished, like a dosha discovery).
+const SESSION_GAP_MS = 4 * 60 * 60 * 1000;
+
+function archiveSession(items: ChatItem[]) {
+  if (!items.length) return;
+  try {
+    localStorage.setItem(LAST_SESSION_KEY, JSON.stringify(items.slice(-12)));
+  } catch {}
+}
+
+// Text-only view of chat items for the model (cards become markers).
+function toModelMessages(items: ChatItem[]) {
+  return items
+    .map((m) => ({
+      role: m.role,
+      content:
+        m.text ||
+        (m.cards.length
+          ? `[Presented: ${m.cards
+              .map((c) =>
+                c.kind === 'ritual'
+                  ? c.result.yogaPractice.title
+                  : c.kind === 'dosha_profile'
+                    ? `Prakriti profile (${c.primary})`
+                    : c.kind === 'options'
+                      ? `answer options: ${c.options.map((o) => o.label).join(' / ')}`
+                      : c.pattern.name
+              )
+              .join(', ')}]`
+          : ''),
+    }))
+    .filter((m) => m.content);
+}
 
 // Reduce Amrita's markdown to plain speakable prose for TTS.
 function toSpeakable(text: string): string {
@@ -30,7 +68,18 @@ function loadJson<T>(key: string, fallback: T): T {
 // request, updates it via Amrita's tools, and returns it — nothing is stored
 // remotely.
 export function useAmritaChat() {
-  const [items, setItems] = useState<ChatItem[]>(() => loadJson<ChatItem[]>(CHAT_KEY, []));
+  const [items, setItems] = useState<ChatItem[]>(() => {
+    const stored = loadJson<ChatItem[]>(CHAT_KEY, []);
+    const lastActivity = loadJson<number>(CHAT_TS_KEY, 0);
+    if (stored.length && lastActivity && Date.now() - lastActivity > SESSION_GAP_MS) {
+      archiveSession(stored);
+      try {
+        localStorage.removeItem(CHAT_KEY);
+      } catch {}
+      return [];
+    }
+    return stored;
+  });
   const [profile, setProfile] = useState<WellnessProfile>(() => loadJson<WellnessProfile>(PROFILE_KEY, {}));
   const [isStreaming, setIsStreaming] = useState(false);
   const [voiceMuted, setVoiceMuted] = useState<boolean>(() => loadJson<boolean>(MUTED_KEY, false));
@@ -51,6 +100,7 @@ export function useAmritaChat() {
   useEffect(() => {
     try {
       localStorage.setItem(CHAT_KEY, JSON.stringify(items.slice(-60)));
+      if (items.length) localStorage.setItem(CHAT_TS_KEY, JSON.stringify(Date.now()));
     } catch {}
   }, [items]);
 
@@ -73,18 +123,10 @@ export function useAmritaChat() {
 
       // History for the model: text turns; card-only turns become a marker so
       // Amrita retains continuity about what she presented.
-      const history = [...items, userItem]
-        .map((m) => ({
-          role: m.role,
-          content:
-            m.text ||
-            (m.cards.length
-              ? `[Presented: ${m.cards
-                  .map((c) => (c.kind === 'ritual' ? c.result.yogaPractice.title : c.pattern.name))
-                  .join(', ')}]`
-              : ''),
-        }))
-        .filter((m) => m.content);
+      const history = toModelMessages([...items, userItem]);
+      // Carry the previous session's tail so Amrita can check in on it or
+      // resume something left unfinished there.
+      const previousSession = toModelMessages(loadJson<ChatItem[]>(LAST_SESSION_KEY, []));
 
       setItems((prev) => [...prev, userItem, assistantItem]);
       setIsStreaming(true);
@@ -99,7 +141,7 @@ export function useAmritaChat() {
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: history, profile, localTime: new Date().toLocaleString(), inputMode }),
+          body: JSON.stringify({ messages: history, profile, localTime: new Date().toLocaleString(), inputMode, previousSession }),
           signal: controller.signal,
         });
         if (!response.ok || !response.body) throw new Error(`Chat request failed (${response.status})`);
@@ -169,7 +211,10 @@ export function useAmritaChat() {
   const resetConversation = useCallback(() => {
     abortRef.current?.abort();
     stopSpeaking();
-    setItems([]);
+    setItems((prev) => {
+      archiveSession(prev);
+      return [];
+    });
     setIsStreaming(false);
   }, [stopSpeaking]);
 

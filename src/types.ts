@@ -70,6 +70,7 @@ export interface WellnessProfile {
   prakriti?: string;
   vikriti?: string;
   prakritiConfidence?: 'low' | 'medium' | 'high';
+  doshaProfile?: DoshaProfileResult & { assessedDate?: string };
   goals?: string[];
   conditions?: string[];
   preferences?: string[];
@@ -77,9 +78,28 @@ export interface WellnessProfile {
   practiceHistory?: { date: string; title: string; kind: 'ritual' | 'breathwork' }[];
 }
 
+export interface AnswerOption {
+  label: string;
+  emoji?: string;
+  imageId?: string;
+  description?: string;
+}
+
+export interface DoshaProfileResult {
+  primary: 'Vata' | 'Pitta' | 'Kapha';
+  secondary?: 'Vata' | 'Pitta' | 'Kapha';
+  balance: { vata: number; pitta: number; kapha: number };
+  essence: string;
+  explanation: string;
+  guidance: string[];
+  confidence: 'low' | 'medium' | 'high';
+}
+
 export type ChatCard =
   | { kind: 'ritual'; result: RecommendationResult }
-  | { kind: 'breathwork'; note?: string; pattern: BreathworkPattern };
+  | { kind: 'breathwork'; note?: string; pattern: BreathworkPattern }
+  | ({ kind: 'dosha_profile' } & DoshaProfileResult)
+  | { kind: 'options'; options: AnswerOption[] };
 
 export interface ChatItem {
   id: string;
