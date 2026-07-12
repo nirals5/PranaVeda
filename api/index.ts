@@ -116,7 +116,7 @@ export const POSES: CatalogPose[] = [
     dosha: { vata: 'Deeply grounding and calming — ideal for vata', pitta: 'Cooling and soothing', kapha: 'Can increase heaviness if held too long' },
     bestTime: 'Evening, or anytime as a reset',
     defaultDurationMin: 2,
-    poseImageUrl: img.child,
+    poseImageUrl: '/poses/childs_pose.jpg',
     videoUrl: vid,
   },
   {
