@@ -424,9 +424,9 @@ export default function App() {
       />
 
       {/* 5. Minimal Human Footer */}
-      <footer className="w-full text-center py-6 space-y-1.5 text-[12px] font-mono tracking-widest text-[#8A79A5]/60 z-10 relative">
+      <footer className="w-full text-center py-6 space-y-1.5 text-[12px] font-mono tracking-widest text-stone-500 z-10 relative">
         <p>PRANAVEDA · ANCIENT WISDOM OF YOGA AND AYURVEDA PERSONALIZED FOR YOU · © 2026</p>
-        <p className="text-[11px] text-stone-500">
+        <p className="text-[11px]">
           POSE PHOTOGRAPHY BY{' '}
           <a
             href="https://yin-yangyoga.com/"
