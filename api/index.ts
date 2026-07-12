@@ -134,7 +134,7 @@ export const POSES: CatalogPose[] = [
     bestTime: 'Morning',
     counterPoseId: 'childs_pose',
     defaultDurationMin: 3,
-    poseImageUrl: img.flow,
+    poseImageUrl: '/poses/cat_cow.jpg',
     videoUrl: vid,
   },
   {
