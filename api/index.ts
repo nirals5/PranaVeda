@@ -152,7 +152,7 @@ export const POSES: CatalogPose[] = [
     bestTime: 'Morning or midday',
     counterPoseId: 'childs_pose',
     defaultDurationMin: 2,
-    poseImageUrl: img.child,
+    poseImageUrl: '/poses/downward_dog.jpg',
     videoUrl: vid,
   },
   {
@@ -170,7 +170,7 @@ export const POSES: CatalogPose[] = [
     bestTime: 'Morning or evening',
     counterPoseId: 'mountain',
     defaultDurationMin: 1,
-    poseImageUrl: img.fold,
+    poseImageUrl: '/poses/standing_forward_fold.jpg',
   },
   {
     id: 'warrior_1',
@@ -187,7 +187,7 @@ export const POSES: CatalogPose[] = [
     bestTime: 'Morning',
     counterPoseId: 'standing_forward_fold',
     defaultDurationMin: 2,
-    poseImageUrl: img.flow,
+    poseImageUrl: '/poses/warrior_1.jpg',
   },
   {
     id: 'warrior_2',
@@ -221,7 +221,7 @@ export const POSES: CatalogPose[] = [
     bestTime: 'Morning or midday',
     counterPoseId: 'mountain',
     defaultDurationMin: 2,
-    poseImageUrl: img.flow,
+    poseImageUrl: '/poses/triangle.jpg',
   },
   {
     id: 'tree_pose',
@@ -255,7 +255,7 @@ export const POSES: CatalogPose[] = [
     bestTime: 'Morning or early evening',
     counterPoseId: 'supine_twist',
     defaultDurationMin: 2,
-    poseImageUrl: img.backbend,
+    poseImageUrl: '/poses/bridge.jpg',
   },
   {
     id: 'cobra',
@@ -272,7 +272,7 @@ export const POSES: CatalogPose[] = [
     bestTime: 'Morning',
     counterPoseId: 'childs_pose',
     defaultDurationMin: 2,
-    poseImageUrl: img.backbend,
+    poseImageUrl: '/poses/cobra.jpg',
   },
   {
     id: 'sphinx',
@@ -289,7 +289,7 @@ export const POSES: CatalogPose[] = [
     bestTime: 'Anytime',
     counterPoseId: 'childs_pose',
     defaultDurationMin: 2,
-    poseImageUrl: img.backbend,
+    poseImageUrl: '/poses/sphinx.jpg',
   },
   {
     id: 'seated_forward_bend',
@@ -356,7 +356,7 @@ export const POSES: CatalogPose[] = [
     bestTime: 'Evening / before sleep',
     counterPoseId: 'corpse_pose',
     defaultDurationMin: 5,
-    poseImageUrl: img.rest,
+    poseImageUrl: '/poses/legs_up_the_wall.jpg',
   },
   {
     id: 'easy_pose',
@@ -388,7 +388,7 @@ export const POSES: CatalogPose[] = [
     dosha: { vata: 'Essential — cover with a blanket to stay warm', pitta: 'Deeply cooling and releasing', kapha: 'Keep brief in the morning to avoid drowsiness' },
     bestTime: 'End of any practice',
     defaultDurationMin: 3,
-    poseImageUrl: img.rest,
+    poseImageUrl: '/poses/corpse_pose.jpg',
   },
 ];
 
