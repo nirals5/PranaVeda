@@ -1081,6 +1081,7 @@ function buildRitual(input: any, profile: WellnessProfile): { error?: string; ca
     if (bad.length) conflicts.push(`${pose.id} (contraindicated for ${bad.join(', ')})`);
     const mins = Math.max(1, Math.round(p.durationMinutes));
     poses.push({
+      poseId: pose.id,
       nameEnglish: pose.nameEnglish,
       nameSanskrit: pose.nameSanskrit,
       duration: `${mins} minute${mins === 1 ? '' : 's'}`,

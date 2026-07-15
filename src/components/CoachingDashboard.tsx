@@ -43,6 +43,24 @@ const getFallbackPoseImage = (pose: { nameEnglish: string; nameSanskrit?: string
   return placeholders[charSum % placeholders.length];
 };
 
+// Niral's composited room scenes (public/poses_with_background/{poseId}.png)
+// are her final art, shown verbatim. Three asanas ship a 16:9 "_wide" version
+// for these landscape cards (their unsuffixed files are 9:16 portrait). If a
+// pose has no composite, onError falls back to the flat photo.
+const WIDE_SCENES = new Set(['triangle', 'dancer', 'seated_twist']);
+
+const poseSceneUrl = (pose: { poseId?: string }) =>
+  pose.poseId
+    ? `/poses_with_background/web/${pose.poseId}${WIDE_SCENES.has(pose.poseId) ? '_wide' : ''}.webp`
+    : undefined;
+
+const fallbackToFlatImage = (e: React.SyntheticEvent<HTMLImageElement>, flatUrl: string) => {
+  if (e.currentTarget.src !== flatUrl && !e.currentTarget.dataset.fellBack) {
+    e.currentTarget.dataset.fellBack = '1';
+    e.currentTarget.src = flatUrl;
+  }
+};
+
 interface CoachingDashboardProps {
   result: RecommendationResult;
   onBack: () => void;
@@ -569,7 +587,14 @@ export default function CoachingDashboard({
                         
                         {/* Pose Visual Demonstration Header */}
                         <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-stone-950 border border-stone-800/80 shadow-md">
-                          {result.yogaPractice.poses[currentPoseIndex].videoUrl ? (
+                          {poseSceneUrl(result.yogaPractice.poses[currentPoseIndex]) ? (
+                            <img
+                              src={poseSceneUrl(result.yogaPractice.poses[currentPoseIndex])}
+                              alt={result.yogaPractice.poses[currentPoseIndex].nameEnglish}
+                              onError={(e) => fallbackToFlatImage(e, result.yogaPractice.poses[currentPoseIndex].poseImageUrl || getFallbackPoseImage(result.yogaPractice.poses[currentPoseIndex]))}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : result.yogaPractice.poses[currentPoseIndex].videoUrl ? (
                             <video
                               src={result.yogaPractice.poses[currentPoseIndex].videoUrl}
                               autoPlay
@@ -587,7 +612,7 @@ export default function CoachingDashboard({
                             />
                           )}
                           <div className="absolute bottom-3 right-3 bg-stone-950/80 backdrop-blur-xs text-[12px] font-mono p-1 px-2.5 rounded-md text-stone-300 font-bold border border-stone-800">
-                            {result.yogaPractice.poses[currentPoseIndex].videoUrl ? "Looping flow" : "Static guide"}
+                            {poseSceneUrl(result.yogaPractice.poses[currentPoseIndex]) ? "Pose guide" : result.yogaPractice.poses[currentPoseIndex].videoUrl ? "Looping flow" : "Static guide"}
                           </div>
                         </div>
 
@@ -702,10 +727,11 @@ export default function CoachingDashboard({
                         >
                           {/* Posture Demonstration Header */}
                           <div className="w-full h-48 relative overflow-hidden bg-stone-50 border-b border-stone-100/60">
-                            <img 
-                              src={pose.poseImageUrl || getFallbackPoseImage(pose)} 
+                            <img
+                              src={poseSceneUrl(pose) || pose.poseImageUrl || getFallbackPoseImage(pose)}
                               alt={pose.nameEnglish}
                               referrerPolicy="no-referrer"
+                              onError={(e) => fallbackToFlatImage(e, pose.poseImageUrl || getFallbackPoseImage(pose))}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                             />
                             <div className="absolute top-4 left-4 p-1 px-3 text-[12px] uppercase font-mono tracking-wider font-bold bg-white/90 text-[#8A79A5] backdrop-blur-xs rounded-full shadow-xs">

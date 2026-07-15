@@ -1,6 +1,7 @@
 export type DoshaType = 'Vata' | 'Pitta' | 'Kapha' | 'Anami' | 'Dual' | 'Unknown';
 
 export interface YogaPose {
+  poseId?: string;
   nameEnglish: string;
   nameSanskrit: string;
   duration: string;
