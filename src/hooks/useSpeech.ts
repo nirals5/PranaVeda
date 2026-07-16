@@ -57,7 +57,8 @@ export function useSpeech() {
     if (abortRef.current !== controller) return;
     if (!('speechSynthesis' in window)) return;
 
-    const utterance = new SpeechSynthesisUtterance(text);
+    // ElevenLabs pause markup would be read literally by browser TTS — strip it
+    const utterance = new SpeechSynthesisUtterance(text.replace(/<break[^>]*\/>/g, '. . .'));
     utterance.rate = 0.8;
     utterance.pitch = 0.95;
     const voices = window.speechSynthesis.getVoices();

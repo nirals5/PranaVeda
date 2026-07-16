@@ -115,6 +115,12 @@ export default function CoachingDashboard({
   const [breathingTimeRemaining, setBreathingTimeRemaining] = useState(result.breathwork.inhale);
   const [breathingCycleCount, setBreathingCycleCount] = useState(1);
   const breathingTimerRef = useRef<number | null>(null);
+  // Authoritative timer state lives in refs so the interval tick (a plain
+  // function StrictMode never double-invokes) drives transitions exactly once.
+  // React state mirrors these for display only.
+  const phaseRef = useRef<'inhale' | 'holdFull' | 'exhale' | 'holdEmpty'>('inhale');
+  const remainingRef = useRef(result.breathwork.inhale);
+  const cycleRef = useRef(1);
 
   const { speak, stop: stopSpeech } = useSpeech();
   useEffect(() => () => stopSpeech(), [stopSpeech]);
@@ -131,64 +137,77 @@ export default function CoachingDashboard({
     return <Droplet className="w-5 h-5 text-blue-600" />;
   };
 
-  // 1. Manage Breathing Timer Logic
+  // 1. Breathing timer. All authoritative logic runs inside the interval tick —
+  //    a plain callback StrictMode never double-invokes — so transitions and cue
+  //    audio fire exactly once. React state is updated only for display.
   useEffect(() => {
-    if (isBreathingRunning) {
-      breathingTimerRef.current = window.setInterval(() => {
-        setBreathingTimeRemaining(prev => {
-          if (prev <= 1) {
-            // Sector transition logic
-            switch (breathingPhase) {
-              case 'inhale':
-                if (result.breathwork.holdActive > 0) {
-                  setBreathingPhase('holdFull');
-                  speakVocalPhase('Hold Breath Full');
-                  return result.breathwork.holdActive;
-                } else {
-                  setBreathingPhase('exhale');
-                  speakVocalPhase('Exhale slowly');
-                  return result.breathwork.exhale;
-                }
-              case 'holdFull':
-                setBreathingPhase('exhale');
-                speakVocalPhase('Exhale slowly');
-                return result.breathwork.exhale;
-              case 'exhale':
-                if (result.breathwork.holdEmpty > 0) {
-                  setBreathingPhase('holdEmpty');
-                  speakVocalPhase('Hold Empty');
-                  return result.breathwork.holdEmpty;
-                } else {
-                  setBreathingPhase('inhale');
-                  speakVocalPhase('Inhale deeply');
-                  setBreathingCycleCount(c => c + 1);
-                  return result.breathwork.inhale;
-                }
-              case 'holdEmpty':
-                setBreathingPhase('inhale');
-                speakVocalPhase('Inhale deeply');
-                setBreathingCycleCount(c => c + 1);
-                return result.breathwork.inhale;
-              default:
-                return result.breathwork.inhale;
-            }
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
+    if (!isBreathingRunning) {
       if (breathingTimerRef.current) {
         clearInterval(breathingTimerRef.current);
         breathingTimerRef.current = null;
       }
+      return;
     }
+    const b = result.breathwork;
+    const goPhase = (
+      next: 'inhale' | 'holdFull' | 'exhale' | 'holdEmpty',
+      dur: number,
+      cue: 'inhale' | 'holdFull' | 'exhale' | 'holdEmpty'
+    ) => {
+      phaseRef.current = next;
+      remainingRef.current = dur;
+      setBreathingPhase(next);
+      setBreathingTimeRemaining(dur);
+      speakBreathPhase(cue, dur);
+    };
+    const nextCycleOrFinish = () => {
+      if (cycleRef.current >= b.cycles) {
+        // Completed the recommended number of cycles — end the session.
+        phaseRef.current = 'inhale';
+        remainingRef.current = b.inhale;
+        cycleRef.current = 1;
+        setIsBreathingRunning(false);
+        setBreathingPhase('inhale');
+        setBreathingTimeRemaining(b.inhale);
+        setBreathingCycleCount(1);
+        phaseAudioRef.current.player?.pause();
+        stopSpeech();
+        speak(`Beautiful. <break time="0.8s" /> You've completed your ${b.name}. <break time="0.8s" /> Rest here, and let your breath return to its natural rhythm.`);
+        return;
+      }
+      cycleRef.current += 1;
+      setBreathingCycleCount(cycleRef.current);
+      goPhase('inhale', b.inhale, 'inhale');
+    };
+
+    breathingTimerRef.current = window.setInterval(() => {
+      if (remainingRef.current > 1) {
+        remainingRef.current -= 1;
+        setBreathingTimeRemaining(remainingRef.current);
+        return;
+      }
+      // Current phase just completed — advance.
+      switch (phaseRef.current) {
+        case 'inhale':
+          b.holdActive > 0 ? goPhase('holdFull', b.holdActive, 'holdFull') : goPhase('exhale', b.exhale, 'exhale');
+          break;
+        case 'holdFull':
+          goPhase('exhale', b.exhale, 'exhale');
+          break;
+        case 'exhale':
+          b.holdEmpty > 0 ? goPhase('holdEmpty', b.holdEmpty, 'holdEmpty') : nextCycleOrFinish();
+          break;
+        case 'holdEmpty':
+          nextCycleOrFinish();
+          break;
+      }
+    }, 1000);
 
     return () => {
-      if (breathingTimerRef.current) {
-        clearInterval(breathingTimerRef.current);
-      }
+      if (breathingTimerRef.current) clearInterval(breathingTimerRef.current);
     };
-  }, [isBreathingRunning, breathingPhase, result]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBreathingRunning, result]);
 
   // Naturalizes a phase cue phrase, then speaks it via ElevenLabs (with browser TTS fallback)
   const speakVocalPhase = (phrase: string) => {
@@ -213,8 +232,85 @@ export default function CoachingDashboard({
     speak(naturalized);
   };
 
+  // Breath-phase cues must FIT the breath: a 4s phase leaves ~2 seconds of
+  // comfortable speech, so cues are sized to each phase's duration, and their
+  // audio is pre-generated when breathwork starts so playback is instant —
+  // no synthesis latency, no sentence outliving its breath.
+  const PHASE_CUE_VARIANTS = {
+    inhale: ['Breathe in', 'Inhale slowly', 'Inhale slowly, drawing in calm'],
+    holdFull: ['Hold', 'Hold, steady', 'Hold the breath, soft and steady'],
+    exhale: ['Release', 'Exhale slowly', 'Exhale fully, letting the day go'],
+    holdEmpty: ['Rest', 'Rest, empty', 'Rest in the quiet emptiness'],
+  } as const;
+
+  const phaseCueFor = (phase: keyof typeof PHASE_CUE_VARIANTS, seconds: number) => {
+    const [short, medium, long] = PHASE_CUE_VARIANTS[phase];
+    return seconds >= 7 ? long : seconds >= 5 ? medium : short;
+  };
+
+  const phaseAudioRef = useRef<{ cache: Map<string, string>; player: HTMLAudioElement | null }>({
+    cache: new Map(),
+    player: null,
+  });
+
+  useEffect(() => {
+    const store = phaseAudioRef.current;
+    return () => {
+      store.player?.pause();
+      store.cache.forEach((url) => URL.revokeObjectURL(url));
+      store.cache.clear();
+    };
+  }, []);
+
+  const prefetchPhaseCues = async () => {
+    const b = result.breathwork;
+    const texts = new Set([phaseCueFor('inhale', b.inhale), phaseCueFor('exhale', b.exhale)]);
+    if (b.holdActive > 0) texts.add(phaseCueFor('holdFull', b.holdActive));
+    if (b.holdEmpty > 0) texts.add(phaseCueFor('holdEmpty', b.holdEmpty));
+    // sequential with one retry: parallel bursts can trip ElevenLabs throttling
+    for (const text of texts) {
+      if (phaseAudioRef.current.cache.has(text)) continue;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text }),
+          });
+          if (res.ok) {
+            phaseAudioRef.current.cache.set(text, URL.createObjectURL(await res.blob()));
+            break;
+          }
+        } catch {}
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+    }
+  };
+
+  const speakBreathPhase = (phase: keyof typeof PHASE_CUE_VARIANTS, seconds: number) => {
+    const text = phaseCueFor(phase, seconds);
+    const cached = phaseAudioRef.current.cache.get(text);
+    if (cached) {
+      phaseAudioRef.current.player?.pause();
+      stopSpeech();
+      const audio = new Audio(cached);
+      phaseAudioRef.current.player = audio;
+      audio.play().catch(() => {});
+    } else {
+      speak(text);
+    }
+  };
+
   const toggleBreathing = () => {
     if (!isBreathingRunning) {
+      // Starting fresh from a standby (inhale, full time, cycle 1) resets refs;
+      // resuming mid-phase keeps them where the pause left off.
+      if (phaseRef.current === 'inhale' && breathingCycleCount === 1 && breathingTimeRemaining === result.breathwork.inhale) {
+        phaseRef.current = 'inhale';
+        remainingRef.current = result.breathwork.inhale;
+        cycleRef.current = 1;
+      }
+      prefetchPhaseCues();
       speakVocalPhase(`Beginning ${result.breathwork.name}`);
     }
     setIsBreathingRunning(!isBreathingRunning);
@@ -222,11 +318,24 @@ export default function CoachingDashboard({
 
   const resetBreathing = () => {
     setIsBreathingRunning(false);
+    phaseRef.current = 'inhale';
+    remainingRef.current = result.breathwork.inhale;
+    cycleRef.current = 1;
     setBreathingPhase('inhale');
     setBreathingTimeRemaining(result.breathwork.inhale);
     setBreathingCycleCount(1);
     speakVocalPhase("Timer reset");
   };
+
+  // Spoken pose names: Roman numerals read as words ("Warrior I" → "Warrior One")
+  const speakableName = (name: string) =>
+    name.replace(/\bIII\b/g, 'Three').replace(/\bII\b/g, 'Two').replace(/\bI\b/g, 'One');
+
+  // Teaching pace: a 1.4s pause after each sentence so the practitioner can
+  // actually move into position between cues (ElevenLabs break markup;
+  // the browser-voice fallback strips it)
+  const pacedInstructions = (text: string) =>
+    text.replace(/\.\s+/g, '. <break time="1.4s" /> ');
 
   // 2. Yoga Wizard Sequences Logic
   const startYogaWizard = () => {
@@ -236,7 +345,8 @@ export default function CoachingDashboard({
     const seconds = parseDurationToSeconds(initialPose.duration);
     setPoseTimerInternal(seconds);
     setIsPoseTimerRunning(true);
-    speakVocalPhase(`Starting posture: ${initialPose.nameEnglish}, or ${initialPose.nameSanskrit}`);
+    // Guide the practitioner INTO the pose, not just its name
+    speak(`Starting posture: ${speakableName(initialPose.nameEnglish)}, or ${speakableName(initialPose.nameSanskrit)}. <break time="1.2s" /> ${pacedInstructions(initialPose.instructions)}`);
   };
 
   const parseDurationToSeconds = (durStr: string): number => {
@@ -279,7 +389,7 @@ export default function CoachingDashboard({
       const nextPose = result.yogaPractice.poses[nextIdx];
       const seconds = parseDurationToSeconds(nextPose.duration);
       setPoseTimerInternal(seconds);
-      speakVocalPhase(`Entering posture: ${nextPose.nameEnglish}, ${nextPose.nameSanskrit}`);
+      speak(`Entering posture: ${speakableName(nextPose.nameEnglish)}. <break time="1.2s" /> ${pacedInstructions(nextPose.instructions)}`);
     } else {
       setIsPoseTimerRunning(false);
       speakVocalPhase("Yoga ritual completed. Sit quietly and feel the light of integration.");
@@ -299,7 +409,7 @@ export default function CoachingDashboard({
       const prevPose = result.yogaPractice.poses[prevIdx];
       const seconds = parseDurationToSeconds(prevPose.duration);
       setPoseTimerInternal(seconds);
-      speakVocalPhase(`Returning to posture: ${prevPose.nameEnglish}`);
+      speak(`Returning to posture: ${speakableName(prevPose.nameEnglish)}. <break time="1.2s" /> ${pacedInstructions(prevPose.instructions)}`);
     }
   };
 
