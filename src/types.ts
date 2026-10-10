@@ -57,6 +57,37 @@ export interface SavedPractice {
   result: RecommendationResult;
 }
 
+// One finished practice. The log is the calendar's source of truth and, like
+// the wellness profile, lives on-device only.
+export interface PracticeLogEntry {
+  id: string;
+  kind: 'ritual' | 'breathwork';
+  title: string;
+  completedAt: string; // ISO timestamp
+  localDate: string; // YYYY-MM-DD in the user's own timezone — the calendar key
+  durationMinutes: number;
+  result?: RecommendationResult; // snapshot so the day can reopen its ritual
+  heart?: HeartSummary; // present when a heart-rate device was connected
+}
+
+// Heart rate across one practice, from a connected Bluetooth device.
+export interface HeartSummary {
+  startBpm: number;
+  endBpm: number;
+  avgBpm: number;
+  minBpm: number;
+  maxBpm: number;
+  rmssd?: number; // HRV in ms, when the device reports beat-to-beat intervals
+}
+
+// One day of wearable readings from Google Health, kept on-device.
+export interface HealthDay {
+  date: string; // YYYY-MM-DD
+  restingHeartRate?: number;
+  hrv?: number; // daily average RMSSD, ms
+  sleepMinutes?: number; // main sleep ending on this date
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChatCard, ChatItem, WellnessProfile } from '../types';
 import { useSpeech } from './useSpeech';
+import { CalendarContext } from './useExternalCalendar';
+import { HealthContext } from './useWearableHealth';
 
 const CHAT_KEY = 'pranaveda_chat';
 const CHAT_TS_KEY = 'pranaveda_chat_ts';
@@ -67,7 +69,7 @@ function loadJson<T>(key: string, fallback: T): T {
 // The wellness profile lives on-device only: the server receives it per
 // request, updates it via Amrita's tools, and returns it — nothing is stored
 // remotely.
-export function useAmritaChat() {
+export function useAmritaChat(calendar?: CalendarContext | null, health?: HealthContext | null) {
   const [items, setItems] = useState<ChatItem[]>(() => {
     const stored = loadJson<ChatItem[]>(CHAT_KEY, []);
     const lastActivity = loadJson<number>(CHAT_TS_KEY, 0);
@@ -141,7 +143,7 @@ export function useAmritaChat() {
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: history, profile, localTime: new Date().toLocaleString(), inputMode, previousSession }),
+          body: JSON.stringify({ messages: history, profile, localTime: new Date().toLocaleString(), inputMode, previousSession, calendar: calendar ?? undefined, health: health ?? undefined }),
           signal: controller.signal,
         });
         if (!response.ok || !response.body) throw new Error(`Chat request failed (${response.status})`);
@@ -205,7 +207,7 @@ export function useAmritaChat() {
         abortRef.current = null;
       }
     },
-    [items, profile, isStreaming, voiceMuted, speak, stopSpeaking]
+    [items, profile, isStreaming, voiceMuted, speak, stopSpeaking, calendar, health]
   );
 
   const resetConversation = useCallback(() => {

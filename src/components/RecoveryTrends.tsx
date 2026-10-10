@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ChartFrame from './ChartFrame';
+import WearableTrends from './WearableTrends';
+import { HealthDay, PracticeLogEntry } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, 
@@ -64,42 +67,14 @@ const DEFAULT_METRICS: LogRecord[] = [
 
 interface RecoveryTrendsProps {
   showNotification?: (message: string, type: 'info' | 'success' | 'warn') => void;
+  // Consecutive practice days, derived from the on-device practice log.
+  streak?: number;
+  // Real readings from connected wearables; the rest of this view is sample data.
+  healthDays?: HealthDay[];
+  practiceLog?: PracticeLogEntry[];
 }
 
-function ChartFrame({
-  height,
-  children,
-}: {
-  height: number;
-  children: (size: { width: number; height: number }) => React.ReactElement;
-}) {
-  const frameRef = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(0);
-
-  useLayoutEffect(() => {
-    const updateWidth = () => {
-      setWidth(Math.max(0, Math.floor(frameRef.current?.clientWidth ?? 0)));
-    };
-
-    updateWidth();
-    const observer = new ResizeObserver(updateWidth);
-    if (frameRef.current) observer.observe(frameRef.current);
-    window.addEventListener('resize', updateWidth);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', updateWidth);
-    };
-  }, []);
-
-  return (
-    <div ref={frameRef} className="h-full w-full min-w-0">
-      {width > 0 ? children({ width, height }) : null}
-    </div>
-  );
-}
-
-export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps = {}) {
+export default function RecoveryTrends({ showNotification, streak = 0, healthDays = [], practiceLog = [] }: RecoveryTrendsProps = {}) {
   const [activeTab, setActiveTab] = useState<'trends' | 'sleep' | 'breathing' | 'posture' | 'pulse'>('trends');
   const [metrics, setMetrics] = useState<LogRecord[]>(() => {
     try {
@@ -112,7 +87,6 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
 
   // Habit builder, accomplishments, and reward simulation states based on customer mockup
   const [completedHabits, setCompletedHabits] = useState<string[]>(['breath']);
-  const [streakCount, setStreakCount] = useState<number>(5);
   const [mindfulnessIntensity, setMindfulnessIntensity] = useState<'beginner' | 'steady' | 'yogi'>('steady');
   const [rewardClaimed, setRewardClaimed] = useState<string | null>(null);
 
@@ -555,6 +529,8 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
         })}
       </div>
 
+      {activeTab === 'trends' && <WearableTrends days={healthDays} practiceLog={practiceLog} />}
+
       <AnimatePresence mode="wait">
         
         {/* TABS 1: TRENDS & CHARTS */}
@@ -620,10 +596,12 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
 
                 <div className="space-y-1">
                   <h4 className="text-lg font-serif font-extrabold text-stone-850">
-                    Posture Pro: {streakCount}-Day Streak!
+                    {streak > 0 ? `${streak}-day practice streak` : 'No streak yet'}
                   </h4>
                   <p className="text-xs text-stone-600 leading-relaxed font-sans font-light">
-                    You've completed posture practice for {streakCount} days in a row. Treat yourself to a refreshing smoothie today. Keep going; you're building a lasting habit.
+                    {streak > 0
+                      ? `You've practiced ${streak} ${streak === 1 ? 'day' : 'days'} in a row. Keep going; you're building a lasting habit.`
+                      : 'Finish a ritual or a breathwork session today to begin one.'}
                   </p>
                 </div>
 
@@ -659,7 +637,6 @@ export default function RecoveryTrends({ showNotification }: RecoveryTrendsProps
                             setCompletedHabits(updated);
                             // Visual reward trigger when all 3 completed
                             if (updated.length === 3) {
-                              setStreakCount(6);
                               setRewardClaimed("Gold Crown Ginger-Mint Elixir Unlocked!");
                             }
                           }

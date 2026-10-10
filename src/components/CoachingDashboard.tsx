@@ -6,6 +6,8 @@ import {
   Clock, Coffee, BookOpen, Volume2, HelpCircle 
 } from 'lucide-react';
 import { RecommendationResult, SavedPractice } from '../types';
+import { NewPracticeLogEntry } from '../hooks/usePracticeLog';
+import { HeartRateMonitor } from '../hooks/useHeartRateMonitor';
 import { useSpeech } from '../hooks/useSpeech';
 
 const getFallbackPoseImage = (pose: { nameEnglish: string; nameSanskrit?: string }) => {
@@ -67,6 +69,9 @@ interface CoachingDashboardProps {
   isSaved: boolean;
   onToggleSave: () => void;
   showNotification?: (message: string, type: 'info' | 'success' | 'warn') => void;
+  onPracticeComplete?: (entry: NewPracticeLogEntry) => void;
+  // A connected Bluetooth heart-rate device, if any: shown live and saved with the practice.
+  heart?: HeartRateMonitor;
 }
 
 type TabType = 'Overview' | 'Yoga' | 'Ayurveda' | 'Breathwork';
@@ -98,6 +103,8 @@ export default function CoachingDashboard({
   isSaved,
   onToggleSave,
   showNotification,
+  onPracticeComplete,
+  heart,
 }: CoachingDashboardProps) {
   const [activeTab, setActiveTab] = useState<TabType>('Overview');
   const [summaryExpanded, setSummaryExpanded] = useState(false);
@@ -108,6 +115,9 @@ export default function CoachingDashboard({
   const [poseTimerInternal, setPoseTimerInternal] = useState(120); // standard 2 minutes
   const [isPoseTimerRunning, setIsPoseTimerRunning] = useState(false);
   const poseIntervalRef = useRef<number | null>(null);
+  // The final handleNextPose can run twice (it is called from a state updater,
+  // which StrictMode double-invokes), so the practice log is written once per run.
+  const yogaLoggedRef = useRef(false);
 
   // Breathing Timer State
   const [isBreathingRunning, setIsBreathingRunning] = useState(false);
@@ -172,6 +182,17 @@ export default function CoachingDashboard({
         setBreathingCycleCount(1);
         phaseAudioRef.current.player?.pause();
         stopSpeech();
+        const heartSummary = heart?.endSession() ?? undefined;
+        onPracticeComplete?.({
+          kind: 'breathwork',
+          title: b.name,
+          durationMinutes: Math.max(1, Math.round(((b.inhale + b.holdActive + b.exhale + b.holdEmpty) * b.cycles) / 60)),
+          result,
+          heart: heartSummary,
+        });
+        if (heartSummary) {
+          showNotification?.(`Your heart rate moved from ${heartSummary.startBpm} to ${heartSummary.endBpm} bpm across this breathwork.`, 'success');
+        }
         speak(`Beautiful. <break time="0.8s" /> You've completed your ${b.name}. <break time="0.8s" /> Rest here, and let your breath return to its natural rhythm.`);
         return;
       }
@@ -309,6 +330,7 @@ export default function CoachingDashboard({
         phaseRef.current = 'inhale';
         remainingRef.current = result.breathwork.inhale;
         cycleRef.current = 1;
+        heart?.startSession();
       }
       prefetchPhaseCues();
       speakVocalPhase(`Beginning ${result.breathwork.name}`);
@@ -340,6 +362,8 @@ export default function CoachingDashboard({
   // 2. Yoga Wizard Sequences Logic
   const startYogaWizard = () => {
     setIsYogaWizardActive(true);
+    yogaLoggedRef.current = false;
+    heart?.startSession();
     setCurrentPoseIndex(0);
     const initialPose = result.yogaPractice.poses[0];
     const seconds = parseDurationToSeconds(initialPose.duration);
@@ -392,9 +416,26 @@ export default function CoachingDashboard({
       speak(`Entering posture: ${speakableName(nextPose.nameEnglish)}. <break time="1.2s" /> ${pacedInstructions(nextPose.instructions)}`);
     } else {
       setIsPoseTimerRunning(false);
+      let heartSummary: ReturnType<NonNullable<typeof heart>['endSession']> = null;
+      if (!yogaLoggedRef.current) {
+        yogaLoggedRef.current = true;
+        heartSummary = heart?.endSession() ?? null;
+        onPracticeComplete?.({
+          kind: 'ritual',
+          title: result.yogaPractice.title,
+          durationMinutes: result.yogaPractice.durationMinutes,
+          result,
+          heart: heartSummary ?? undefined,
+        });
+      }
       speakVocalPhase("Yoga ritual completed. Sit quietly and feel the light of integration.");
       if (showNotification) {
-        showNotification("Namaste. You have successfully aligned your 10-minute yoga sequence!", "success");
+        showNotification(
+          heartSummary
+            ? `Namaste. Your heart rate moved from ${heartSummary.startBpm} to ${heartSummary.endBpm} bpm across this practice.`
+            : "Namaste. You have successfully aligned your 10-minute yoga sequence!",
+          "success"
+        );
       } else {
         alert("Namaste. You have successfully aligned your 10-minute yoga sequence!");
       }
@@ -767,6 +808,11 @@ export default function CoachingDashboard({
                             <span className="text-[12px] text-[#A294BF] font-mono uppercase tracking-wider mt-1 font-bold flex items-center gap-1">
                               <Clock className="w-2.5 h-2.5" /> {result.yogaPractice.poses[currentPoseIndex].duration} Focus
                             </span>
+                            {heart?.bpm && (
+                              <span aria-live="off" className="text-[12px] text-stone-300 font-mono uppercase tracking-wider mt-1.5 flex items-center gap-1">
+                                <Heart className="w-2.5 h-2.5" /> {heart.bpm} bpm
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -1025,6 +1071,11 @@ export default function CoachingDashboard({
                     {/* Cycle Indicators */}
                     <div className="text-center font-mono text-xs text-stone-600 uppercase tracking-wider font-bold">
                       Cycle {breathingCycleCount} / {result.breathwork.cycles}
+                      {heart?.bpm && (
+                        <span className="flex items-center justify-center gap-1 mt-1.5 text-stone-600">
+                          <Heart className="w-3 h-3 text-[#8A79A5]" /> {heart.bpm} bpm
+                        </span>
+                      )}
                     </div>
 
                     {/* Controls */}
