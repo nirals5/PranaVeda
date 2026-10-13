@@ -18,6 +18,7 @@ import FreeTimeNudge from './components/FreeTimeNudge';
 import { useNudgeNotifications } from './hooks/useNudgeNotifications';
 import { useHeartRateMonitor } from './hooks/useHeartRateMonitor';
 import { useWearableHealth, buildHealthContext } from './hooks/useWearableHealth';
+import { usePlace, PLACE_SUGGESTION } from './hooks/usePlace';
 
 export default function App() {
   const prefersReducedMotion = useReducedMotion();
@@ -57,7 +58,9 @@ export default function App() {
     () => buildHealthContext(health.days, practiceLog, { bpm: heart.bpm, hrv: heart.hrv }),
     [health.days, practiceLog, heart.bpm, heart.hrv]
   );
-  const { items: chatItems, profile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat(calendarContext, healthContext);
+  const place = usePlace();
+  const locationContext = useMemo(() => (place.current ? { place: place.current } : null), [place.current]);
+  const { items: chatItems, profile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat(calendarContext, healthContext, locationContext);
   const lastPracticeAt = practiceLog.length ? Date.parse(practiceLog[practiceLog.length - 1].completedAt) : null;
   const notifications = useNudgeNotifications({
     connected: calendar.connected,
@@ -319,6 +322,7 @@ export default function App() {
                 notifications={notifications}
                 heart={heart}
                 health={health}
+                place={place}
                 onOpenRitual={(result) => {
                   handleOpenRitual(result);
                   setCurrentView('coach');
@@ -458,6 +462,8 @@ export default function App() {
                 {/* Sugges-chips list (chip-cloud) */}
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-3 max-w-3xl mx-auto pb-4 sm:pb-0">
                   {[
+                    // Where they are comes first when location is on
+                    ...(place.current ? [PLACE_SUGGESTION[place.current]] : []),
                     "I haven't been sleeping well lately",
                     "I feel stressed and overwhelmed",
                     // Until a constitution is on file, invite the discovery journey

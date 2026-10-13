@@ -824,6 +824,20 @@ function sanitizeHealthContext(raw: any): HealthContext | undefined {
   return Object.values(out).some(Boolean) ? out : undefined;
 }
 
+// Where the user is, as a KIND of place they saved themselves. The client
+// never sends coordinates or addresses.
+const PLACE_GUIDANCE: Record<string, string> = {
+  home: 'At home. Floor work, lying poses and audible breath (humming, bellows) are all fine; props like cushions and blankets are likely to hand.',
+  work: 'At work. Keep it discreet and short: seated or standing poses that work in ordinary clothes beside a desk, nothing lying on the floor, and silent breath only (no humming or forceful breath).',
+  studio: 'At a studio or gym, with a mat and room to move. A fuller, more physical practice suits this setting.',
+  outdoors: 'At an outdoor spot they chose. Favor standing and balancing poses and steady breath; avoid lying down or anything needing a mat.',
+  elsewhere: 'Away from all of their saved places — out, commuting or travelling. Assume no mat, limited space and other people nearby: brief, equipment-free, seated or standing, with silent breath.',
+};
+
+function sanitizeLocationContext(raw: any): string | undefined {
+  return typeof raw?.place === 'string' && Object.hasOwn(PLACE_GUIDANCE, raw.place) ? raw.place : undefined;
+}
+
 function healthPromptLines(health: HealthContext): string[] {
   const hm = (minutes: number) => `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
   const lines: string[] = [];
@@ -844,7 +858,8 @@ export function buildSystemPrompt(
   inputMode?: 'voice' | 'text',
   previousSession?: { role: string; content: string }[],
   calendar?: CalendarContext,
-  health?: HealthContext
+  health?: HealthContext,
+  place?: string
 ): string {
   const profileBlock = profile && Object.keys(profile).length
     ? JSON.stringify(profile, null, 1)
@@ -880,6 +895,13 @@ From devices they chose to connect. These are wellness signals, not medical meas
 ${healthPromptLines(health).map((l) => `- ${l}`).join('\n')}
 
 Read each against THEIR usual, never population norms. Resting heart rate clearly above usual, HRV clearly below usual, or short sleep suggest a taxed system: favor gentle, grounding, restorative choices and shorter holds. Readings at or better than usual can support a fuller practice. Let the readings quietly shape what you choose and mention them lightly, in a phrase — do not recite numbers unless asked. Never diagnose, never alarm; if they describe symptoms or a reading worries them, suggest checking with a clinician.\n`
+    : '';
+
+  const placeBlock = place
+    ? `\n# Where they are
+
+${PLACE_GUIDANCE[place]}
+You know only this kind of place — not an address or coordinates — so never claim more. Let it shape WHICH poses and breath you choose and how long; if they ask for something that does not suit the setting, offer the nearest fitting alternative and say why in a phrase. They can always tell you otherwise ("I have a private room"), and what they say wins.\n`
     : '';
 
   const voiceBlock =
@@ -930,10 +952,10 @@ Your purpose is not to generate wellness plans. Your purpose is to build a long-
 
 # What you can and cannot do
 
-- You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time${calendar ? ' and when their calendar is busy or free' : ''}${health ? ', and see the wearable readings listed below' : ''}.
+- You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time${calendar ? ' and when their calendar is busy or free' : ''}${health ? ', and see the wearable readings listed below' : ''}${place ? ', and know the kind of place they are in' : ''}.
 - You CANNOT (yet): see the user's camera or posture, ${health ? 'read any wearable data beyond the readings listed below' : 'read wearables/sleep data'}, ${calendar ? 'see what their calendar events are or change their calendar' : 'access their calendar'}, control smart-home devices, or set reminders. If asked, say warmly that this isn't available yet — never pretend.
 
-${previousBlock}${calendarBlock}${healthBlock}${voiceBlock}
+${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${voiceBlock}
 # Context
 
 Local time for the user: ${localTime}
@@ -1251,7 +1273,7 @@ function buildBreathworkCard(input: any, profile: WellnessProfile): { error?: st
 
 export function registerChatRoute(app: import('express').Express, client: Anthropic, apiKey: string | undefined) {
   app.post('/api/chat', async (req: Request, res: Response) => {
-    const { messages, profile: rawProfile, localTime, inputMode, previousSession, calendar, health } = req.body ?? {};
+    const { messages, profile: rawProfile, localTime, inputMode, previousSession, calendar, health, location } = req.body ?? {};
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages array is required' });
     }
@@ -1288,7 +1310,8 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
         ? previousSession.filter((m: any) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant'))
         : undefined,
       sanitizeCalendarContext(calendar),
-      sanitizeHealthContext(health)
+      sanitizeHealthContext(health),
+      sanitizeLocationContext(location)
     );
 
     try {

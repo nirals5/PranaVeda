@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Activity, ArrowLeft, ArrowRight, CalendarDays, Link2, User, Watch } from 'lucide-react';
+import { Activity, ArrowLeft, ArrowRight, CalendarDays, Link2, MapPin, User, Watch } from 'lucide-react';
 import { PracticeLogEntry, RecommendationResult, WellnessProfile } from '../types';
 import PracticeCalendar from './PracticeCalendar';
 import CalendarConnections from './CalendarConnections';
 import WearableConnections from './WearableConnections';
+import LocationSettings from './LocationSettings';
+import { Place } from '../hooks/usePlace';
 import { HeartRateMonitor } from '../hooks/useHeartRateMonitor';
 import { WearableHealth } from '../hooks/useWearableHealth';
 import { ExternalCalendar } from '../hooks/useExternalCalendar';
@@ -17,14 +19,15 @@ interface ProfileViewProps {
   notifications: NudgeNotifications;
   heart: HeartRateMonitor;
   health: WearableHealth;
+  place: Place;
   onOpenRitual: (result: RecommendationResult) => void;
   onStartPractice: () => void;
 }
 
-// PLACEHOLDER profile: there are no accounts yet. Calendar and Wearables are
-// live connectors; the rest mark where further integrations will plug in.
+// PLACEHOLDER profile: there are no accounts yet. Calendar, Wearables and
+// Location are live connectors; the rest mark where further integrations will plug in.
 const CONNECTORS: {
-  id: 'calendar' | 'wearables' | 'health';
+  id: 'calendar' | 'wearables' | 'location' | 'health';
   icon: typeof CalendarDays;
   title: string;
   description: string;
@@ -45,6 +48,13 @@ const CONNECTORS: {
     available: true,
   },
   {
+    id: 'location',
+    icon: MapPin,
+    title: 'Location',
+    description: 'Home, work, studio or outdoors — so Amrita suggests a practice that suits where you are.',
+    available: true,
+  },
+  {
     id: 'health',
     icon: Activity,
     title: 'Health monitors',
@@ -53,8 +63,8 @@ const CONNECTORS: {
   },
 ];
 
-export default function ProfileView({ profile, practiceLog, streak, calendar, notifications, heart, health, onOpenRitual, onStartPractice }: ProfileViewProps) {
-  const [section, setSection] = useState<'connectors' | 'calendar' | 'wearables'>('connectors');
+export default function ProfileView({ profile, practiceLog, streak, calendar, notifications, heart, health, place, onOpenRitual, onStartPractice }: ProfileViewProps) {
+  const [section, setSection] = useState<'connectors' | 'calendar' | 'wearables' | 'location'>('connectors');
 
   const backToConnectors = (
     <button
@@ -71,6 +81,15 @@ export default function ProfileView({ profile, practiceLog, streak, calendar, no
       <div className="w-full max-w-3xl mx-auto px-5 sm:px-6 pb-12 space-y-4">
         {backToConnectors}
         <WearableConnections heart={heart} health={health} />
+      </div>
+    );
+  }
+
+  if (section === 'location') {
+    return (
+      <div className="w-full max-w-3xl mx-auto px-5 sm:px-6 pb-12 space-y-4">
+        {backToConnectors}
+        <LocationSettings place={place} />
       </div>
     );
   }
@@ -126,11 +145,15 @@ export default function ProfileView({ profile, practiceLog, streak, calendar, no
               {available ? (
                 <button
                   type="button"
-                  onClick={() => setSection(id === 'wearables' ? 'wearables' : 'calendar')}
+                  onClick={() => setSection(id === 'health' ? 'connectors' : id)}
                   aria-label={`Open ${title}`}
                   className="flex-shrink-0 flex items-center gap-1.5 py-2 px-4 bg-[#8A79A5] hover:bg-[#72618F] text-white text-[11px] uppercase tracking-wider font-mono font-bold rounded-full transition-all cursor-pointer"
                 >
-                  {(id === 'calendar' ? calendar.connected : heart.status === 'connected' || health.connected) ? 'Connected' : 'Open'}{' '}
+                  {(id === 'calendar' ? calendar.connected : id === 'location' ? place.enabled : heart.status === 'connected' || health.connected)
+                    ? id === 'location'
+                      ? 'On'
+                      : 'Connected'
+                    : 'Open'}{' '}
                   <ArrowRight className="w-3 h-3" />
                 </button>
               ) : (

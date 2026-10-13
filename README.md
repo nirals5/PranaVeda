@@ -19,7 +19,7 @@ View your app in AI Studio: https://ai.studio/apps/8cc0863b-b75e-48c1-a990-c33be
 3. Run the app:
    `npm run dev`
 
-## Features: practice calendar, connectors, and wearables
+## Features: practice calendar, connectors, wearables, and location
 
 Everything below lives under the profile button at the right end of the top navigation: **Profile → Connectors**. There are no user accounts yet; the profile is a placeholder that shows the name and constitution Amrita has learned, or "Guest".
 
@@ -27,6 +27,7 @@ Everything below lives under the profile button at the right end of the top navi
 |---|---|---|
 | Calendar | Live | Practice calendar, outside-calendar free time, free-time nudges |
 | Wearables | Live | Nearby heart-rate device, Google Health readings |
+| Location | Live | Recognises saved places so Amrita suggests a practice that suits the setting |
 | Health monitors | Placeholder | Marked "Coming soon" |
 
 New connectors are one entry each in the `CONNECTORS` array in `src/components/ProfileView.tsx`.
@@ -112,6 +113,41 @@ Limits:
 - **Google Health access lapses about hourly.** Saved readings stay visible; refreshing needs a "Reconnect" click.
 - Google may require app verification for health-data access before public launch.
 
+### Location
+
+Location tells Amrita the **kind of place** the user is in, so the practice fits the setting. It is off until the user turns it on under Profile → Connectors → Location, which triggers the browser's permission prompt.
+
+How it works:
+
+- While PranaVeda is open, the browser reports the device's position, and updates it as the user moves.
+- The user marks the spots that matter by pressing "I am here" while standing in them: Home, Work, Studio or gym, and Outdoor spot. There is one spot per kind; pressing "Move here" relocates it.
+- The current position is matched to the nearest saved spot within about 150 metres. A good position that matches none is treated as "Somewhere else".
+
+What changes with the place:
+
+- **Home screen:** the first suggestion chip reflects the place, for example "I'm at work. Something quiet I can do at my desk, please."
+- **Amrita:** each chat message carries the kind of place, with guidance for it:
+  - Home: floor work, lying poses and audible breath are fine.
+  - Work: discreet and short, seated or standing, silent breath only.
+  - Studio or gym: a fuller, more physical practice.
+  - Outdoor spot: standing and balancing poses, nothing lying down.
+  - Somewhere else: brief, equipment-free, seated or standing.
+- What the user says always wins over the place ("I have a private room").
+
+Privacy:
+
+- Coordinates stay on the device. Only the kind of place is sent with a chat message; no address or coordinates are sent.
+- No location history is kept. Only the saved spots are stored; the current position lives in memory while the app is open.
+
+Limits:
+
+- **Only while the app is open.** A web page cannot follow location in the background or with the tab closed, so there is no all-day trail.
+- **Nothing is suggested until at least one spot is saved.** With none saved, Amrita is told nothing about location.
+- **A rough position is ignored.** If the device can only place the user to within about 2 km (common on desktops without Wi-Fi positioning), the app says so and does not guess.
+- Places are not looked up on a map. The app does not know that a spot is a park or an office unless the user saves it as one.
+
+The 150-metre match radius and the 2 km accuracy cut-off are constants at the top of `src/hooks/usePlace.ts`; the per-place guidance is `PLACE_GUIDANCE` in `api/index.ts`.
+
 ### Where data is stored
 
 Everything is kept in the browser on the user's device. The server stores nothing.
@@ -123,6 +159,7 @@ Everything is kept in the browser on the user's device. The server stores nothin
 | Notification preference and last notification | `pranaveda_nudge_notifications`, `pranaveda_nudge_notified` |
 | Google Health daily readings (up to 90 days) | `pranaveda_health_days` |
 | Remembered Bluetooth device name | `pranaveda_hr_device` |
+| Location on/off and saved spots | `pranaveda_location_enabled`, `pranaveda_places` |
 | Google access tokens (this tab only, about an hour) | `pranaveda_google_token`, `pranaveda_google_health_token` |
 
 Disconnecting Google Health also clears its saved readings.
@@ -145,10 +182,12 @@ Tested in a browser with simulated data:
 - The in-app nudge appearing when free and disappearing when busy.
 - Browser notification rules and one end-to-end notification, using a stand-in for the real notification.
 - The Bluetooth and Google Health flows, session heart-rate saving, the Trends card, and the summary sent to Amrita, using a simulated strap and simulated Google Health responses.
+- Location: place matching, saving spots, the place-aware suggestion, and the chat request carrying only the kind of place, using a simulated position.
 
 Not yet tested against the real thing:
 
 - Google Calendar and Google Health sign-in with a real client ID. The Google Health field names and filters come from Google's documentation, not a live call.
 - A real Bluetooth heart-rate device.
 - A real system notification appearing on screen.
+- Location with a real device position and the browser's real permission prompt.
 - Amrita's replies using calendar and wearable context, which needs an Anthropic API key.
