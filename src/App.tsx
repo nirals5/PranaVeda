@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Sparkles, Mic, ArrowRight, HelpCircle, Flame, Wind, Droplet, Star, Play, RotateCcw, CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { Sparkles, Mic, ArrowRight, HelpCircle, Flame, Wind, Droplet, Star, Play, RotateCcw, CheckCircle2, AlertCircle, Info, X, User } from 'lucide-react';
 import PranaBackground from './components/PranaBackground';
 import Logo from './components/Logo';
 import VoiceModal from './components/VoiceModal';
@@ -11,10 +11,18 @@ import DoshaProfileView from './components/DoshaProfileView';
 import { useAmritaChat } from './hooks/useAmritaChat';
 import { RecommendationResult, SavedPractice } from './types';
 import RecoveryTrends from './components/RecoveryTrends';
+import ProfileView from './components/ProfileView';
+import { usePracticeLog } from './hooks/usePracticeLog';
+import { useExternalCalendar, describeCalendar } from './hooks/useExternalCalendar';
+import FreeTimeNudge from './components/FreeTimeNudge';
+import { useNudgeNotifications } from './hooks/useNudgeNotifications';
+import { useHeartRateMonitor } from './hooks/useHeartRateMonitor';
+import { useWearableHealth, buildHealthContext } from './hooks/useWearableHealth';
+import { usePlace, PLACE_SUGGESTION } from './hooks/usePlace';
 
 export default function App() {
   const prefersReducedMotion = useReducedMotion();
-  const [currentView, setCurrentView] = useState<'coach' | 'dosha' | 'recovery'>('coach');
+  const [currentView, setCurrentView] = useState<'coach' | 'dosha' | 'recovery' | 'profile'>('coach');
   const [showAmritaHint, setShowAmritaHint] = useState(true);
   const hoverTimerRef = useRef<number | null>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -38,7 +46,34 @@ export default function App() {
   // Logo always leads home (welcome screen), even mid-conversation; the
   // conversation itself is kept and resumable.
   const [showHome, setShowHome] = useState(false);
-  const { items: chatItems, profile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat();
+  const calendar = useExternalCalendar();
+  const calendarContext = useMemo(
+    () => (calendar.connected ? describeCalendar(calendar.busy, calendar.now) : null),
+    [calendar.connected, calendar.busy, calendar.now]
+  );
+  const { entries: practiceLog, streak, logPractice } = usePracticeLog();
+  const heart = useHeartRateMonitor();
+  const health = useWearableHealth();
+  const healthContext = useMemo(
+    () => buildHealthContext(health.days, practiceLog, { bpm: heart.bpm, hrv: heart.hrv }),
+    [health.days, practiceLog, heart.bpm, heart.hrv]
+  );
+  const place = usePlace();
+  const locationContext = useMemo(() => (place.current ? { place: place.current } : null), [place.current]);
+  const { items: chatItems, profile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat(calendarContext, healthContext, locationContext);
+  const lastPracticeAt = practiceLog.length ? Date.parse(practiceLog[practiceLog.length - 1].completedAt) : null;
+  const notifications = useNudgeNotifications({
+    connected: calendar.connected,
+    busy: calendar.busy,
+    now: calendar.now,
+    lastPracticeAt,
+    suppressed: currentResult !== null,
+    // Land on the home screen, where the in-app nudge offers the practice.
+    onOpen: () => {
+      setCurrentView('coach');
+      setShowHome(true);
+    },
+  });
   const [savedPractices, setSavedPractices] = useState<SavedPractice[]>([]);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   
@@ -163,7 +198,7 @@ export default function App() {
           <Logo size="md" />
         </button>
         
-        <div className="flex items-center gap-2 bg-white/40 p-1 rounded-2xl border border-white/60 shadow-xs w-full sm:w-auto max-w-full sm:max-w-none overflow-x-auto">
+        <div className="flex items-center gap-1 sm:gap-2 bg-white/40 p-1 rounded-2xl border border-white/60 shadow-xs w-full sm:w-auto max-w-full sm:max-w-none overflow-x-auto">
           <div
             className="relative"
             onMouseEnter={handleAmritaMouseEnter}
@@ -171,7 +206,7 @@ export default function App() {
           >
             <button
               onClick={() => { setCurrentView('coach'); setShowHome(false); }}
-              className={`flex-1 sm:flex-none py-2 px-3 sm:px-5 rounded-xl text-[12px] sm:text-[14px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-none py-2 px-1.5 sm:px-5 rounded-xl text-[11px] sm:text-[14px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 currentView === 'coach'
                   ? 'bg-[#8A79A5]/90 text-white shadow-sm'
                   : 'text-stone-550 hover:text-stone-900'
@@ -196,7 +231,7 @@ export default function App() {
           
           <button
             onClick={() => setCurrentView('dosha')}
-            className={`flex-1 sm:flex-none py-2 px-3 sm:px-5 rounded-xl text-[12px] sm:text-[14px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none py-2 px-1.5 sm:px-5 rounded-xl text-[11px] sm:text-[14px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
               currentView === 'dosha'
                 ? 'bg-[#8A79A5]/90 text-white shadow-sm'
                 : 'text-stone-550 hover:text-stone-900'
@@ -207,13 +242,26 @@ export default function App() {
 
           <button
             onClick={() => setCurrentView('recovery')}
-            className={`flex-1 sm:flex-none py-2 px-3 sm:px-5 rounded-xl text-[12px] sm:text-[14px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none py-2 px-1.5 sm:px-5 rounded-xl text-[11px] sm:text-[14px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
               currentView === 'recovery'
                 ? 'bg-[#8A79A5]/90 text-white shadow-sm'
                 : 'text-stone-550 hover:text-stone-900'
             }`}
           >
             Recovery & Trends
+          </button>
+
+          <button
+            onClick={() => setCurrentView('profile')}
+            aria-label="Profile and connectors"
+            title="Profile and connectors"
+            className={`flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl transition-all cursor-pointer ${
+              currentView === 'profile'
+                ? 'bg-[#8A79A5]/90 text-white shadow-sm'
+                : 'text-stone-550 hover:text-stone-900'
+            }`}
+          >
+            <User className="w-4 h-4" />
           </button>
         </div>
       </header>
@@ -253,10 +301,41 @@ export default function App() {
               exit={{ opacity: 0, y: -15 }}
               className="w-full"
             >
-              <RecoveryTrends showNotification={showToast} />
+              <RecoveryTrends showNotification={showToast} streak={streak} healthDays={health.days} practiceLog={practiceLog} />
             </motion.div>
           )}
  
+          {/* PROFILE & CONNECTORS SCREEN (practice calendar lives here) */}
+          {currentView === 'profile' && (
+            <motion.div
+              key="profile"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="w-full"
+            >
+              <ProfileView
+                profile={profile}
+                practiceLog={practiceLog}
+                streak={streak}
+                calendar={calendar}
+                notifications={notifications}
+                heart={heart}
+                health={health}
+                place={place}
+                onOpenRitual={(result) => {
+                  handleOpenRitual(result);
+                  setCurrentView('coach');
+                }}
+                onStartPractice={() => {
+                  setCurrentResult(null);
+                  setCurrentView('coach');
+                  setShowHome(true);
+                }}
+              />
+            </motion.div>
+          )}
+
           {/* RESULTS DASHBOARD SCREEN */}
           {currentView === 'coach' && currentResult && (
             <motion.div
@@ -272,6 +351,8 @@ export default function App() {
                 isSaved={isResultSaved()}
                 onToggleSave={handleToggleSave}
                 showNotification={showToast}
+                onPracticeComplete={logPractice}
+                heart={heart}
               />
             </motion.div>
           )}
@@ -307,6 +388,14 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="flex flex-col items-center w-full px-5 sm:px-6 text-center space-y-10 sm:space-y-12"
             >
+              {calendar.connected && (
+                <FreeTimeNudge
+                  busy={calendar.busy}
+                  now={calendar.now}
+                  lastPracticeAt={lastPracticeAt}
+                  onAccept={handleConsultCoach}
+                />
+              )}
               
               {/* Editorial Display Intro */}
               <div className="space-y-4 max-w-2xl mt-8 sm:mt-12">
@@ -373,6 +462,8 @@ export default function App() {
                 {/* Sugges-chips list (chip-cloud) */}
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-3 max-w-3xl mx-auto pb-4 sm:pb-0">
                   {[
+                    // Where they are comes first when location is on
+                    ...(place.current ? [PLACE_SUGGESTION[place.current]] : []),
                     "I haven't been sleeping well lately",
                     "I feel stressed and overwhelmed",
                     // Until a constitution is on file, invite the discovery journey

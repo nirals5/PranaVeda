@@ -1,6 +1,9 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
+import ICAL from 'ical.js';
+import { lookup } from 'node:dns/promises';
+import { BlockList, isIP } from 'node:net';
 
 // IMPORTANT: this file must stay fully self-contained (no imports from other
 // project files). Cross-file imports crash Vercel's ESM runtime with
@@ -762,11 +765,101 @@ export interface WellnessProfile {
   practiceHistory?: { date: string; title: string; kind: 'ritual' | 'breathwork' }[];
 }
 
+// Busy/free summary of the user's connected calendar, pre-formatted by the
+// client in the user's own timezone. Times only — event details never leave
+// the calendar provider.
+export interface CalendarContext {
+  now: string;
+  busyToday: string[];
+  busyTomorrow: string[];
+}
+
+// The summary is client-supplied text headed for the system prompt, so keep
+// it to short, single-line, time-shaped strings.
+function sanitizeCalendarContext(raw: any): CalendarContext | undefined {
+  if (!raw || typeof raw !== 'object' || typeof raw.now !== 'string') return undefined;
+  const clean = (v: unknown) => String(v).replace(/[^\w :.,–-]/g, '').slice(0, 80);
+  const list = (v: unknown) => (Array.isArray(v) ? v.slice(0, 20).map(clean).filter(Boolean) : []);
+  return { now: clean(raw.now), busyToday: list(raw.busyToday), busyTomorrow: list(raw.busyTomorrow) };
+}
+
+// Wearable readings, validated to plain numbers before they reach the prompt.
+export interface HealthContext {
+  live?: { bpm: number; hrv?: number };
+  lastPractice?: { title: string; startBpm: number; endBpm: number; daysAgo: number };
+  restingHeartRate?: { latest: number; usual: number };
+  hrv?: { latest: number; usual: number };
+  sleep?: { lastNightMinutes: number; usualMinutes: number };
+}
+
+function sanitizeHealthContext(raw: any): HealthContext | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const num = (v: unknown, min: number, max: number) => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) && n >= min && n <= max ? n : undefined;
+  };
+  const pair = (v: any, min: number, max: number) => {
+    const latest = num(v?.latest, min, max);
+    const usual = num(v?.usual, min, max);
+    return latest !== undefined && usual !== undefined ? { latest, usual } : undefined;
+  };
+  const out: HealthContext = {};
+  const bpm = num(raw.live?.bpm, 25, 240);
+  if (bpm !== undefined) out.live = { bpm, hrv: num(raw.live?.hrv, 1, 300) };
+  const startBpm = num(raw.lastPractice?.startBpm, 25, 240);
+  const endBpm = num(raw.lastPractice?.endBpm, 25, 240);
+  if (startBpm !== undefined && endBpm !== undefined) {
+    out.lastPractice = {
+      title: String(raw.lastPractice.title ?? '').replace(/[^\w '’&,.()–-]/g, '').slice(0, 80),
+      startBpm,
+      endBpm,
+      daysAgo: num(raw.lastPractice.daysAgo, 0, 7) ?? 0,
+    };
+  }
+  out.restingHeartRate = pair(raw.restingHeartRate, 25, 150);
+  out.hrv = pair(raw.hrv, 1, 300);
+  const lastNightMinutes = num(raw.sleep?.lastNightMinutes, 1, 1200);
+  const usualMinutes = num(raw.sleep?.usualMinutes, 1, 1200);
+  if (lastNightMinutes !== undefined && usualMinutes !== undefined) out.sleep = { lastNightMinutes, usualMinutes };
+  return Object.values(out).some(Boolean) ? out : undefined;
+}
+
+// Where the user is, as a KIND of place they saved themselves. The client
+// never sends coordinates or addresses.
+const PLACE_GUIDANCE: Record<string, string> = {
+  home: 'At home. Floor work, lying poses and audible breath (humming, bellows) are all fine; props like cushions and blankets are likely to hand.',
+  work: 'At work. Keep it discreet and short: seated or standing poses that work in ordinary clothes beside a desk, nothing lying on the floor, and silent breath only (no humming or forceful breath).',
+  studio: 'At a studio or gym, with a mat and room to move. A fuller, more physical practice suits this setting.',
+  outdoors: 'At an outdoor spot they chose. Favor standing and balancing poses and steady breath; avoid lying down or anything needing a mat.',
+  elsewhere: 'Away from all of their saved places — out, commuting or travelling. Assume no mat, limited space and other people nearby: brief, equipment-free, seated or standing, with silent breath.',
+};
+
+function sanitizeLocationContext(raw: any): string | undefined {
+  return typeof raw?.place === 'string' && Object.hasOwn(PLACE_GUIDANCE, raw.place) ? raw.place : undefined;
+}
+
+function healthPromptLines(health: HealthContext): string[] {
+  const hm = (minutes: number) => `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
+  const lines: string[] = [];
+  if (health.live) lines.push(`Heart rate right now: ${health.live.bpm} bpm${health.live.hrv ? ` (live HRV ${health.live.hrv} ms)` : ''}`);
+  if (health.lastPractice) {
+    const when = health.lastPractice.daysAgo === 0 ? 'today' : health.lastPractice.daysAgo === 1 ? 'yesterday' : `${health.lastPractice.daysAgo} days ago`;
+    lines.push(`Last practice with a heart-rate device ("${health.lastPractice.title}", ${when}): ${health.lastPractice.startBpm} → ${health.lastPractice.endBpm} bpm from start to finish`);
+  }
+  if (health.restingHeartRate) lines.push(`Resting heart rate: ${health.restingHeartRate.latest} bpm (their usual: ${health.restingHeartRate.usual})`);
+  if (health.hrv) lines.push(`Overnight HRV: ${health.hrv.latest} ms (their usual: ${health.hrv.usual})`);
+  if (health.sleep) lines.push(`Sleep last night: ${hm(health.sleep.lastNightMinutes)} (their usual: ${hm(health.sleep.usualMinutes)})`);
+  return lines;
+}
+
 export function buildSystemPrompt(
   profile: WellnessProfile | undefined,
   localTime: string,
   inputMode?: 'voice' | 'text',
-  previousSession?: { role: string; content: string }[]
+  previousSession?: { role: string; content: string }[],
+  calendar?: CalendarContext,
+  health?: HealthContext,
+  place?: string
 ): string {
   const profileBlock = profile && Object.keys(profile).length
     ? JSON.stringify(profile, null, 1)
@@ -782,6 +875,33 @@ ${previousSession
   .join('\n')}
 
 Weave continuity naturally: if you gave a practice, you may ask how it went; if something meaningful was left unfinished (a dosha discovery mid-way, an unanswered question), gently offer to pick it up. One light touch — never recap at length, never force it.\n`
+    : '';
+
+  const calendarBlock = calendar
+    ? `\n# Calendar — busy and free time only
+
+They have connected their calendar. You see only WHEN they are busy, never what the commitments are — so never guess or name an event.
+Right now: ${calendar.now}
+Busy today: ${calendar.busyToday.length ? calendar.busyToday.join(', ') : 'nothing further'}
+Busy tomorrow: ${calendar.busyTomorrow.length ? calendar.busyTomorrow.join(', ') : 'nothing'}
+
+Respect this time: size any practice to fit inside the open window with a few minutes to spare. If they are mid-commitment, offer only something tiny (a few breaths) or point to their next opening. Mention their free time lightly and only when it helps — one phrase, not a schedule recital.\n`
+    : '';
+
+  const healthBlock = health
+    ? `\n# Wearable readings
+
+From devices they chose to connect. These are wellness signals, not medical measurements.
+${healthPromptLines(health).map((l) => `- ${l}`).join('\n')}
+
+Read each against THEIR usual, never population norms. Resting heart rate clearly above usual, HRV clearly below usual, or short sleep suggest a taxed system: favor gentle, grounding, restorative choices and shorter holds. Readings at or better than usual can support a fuller practice. Let the readings quietly shape what you choose and mention them lightly, in a phrase — do not recite numbers unless asked. Never diagnose, never alarm; if they describe symptoms or a reading worries them, suggest checking with a clinician.\n`
+    : '';
+
+  const placeBlock = place
+    ? `\n# Where they are
+
+${PLACE_GUIDANCE[place]}
+You know only this kind of place — not an address or coordinates — so never claim more. Let it shape WHICH poses and breath you choose and how long; if they ask for something that does not suit the setting, offer the nearest fitting alternative and say why in a phrase. They can always tell you otherwise ("I have a private room"), and what they say wins.\n`
     : '';
 
   const voiceBlock =
@@ -832,10 +952,10 @@ Your purpose is not to generate wellness plans. Your purpose is to build a long-
 
 # What you can and cannot do
 
-- You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time.
-- You CANNOT (yet): see the user's camera or posture, read wearables/sleep data, access their calendar, control smart-home devices, or set reminders. If asked, say warmly that this isn't available yet — never pretend.
+- You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time${calendar ? ' and when their calendar is busy or free' : ''}${health ? ', and see the wearable readings listed below' : ''}${place ? ', and know the kind of place they are in' : ''}.
+- You CANNOT (yet): see the user's camera or posture, ${health ? 'read any wearable data beyond the readings listed below' : 'read wearables/sleep data'}, ${calendar ? 'see what their calendar events are or change their calendar' : 'access their calendar'}, control smart-home devices, or set reminders. If asked, say warmly that this isn't available yet — never pretend.
 
-${previousBlock}${voiceBlock}
+${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${voiceBlock}
 # Context
 
 Local time for the user: ${localTime}
@@ -1153,7 +1273,7 @@ function buildBreathworkCard(input: any, profile: WellnessProfile): { error?: st
 
 export function registerChatRoute(app: import('express').Express, client: Anthropic, apiKey: string | undefined) {
   app.post('/api/chat', async (req: Request, res: Response) => {
-    const { messages, profile: rawProfile, localTime, inputMode, previousSession } = req.body ?? {};
+    const { messages, profile: rawProfile, localTime, inputMode, previousSession, calendar, health, location } = req.body ?? {};
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages array is required' });
     }
@@ -1188,7 +1308,10 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       inputMode === 'voice' ? 'voice' : 'text',
       Array.isArray(previousSession)
         ? previousSession.filter((m: any) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant'))
-        : undefined
+        : undefined,
+      sanitizeCalendarContext(calendar),
+      sanitizeHealthContext(health),
+      sanitizeLocationContext(location)
     );
 
     try {
@@ -1587,6 +1710,157 @@ async function handleInsight(req: Request, res: Response) {
 }
 app.get('/api/insight', handleInsight);
 app.post('/api/insight', handleInsight);
+
+// ====================== Calendar: private iCal link → busy ======================
+
+// A private iCal link can't be read from the browser (no CORS), so the server
+// fetches it per request and returns ONLY busy intervals. Nothing is stored:
+// the link lives on the user's device and event details are dropped here.
+
+// The URL is user-supplied, so refuse anything that isn't a public https host
+// (no loopback, private ranges, or cloud metadata addresses).
+const privateRanges = new BlockList();
+for (const [net, bits] of [
+  ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16],
+  ['172.16.0.0', 12], ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 3],
+] as const) privateRanges.addSubnet(net, bits, 'ipv4');
+for (const [net, bits] of [['::', 127], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8]] as const) {
+  privateRanges.addSubnet(net, bits, 'ipv6');
+}
+
+function isPrivateAddress(address: string): boolean {
+  const mapped = address.toLowerCase().startsWith('::ffff:') ? address.slice(7) : address;
+  const family = isIP(mapped);
+  if (!family) return true;
+  return privateRanges.check(mapped, family === 4 ? 'ipv4' : 'ipv6');
+}
+
+class CalendarLinkError extends Error {}
+
+async function assertPublicHttps(raw: string): Promise<URL> {
+  let url: URL;
+  try {
+    url = new URL(raw.trim().replace(/^webcal:/i, 'https:'));
+  } catch {
+    throw new CalendarLinkError('That does not look like a calendar link.');
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) {
+    throw new CalendarLinkError('Calendar links must start with https:// or webcal://.');
+  }
+  const host = url.hostname.replace(/^\[|\]$/g, '');
+  const addresses = isIP(host) ? [{ address: host }] : await lookup(host, { all: true }).catch(() => []);
+  if (!addresses.length || addresses.some((a) => isPrivateAddress(a.address))) {
+    throw new CalendarLinkError('That calendar link cannot be reached.');
+  }
+  return url;
+}
+
+const ICS_MAX_BYTES = 5 * 1024 * 1024;
+
+async function fetchCalendarText(raw: string): Promise<string> {
+  let url = await assertPublicHttps(raw);
+  // Redirects are followed by hand so every hop is re-checked.
+  for (let hop = 0; hop < 4; hop++) {
+    const response = await fetch(url, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(8000),
+      headers: { Accept: 'text/calendar, text/plain;q=0.8' },
+    });
+    const location = response.headers.get('location');
+    if (response.status >= 300 && response.status < 400 && location) {
+      url = await assertPublicHttps(new URL(location, url).toString());
+      continue;
+    }
+    if (!response.ok) throw new CalendarLinkError('The calendar link did not respond. Check that it is still active.');
+    const body = await response.arrayBuffer();
+    if (body.byteLength > ICS_MAX_BYTES) throw new CalendarLinkError('That calendar is too large to read.');
+    return new TextDecoder().decode(body);
+  }
+  throw new CalendarLinkError('That calendar link cannot be reached.');
+}
+
+// Expand a calendar feed into the timed, busy-marked occurrences that overlap
+// [from, to). All-day entries (holidays, birthdays), cancelled events, and
+// events marked "free" do not count as busy.
+function icsBusyIntervals(text: string, from: Date, to: Date): { start: string; end: string }[] {
+  const root = new ICAL.Component(ICAL.parse(text));
+  for (const vtz of root.getAllSubcomponents('vtimezone')) ICAL.TimezoneService.register(vtz);
+
+  const blocks = (ve: ICAL.Component) =>
+    String(ve.getFirstPropertyValue('status') ?? '').toUpperCase() !== 'CANCELLED' &&
+    String(ve.getFirstPropertyValue('transp') ?? '').toUpperCase() !== 'TRANSPARENT';
+
+  const spans: [number, number][] = [];
+  const add = (ve: ICAL.Component, start: ICAL.Time, end: ICAL.Time) => {
+    if (start.isDate || !blocks(ve)) return;
+    const s = start.toJSDate().getTime();
+    const e = end.toJSDate().getTime();
+    if (e > from.getTime() && s < to.getTime() && e > s) spans.push([s, e]);
+  };
+
+  const vevents = root.getAllSubcomponents('vevent');
+  const uidOf = (ve: ICAL.Component) => String(ve.getFirstPropertyValue('uid') ?? '');
+  const masters = vevents.filter((ve) => !ve.hasProperty('recurrence-id'));
+  const masterUids = new Set(masters.map(uidOf));
+  const overrides = new Map<string, ICAL.Component[]>();
+  for (const ve of vevents) {
+    if (!ve.hasProperty('recurrence-id')) continue;
+    if (!masterUids.has(uidOf(ve))) {
+      // A moved occurrence whose series isn't in the feed: treat as one event.
+      const lone = new ICAL.Event(ve);
+      add(ve, lone.startDate, lone.endDate);
+      continue;
+    }
+    overrides.set(uidOf(ve), [...(overrides.get(uidOf(ve)) ?? []), ve]);
+  }
+
+  for (const ve of masters) {
+    const event = new ICAL.Event(ve, { exceptions: overrides.get(uidOf(ve)) ?? [], strictExceptions: true });
+    if (!event.startDate || event.startDate.isDate) continue;
+    if (!event.isRecurring()) {
+      add(ve, event.startDate, event.endDate);
+      continue;
+    }
+    // The iterator always walks from the series start; the cap bounds
+    // pathological rules (e.g. minutely) rather than normal long-lived series.
+    const iterator = event.iterator();
+    for (let i = 0, next = iterator.next(); next && i < 20000; i++, next = iterator.next()) {
+      const occurrence = event.getOccurrenceDetails(next);
+      if (occurrence.startDate.toJSDate().getTime() >= to.getTime()) break;
+      add(occurrence.item.component, occurrence.startDate, occurrence.endDate);
+    }
+  }
+
+  spans.sort((a, b) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const span of spans) {
+    const last = merged[merged.length - 1];
+    if (last && span[0] <= last[1]) last[1] = Math.max(last[1], span[1]);
+    else merged.push([...span]);
+  }
+  return merged.map(([s, e]) => ({ start: new Date(s).toISOString(), end: new Date(e).toISOString() }));
+}
+
+app.post('/api/calendar/ics', async (req, res) => {
+  const { url, timeMin, timeMax } = req.body ?? {};
+  const from = new Date(timeMin);
+  const to = new Date(timeMax);
+  const span = to.getTime() - from.getTime();
+  if (typeof url !== 'string' || url.length > 2000 || !(span > 0) || span > 14 * 24 * 60 * 60 * 1000) {
+    return res.status(400).json({ error: 'A calendar link and a time range of up to two weeks are required.' });
+  }
+  try {
+    const text = await fetchCalendarText(url);
+    if (!/BEGIN:VCALENDAR/i.test(text.slice(0, 2000))) {
+      throw new CalendarLinkError('That link did not return a calendar. Use the private iCal address from your calendar settings.');
+    }
+    res.json({ busy: icsBusyIntervals(text, from, to) });
+  } catch (err: any) {
+    if (err instanceof CalendarLinkError) return res.status(422).json({ error: err.message });
+    console.error('[calendar] ics read failed:', err?.name || err?.message || err);
+    res.status(502).json({ error: 'The calendar could not be read just now. Please try again.' });
+  }
+});
 
 app.post('/api/tts', async (req, res) => {
   const { text } = req.body;
