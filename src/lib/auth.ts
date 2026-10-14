@@ -102,3 +102,37 @@ export async function deleteAccount(): Promise<void> {
   if (response.status !== 204) throw new Error('Your account could not be deleted just now. Please try again.');
   setSessionHint(false);
 }
+
+// For requests that may carry a session. An expired access token (after 15
+// minutes away) gets one refresh and one retry. If the session is over, the
+// refresh clears its cookies, so the retry goes out signed out — the caller
+// is told via `sessionEnded`.
+export async function fetchWithSession(url: string, init: RequestInit): Promise<{ response: Response; sessionEnded: boolean }> {
+  const response = await fetch(url, init);
+  if (response.status !== 401 || !hasSessionHint()) return { response, sessionEnded: false };
+  const refreshed = await fetch('/api/auth/refresh', json('POST'));
+  const sessionEnded = !refreshed.ok;
+  if (sessionEnded) setSessionHint(false);
+  return { response: await fetch(url, init), sessionEnded };
+}
+
+export interface SyncedProfile<P> {
+  profile: P;
+  version: number;
+}
+
+export async function fetchAccountProfile<P>(): Promise<SyncedProfile<P> | null> {
+  const { response } = await fetchWithSession('/api/sync/profile', { method: 'GET' });
+  return response.ok ? response.json() : null;
+}
+
+// Returns the stored profile: the one just saved, or — if another device saved
+// first — the one that is there now.
+export async function saveAccountProfile<P>(profile: P, baseVersion: number): Promise<SyncedProfile<P> | null> {
+  const { response } = await fetchWithSession('/api/sync/profile', json('PUT', { profile, baseVersion }));
+  if (response.ok || response.status === 409) {
+    const body = await response.json();
+    return { profile: body.profile, version: body.version };
+  }
+  return null;
+}

@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 // Accounts are additive: the app works signed out, and nothing here is read
 // for a request that carries no credentials.
@@ -111,3 +111,16 @@ export const sessions = pgTable(
   },
   (t) => [index('sessions_user_id_idx').on(t.userId)]
 );
+
+// The wellness profile Amrita builds up, for signed-in users. Stored whole, as
+// the same JSON the app keeps on the device, because Amrita's profile tool
+// adds to its shape over time. `version` goes up by one on every write, so two
+// writers cannot silently overwrite each other.
+export const wellnessProfiles = pgTable('wellness_profiles', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  data: jsonb('data').notNull(),
+  version: integer('version').notNull().default(1),
+  updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+});

@@ -4,11 +4,15 @@ import Anthropic from '@anthropic-ai/sdk';
 import ICAL from 'ical.js';
 import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
+import { authenticate } from './_lib/auth.js';
+import { applyProfileChanges, loadAccountProfile } from './_lib/profiles.js';
+import type { VersionedProfile } from './_lib/profiles.js';
 
-// IMPORTANT: this file must stay fully self-contained (no imports from other
-// project files). Cross-file imports crash Vercel's ESM runtime with
-// ERR_MODULE_NOT_FOUND — see commit 761fe05. Everything the API needs lives
-// here, in sections: catalog → system prompt → chat → legacy endpoints.
+// IMPORTANT: relative imports here (and anywhere under api/) must end in
+// ".js". Vercel runs these files as native ES modules, where an
+// extension-less import crashes with ERR_MODULE_NOT_FOUND at the first request
+// (see commit 761fe05). Code shared between functions lives in api/_lib/.
+// This file holds, in sections: catalog → system prompt → chat → legacy endpoints.
 
 // Allow Vercel to stream the /api/chat SSE response instead of buffering it.
 export const config = { supportsResponseStreaming: true };
@@ -1278,6 +1282,25 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       return res.status(400).json({ error: 'messages array is required' });
     }
 
+    // Signed in: the profile comes from the account, not from the request, and
+    // Amrita's changes are saved back to it. Signed out: exactly as before —
+    // the device sends its profile and receives the updated one.
+    const auth = await authenticate(req);
+    if (auth.kind === 'invalid') {
+      return res.status(401).json({ error: auth.reason === 'expired' ? 'token_expired' : 'invalid_token' });
+    }
+    let account: { userId: string; stored: VersionedProfile } | null = null;
+    if (auth.kind === 'user') {
+      try {
+        const stored = await loadAccountProfile(auth.userId);
+        if (!stored) return res.status(401).json({ error: 'not_signed_in' });
+        account = { userId: auth.userId, stored };
+      } catch (err: any) {
+        console.error('[chat] profile load failed:', err?.message || err);
+        return res.status(503).json({ error: 'profile_unavailable' });
+      }
+    }
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
@@ -1294,8 +1317,20 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       return res.end();
     }
 
-    let profile: WellnessProfile = rawProfile && typeof rawProfile === 'object' ? rawProfile : {};
+    let profile: WellnessProfile = account
+      ? (account.stored.profile as WellnessProfile)
+      : rawProfile && typeof rawProfile === 'object'
+        ? rawProfile
+        : {};
     let profileChanged = false;
+    // Every change to the profile goes through here and is remembered, so for
+    // a signed-in user it can be replayed onto the latest stored profile.
+    const changes: ((p: WellnessProfile) => WellnessProfile)[] = [];
+    const changeProfile = (change: (p: WellnessProfile) => WellnessProfile) => {
+      profile = change(profile);
+      changes.push(change);
+      profileChanged = true;
+    };
 
     const history: Anthropic.MessageParam[] = messages
       .filter((m: any) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
@@ -1337,8 +1372,8 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
           let isError = false;
 
           if (block.name === 'update_wellness_profile') {
-            profile = applyProfileUpdate(profile, block.input);
-            profileChanged = true;
+            const input = block.input;
+            changeProfile((p) => applyProfileUpdate(p, input));
             resultText = 'Profile updated.';
           } else if (block.name === 'show_answer_options') {
             const input: any = block.input;
@@ -1378,8 +1413,9 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
                   confidence: input.confidence,
                 },
               });
-              profile = {
-                ...profile,
+              const assessedDate = todayStamp();
+              changeProfile((p) => ({
+                ...p,
                 prakriti: input.secondary ? `${input.primary}-${input.secondary}` : input.primary,
                 prakritiConfidence: input.confidence,
                 doshaProfile: {
@@ -1390,10 +1426,9 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
                   explanation: input.explanation,
                   guidance: input.guidance ?? [],
                   confidence: input.confidence,
-                  assessedDate: todayStamp(),
+                  assessedDate,
                 },
-              };
-              profileChanged = true;
+              }));
               resultText =
                 'Dosha profile card shown and recorded. The full result now lives in their "Dosha Profile" tab, with balancing guidance — you may mention that. Close with one or two warm sentences; do not restate the card.';
             }
@@ -1404,14 +1439,8 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
               isError = true;
             } else {
               send(res, { type: 'card', card });
-              profile = {
-                ...profile,
-                practiceHistory: [
-                  ...(profile.practiceHistory ?? []),
-                  { date: todayStamp(), title: (block.input as any).title, kind: 'ritual' as const },
-                ].slice(-30),
-              };
-              profileChanged = true;
+              const entry = { date: todayStamp(), title: (block.input as any).title, kind: 'ritual' as const };
+              changeProfile((p) => ({ ...p, practiceHistory: [...(p.practiceHistory ?? []), entry].slice(-30) }));
               resultText = 'Ritual card shown to the user. Continue with one or two warm sentences; do not restate its contents.';
             }
           } else if (block.name === 'suggest_breathwork') {
@@ -1421,14 +1450,8 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
               isError = true;
             } else {
               send(res, { type: 'card', card });
-              profile = {
-                ...profile,
-                practiceHistory: [
-                  ...(profile.practiceHistory ?? []),
-                  { date: todayStamp(), title: (card as any).pattern.name, kind: 'breathwork' as const },
-                ].slice(-30),
-              };
-              profileChanged = true;
+              const entry = { date: todayStamp(), title: (card as any).pattern.name, kind: 'breathwork' as const };
+              changeProfile((p) => ({ ...p, practiceHistory: [...(p.practiceHistory ?? []), entry].slice(-30) }));
               resultText = 'Breathwork card shown to the user. Continue with one warm sentence; do not restate its contents.';
             }
           } else {
@@ -1443,6 +1466,17 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
         history.push({ role: 'user', content: toolResults });
       }
 
+      if (profileChanged && account) {
+        // Replayed onto whatever is stored now, so a change saved meanwhile
+        // (another device, a double-sent message) is kept, not overwritten.
+        try {
+          const saved = await applyProfileChanges(account.userId, account.stored, changes as any);
+          if (saved) profile = saved.profile as WellnessProfile;
+          else console.error('[chat] profile not saved: kept changing underneath');
+        } catch (err: any) {
+          console.error('[chat] profile save failed:', err?.message || err);
+        }
+      }
       if (profileChanged) send(res, { type: 'profile', profile });
       send(res, { type: 'done' });
     } catch (err: any) {

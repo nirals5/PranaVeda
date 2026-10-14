@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express';
-import { accessCookieName, first, isHttps, readCookie } from './auth.js';
+import { accessCookieName, authenticate, first, isHttps, readCookie } from './auth.js';
+import { getUser } from './users.js';
+import type { PublicUser } from './users.js';
 import { REFRESH_TTL_MS } from './refresh.js';
 import type { SessionTokens } from './refresh.js';
 
@@ -54,4 +56,22 @@ export function isSameOrigin(req: Request): boolean {
   } catch {
     return false;
   }
+}
+
+// For endpoints that need a signed-in user: answers 401 itself (with a reason
+// the client can act on) and returns null, or returns the user.
+export async function requireUser(req: Request, res: Response): Promise<PublicUser | null> {
+  res.setHeader('Cache-Control', 'no-store');
+  const auth = await authenticate(req);
+  if (auth.kind === 'guest') {
+    res.status(401).json({ error: 'not_signed_in' });
+    return null;
+  }
+  if (auth.kind === 'invalid') {
+    res.status(401).json({ error: auth.reason === 'expired' ? 'token_expired' : 'invalid_token' });
+    return null;
+  }
+  const user = await getUser(auth.userId);
+  if (!user) res.status(401).json({ error: 'not_signed_in' });
+  return user;
 }

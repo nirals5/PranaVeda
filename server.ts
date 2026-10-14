@@ -9,12 +9,14 @@ import path from 'path';
 import express from 'express';
 import app from './api/index';
 import authApp from './api/auth';
+import syncApp from './api/sync';
 
 const PORT = Number(process.env.PORT) || 3000;
 
-// Vercel routes /api/auth/* and /api/me to api/auth.ts (see vercel.json); here
-// the same app is mounted ahead of the page handlers.
+// Vercel routes /api/auth/*, /api/me and /api/sync/* to their own functions
+// (see vercel.json); here the same apps are mounted ahead of the page handlers.
 app.use(authApp);
+app.use(syncApp);
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
