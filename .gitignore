@@ -7,3 +7,6 @@ coverage/
 .env*
 !.env.example
 .claude/
+
+# Google OAuth client downloads contain a client secret.
+client_secret_*.json

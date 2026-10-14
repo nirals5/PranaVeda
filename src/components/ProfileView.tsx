@@ -5,6 +5,10 @@ import PracticeCalendar from './PracticeCalendar';
 import CalendarConnections from './CalendarConnections';
 import WearableConnections from './WearableConnections';
 import LocationSettings from './LocationSettings';
+import GoogleSignIn from './GoogleSignIn';
+import AppleSignIn from './AppleSignIn';
+import { ACCOUNTS_ENABLED, APPLE_SERVICES_ID } from '../lib/auth';
+import { Auth } from '../hooks/useAuth';
 import { Place } from '../hooks/usePlace';
 import { HeartRateMonitor } from '../hooks/useHeartRateMonitor';
 import { WearableHealth } from '../hooks/useWearableHealth';
@@ -13,6 +17,7 @@ import { NudgeNotifications } from '../hooks/useNudgeNotifications';
 
 interface ProfileViewProps {
   profile: WellnessProfile;
+  auth: Auth;
   practiceLog: PracticeLogEntry[];
   streak: number;
   calendar: ExternalCalendar;
@@ -24,8 +29,10 @@ interface ProfileViewProps {
   onStartPractice: () => void;
 }
 
-// PLACEHOLDER profile: there are no accounts yet. Calendar, Wearables and
-// Location are live connectors; the rest mark where further integrations will plug in.
+// The profile shown here is what Amrita has learned, kept on this device.
+// Sign-in is optional, lives in the same header (a signed-in person is not a
+// "Guest"), and only appears where accounts are switched on. Calendar, Wearables and Location are live connectors; the rest
+// mark where further integrations will plug in.
 const CONNECTORS: {
   id: 'calendar' | 'wearables' | 'location' | 'health';
   icon: typeof CalendarDays;
@@ -63,8 +70,25 @@ const CONNECTORS: {
   },
 ];
 
-export default function ProfileView({ profile, practiceLog, streak, calendar, notifications, heart, health, place, onOpenRitual, onStartPractice }: ProfileViewProps) {
+export default function ProfileView({ profile, auth, practiceLog, streak, calendar, notifications, heart, health, place, onOpenRitual, onStartPractice }: ProfileViewProps) {
   const [section, setSection] = useState<'connectors' | 'calendar' | 'wearables' | 'location'>('connectors');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [accountNotice, setAccountNotice] = useState<string | null>(null);
+
+  const deleteAccount = async () => {
+    setDeleting(true);
+    setAccountNotice(null);
+    try {
+      await auth.deleteAccount();
+      setConfirmingDelete(false);
+      setAccountNotice('Your account has been deleted. Everything on this device is still here.');
+    } catch (err: any) {
+      setAccountNotice(err?.message || 'Your account could not be deleted just now. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const backToConnectors = (
     <button
@@ -73,6 +97,16 @@ export default function ProfileView({ profile, practiceLog, streak, calendar, no
       className="flex items-center gap-1.5 py-2 px-4 rounded-full text-[11px] font-mono uppercase tracking-wider text-stone-500 hover:text-stone-800 bg-white/50 hover:bg-white/80 border border-white/70 transition-all cursor-pointer"
     >
       <ArrowLeft className="w-3 h-3" /> Connectors
+    </button>
+  );
+
+  const signOutButton = (
+    <button
+      type="button"
+      onClick={() => auth.signOut()}
+      className="flex-shrink-0 py-2 px-4 rounded-full text-[11px] font-mono uppercase tracking-wider font-bold text-stone-600 hover:text-stone-900 bg-white/60 hover:bg-white/90 border border-white/80 transition-all cursor-pointer"
+    >
+      Sign out
     </button>
   );
 
@@ -110,18 +144,88 @@ export default function ProfileView({ profile, practiceLog, streak, calendar, no
 
   return (
     <div className="w-full max-w-3xl mx-auto px-5 sm:px-6 pb-12 space-y-6">
-      {/* Profile header */}
-      <section className="bg-white/60 backdrop-blur-lg border border-white/80 rounded-[28px] p-6 sm:p-8 shadow-[0_16px_44px_rgba(138,121,165,0.14)] flex items-center gap-5">
-        <div className="w-16 h-16 flex-shrink-0 rounded-full bg-[#E8E1F2] flex items-center justify-center">
-          <User className="w-7 h-7 text-[#71608E]" />
+      {/* Profile header: who this is, and (where accounts are on) sign-in */}
+      <section className="bg-white/60 backdrop-blur-lg border border-white/80 rounded-[28px] p-6 sm:p-8 shadow-[0_16px_44px_rgba(138,121,165,0.14)] space-y-5">
+        <div className="flex items-center gap-5">
+          <div className="w-16 h-16 flex-shrink-0 rounded-full bg-[#E8E1F2] flex items-center justify-center">
+            <User className="w-7 h-7 text-[#71608E]" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <span className="text-[11px] font-mono tracking-widest font-bold text-stone-500 uppercase">Profile</span>
+            {/* The name they gave Amrita comes first; a session being restored is not shown as "Guest". */}
+            <h1 className="text-3xl font-serif text-[#2D3436] truncate">
+              {profile.name || auth.user?.displayName || (auth.status === 'guest' ? 'Guest' : auth.user?.email || '\u00a0')}
+            </h1>
+            <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
+              {profile.prakriti ? `${profile.prakriti} constitution · ` : ''}
+              {auth.status === 'user'
+                ? `${auth.user?.email ? `Signed in as ${auth.user.email}. ` : 'Signed in. '}Your profile and practice history are still kept on this device.`
+                : `Kept on this device.${ACCOUNTS_ENABLED ? '' : ' Accounts and sign-in are not available yet.'}`}
+            </p>
+          </div>
+          {auth.status === 'user' && <div className="hidden sm:block self-start">{signOutButton}</div>}
         </div>
-        <div className="min-w-0 space-y-1">
-          <span className="text-[11px] font-mono tracking-widest font-bold text-stone-500 uppercase">Profile</span>
-          <h1 className="text-3xl font-serif text-[#2D3436] truncate">{profile.name || 'Guest'}</h1>
-          <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
-            {profile.prakriti ? `${profile.prakriti} constitution · ` : ''}Kept on this device. Accounts and sign-in are not available yet.
+        {/* On a phone the button sits below, so it does not squeeze the name. */}
+        {auth.status === 'user' && <div className="sm:hidden">{signOutButton}</div>}
+
+        {auth.status === 'user' && (
+          <div className="pt-4 border-t border-stone-200/50">
+            {confirmingDelete ? (
+              <div className="space-y-3">
+                <p className="text-[13.5px] text-stone-700 font-sans leading-relaxed">
+                  Delete your PranaVeda account? Your account and sign-in are removed from our servers for good, and you are signed out on every device. Your profile and practice history on this device are kept.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={deleteAccount}
+                    disabled={deleting}
+                    className="py-2 px-4 rounded-full text-[11px] font-mono uppercase tracking-wider font-bold text-white bg-[#9A4A4A] hover:bg-[#843C3C] disabled:opacity-60 transition-all cursor-pointer"
+                  >
+                    {deleting ? 'Deleting…' : 'Delete account'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDelete(false)}
+                    disabled={deleting}
+                    className="py-2 px-4 rounded-full text-[11px] font-mono uppercase tracking-wider font-bold text-stone-600 hover:text-stone-900 bg-white/60 hover:bg-white/90 border border-white/80 transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountNotice(null);
+                  setConfirmingDelete(true);
+                }}
+                className="text-[12.5px] font-sans text-stone-500 hover:text-stone-800 underline-offset-4 hover:underline cursor-pointer"
+              >
+                Delete account
+              </button>
+            )}
+          </div>
+        )}
+
+        {accountNotice && (
+          <p role="status" className="text-[13.5px] text-stone-700 font-sans">
+            {accountNotice}
           </p>
-        </div>
+        )}
+
+        {ACCOUNTS_ENABLED && auth.status === 'guest' && (
+          <div className="pt-5 border-t border-stone-200/50 space-y-3">
+            <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
+              Signing in is optional. PranaVeda works fully without an account, and signing in does not move your data off this device yet.
+            </p>
+            <div className="flex flex-col gap-3">
+              <GoogleSignIn signIn={auth.signIn} />
+              {APPLE_SERVICES_ID && <AppleSignIn signIn={auth.signIn} />}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Connectors */}

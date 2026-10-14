@@ -1,15 +1,20 @@
 // Local dev / self-hosted entry point.
 //
-// All API routes live in api/index.ts (the same Express app Vercel serves), so
-// endpoints are defined exactly once. This file only adds env loading, Vite
-// middleware in dev, and static serving in production.
+// API routes live in api/*.ts (the same Express apps Vercel serves as separate
+// functions), so endpoints are defined exactly once. This file only adds env
+// loading, Vite middleware in dev, and static serving in production.
 
 import 'dotenv/config';
 import path from 'path';
 import express from 'express';
 import app from './api/index';
+import authApp from './api/auth';
 
 const PORT = Number(process.env.PORT) || 3000;
+
+// Vercel routes /api/auth/* and /api/me to api/auth.ts (see vercel.json); here
+// the same app is mounted ahead of the page handlers.
+app.use(authApp);
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
