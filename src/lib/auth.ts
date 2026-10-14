@@ -95,3 +95,10 @@ export async function signOut(): Promise<void> {
   setSessionHint(false);
   await fetch('/api/auth/logout', json('POST')).catch(() => {});
 }
+
+// Permanent. Removes the account from the server; nothing on this device.
+export async function deleteAccount(): Promise<void> {
+  const response = await fetch('/api/me', json('DELETE', { confirm: true }));
+  if (response.status !== 204) throw new Error('Your account could not be deleted just now. Please try again.');
+  setSessionHint(false);
+}

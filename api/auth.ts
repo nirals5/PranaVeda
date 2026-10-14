@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import { sql } from 'drizzle-orm';
-import { AppleTokenError, exchangeAppleCode, verifyAppleIdToken } from './_lib/apple.js';
+import { AppleTokenError, exchangeAppleCode, revokeAppleToken, verifyAppleIdToken } from './_lib/apple.js';
 import { authenticate } from './_lib/auth.js';
 import { getDb } from './_lib/db.js';
 import { deviceFromClient, deviceFromUserAgent } from './_lib/device.js';
@@ -12,8 +12,19 @@ import { isValidNonce, issueNonce } from './_lib/nonce.js';
 import { RefreshError, issueSession, revokeSession, rotateSession } from './_lib/refresh.js';
 import type { SessionTokens } from './_lib/refresh.js';
 import { dbRefreshStore } from './_lib/refreshStore.js';
-import { connectionsKey, seal } from './_lib/tokens.js';
-import { AccountExistsError, endSession, findOrCreateUser, getUser, recordSession, saveAppleRefreshToken, touchSession, updateUser } from './_lib/users.js';
+import { connectionsKey } from './_lib/tokens.js';
+import {
+  AccountExistsError,
+  appleGrantsFor,
+  deleteUser,
+  endSession,
+  findOrCreateUser,
+  getUser,
+  recordSession,
+  saveAppleGrant,
+  touchSession,
+  updateUser,
+} from './_lib/users.js';
 import type { PublicUser } from './_lib/users.js';
 
 // Accounts and sign-in: /api/auth/*, /api/me. A separate function from
@@ -148,7 +159,7 @@ app.post(
     if (!key) console.warn('[auth] CONNECTIONS_ENC_KEY is not set; Apple refresh token not stored');
 
     await startSession(req, res, 'apple', { ...identity, name: displayName || undefined }, async () => {
-      if (appleRefresh && key) await saveAppleRefreshToken(identity.subject, seal(appleRefresh, key));
+      if (appleRefresh && key) await saveAppleGrant(identity.subject, { refreshToken: appleRefresh, clientId: identity.clientId }, key);
     });
   })
 );
@@ -232,6 +243,31 @@ app.patch(
     const { timezone } = req.body ?? {};
     if (!isTimeZone(timezone)) return res.status(400).json({ error: 'invalid_timezone' });
     res.json({ user: await updateUser(user.id, { timezone }) });
+  })
+);
+
+// Deletes the account and everything the server holds for it: sign-in
+// methods, sessions on every device, refresh tokens. Nothing on the person's
+// devices is touched — the profile and practice history kept there stay.
+// Needs an explicit confirmation in the body, so no stray request can do it.
+app.delete(
+  '/api/me',
+  route(async (req, res) => {
+    if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
+    if (req.body?.confirm !== true) return res.status(400).json({ error: 'confirmation_required' });
+    const user = await currentUser(req, res);
+    if (!user) return;
+
+    // Apple requires the app's access to be revoked when an account is
+    // deleted. A failure is logged, and does not block the deletion.
+    const { grants, unreadable } = await appleGrantsFor(user.id, connectionsKey());
+    for (const grant of grants) await revokeAppleToken(grant.refreshToken, grant.clientId);
+    if (unreadable) console.warn(`[auth] ${unreadable} stored Apple token(s) could not be read for revocation`);
+
+    await deleteUser(user.id);
+    console.info('[auth] account deleted');
+    if (isWeb(req)) clearSessionCookies(req, res);
+    res.status(204).end();
   })
 );
 

@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ACCOUNTS_ENABLED, AuthUser, SignInRequest, hasSessionHint, restoreSession, saveTimezone, signIn as startSession, signOut as endSession } from '../lib/auth';
+import {
+  ACCOUNTS_ENABLED,
+  AuthUser,
+  SignInRequest,
+  deleteAccount as removeAccount,
+  hasSessionHint,
+  restoreSession,
+  saveTimezone,
+  signIn as startSession,
+  signOut as endSession,
+} from '../lib/auth';
 
 export type AuthStatus = 'guest' | 'checking' | 'user';
 
@@ -47,7 +57,14 @@ export function useAuth() {
     await endSession();
   }, []);
 
-  return { status, user, signIn, signOut };
+  // Throws if the server did not confirm; the person stays signed in then.
+  const deleteAccount = useCallback(async () => {
+    await removeAccount();
+    setUser(null);
+    setStatus('guest');
+  }, []);
+
+  return { status, user, signIn, signOut, deleteAccount };
 }
 
 export type Auth = ReturnType<typeof useAuth>;

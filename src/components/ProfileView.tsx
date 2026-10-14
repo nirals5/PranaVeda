@@ -72,6 +72,23 @@ const CONNECTORS: {
 
 export default function ProfileView({ profile, auth, practiceLog, streak, calendar, notifications, heart, health, place, onOpenRitual, onStartPractice }: ProfileViewProps) {
   const [section, setSection] = useState<'connectors' | 'calendar' | 'wearables' | 'location'>('connectors');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [accountNotice, setAccountNotice] = useState<string | null>(null);
+
+  const deleteAccount = async () => {
+    setDeleting(true);
+    setAccountNotice(null);
+    try {
+      await auth.deleteAccount();
+      setConfirmingDelete(false);
+      setAccountNotice('Your account has been deleted. Everything on this device is still here.');
+    } catch (err: any) {
+      setAccountNotice(err?.message || 'Your account could not be deleted just now. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const backToConnectors = (
     <button
@@ -150,6 +167,53 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
         </div>
         {/* On a phone the button sits below, so it does not squeeze the name. */}
         {auth.status === 'user' && <div className="sm:hidden">{signOutButton}</div>}
+
+        {auth.status === 'user' && (
+          <div className="pt-4 border-t border-stone-200/50">
+            {confirmingDelete ? (
+              <div className="space-y-3">
+                <p className="text-[13.5px] text-stone-700 font-sans leading-relaxed">
+                  Delete your PranaVeda account? Your account and sign-in are removed from our servers for good, and you are signed out on every device. Your profile and practice history on this device are kept.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={deleteAccount}
+                    disabled={deleting}
+                    className="py-2 px-4 rounded-full text-[11px] font-mono uppercase tracking-wider font-bold text-white bg-[#9A4A4A] hover:bg-[#843C3C] disabled:opacity-60 transition-all cursor-pointer"
+                  >
+                    {deleting ? 'Deleting…' : 'Delete account'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDelete(false)}
+                    disabled={deleting}
+                    className="py-2 px-4 rounded-full text-[11px] font-mono uppercase tracking-wider font-bold text-stone-600 hover:text-stone-900 bg-white/60 hover:bg-white/90 border border-white/80 transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountNotice(null);
+                  setConfirmingDelete(true);
+                }}
+                className="text-[12.5px] font-sans text-stone-500 hover:text-stone-800 underline-offset-4 hover:underline cursor-pointer"
+              >
+                Delete account
+              </button>
+            )}
+          </div>
+        )}
+
+        {accountNotice && (
+          <p role="status" className="text-[13.5px] text-stone-700 font-sans">
+            {accountNotice}
+          </p>
+        )}
 
         {ACCOUNTS_ENABLED && auth.status === 'guest' && (
           <div className="pt-5 border-t border-stone-200/50 space-y-3">

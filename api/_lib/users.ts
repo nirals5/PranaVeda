@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, isNull } from 'drizzle-orm';
 import { getDb, schema } from './db.js';
+import { seal, unseal } from './tokens.js';
 import type { DeviceInfo } from './device.js';
 import type { VerifiedIdentity } from './google.js';
 import type { Client } from './refresh.js';
@@ -96,12 +97,46 @@ export async function findOrCreateUser(provider: 'apple' | 'google', identity: V
   return { id, email, displayName: identity.name ?? null, timezone: null };
 }
 
-// Kept encrypted, and replaced on each sign-in so it is always the latest.
-export async function saveAppleRefreshToken(subject: string, sealedToken: string): Promise<void> {
+// Apple's refresh token, with the client id it was issued to (revoking it
+// needs both). Kept encrypted, and replaced on each sign-in so it is current.
+export interface AppleGrant {
+  refreshToken: string;
+  clientId: string;
+}
+
+export async function saveAppleGrant(subject: string, grant: AppleGrant, key: Buffer): Promise<void> {
   await getDb()
     .update(identities)
-    .set({ appleRefreshTokenEnc: sealedToken })
+    .set({ appleRefreshTokenEnc: seal(JSON.stringify(grant), key) })
     .where(and(eq(identities.provider, 'apple'), eq(identities.subject, subject)));
+}
+
+export async function appleGrantsFor(userId: string, key: Buffer | null): Promise<{ grants: AppleGrant[]; unreadable: number }> {
+  const rows = await getDb()
+    .select({ sealed: identities.appleRefreshTokenEnc })
+    .from(identities)
+    .where(and(eq(identities.userId, userId), eq(identities.provider, 'apple')));
+  const grants: AppleGrant[] = [];
+  let unreadable = 0;
+  for (const { sealed } of rows) {
+    if (!sealed) continue;
+    const opened = key ? unseal(sealed, key) : null;
+    try {
+      const grant = opened ? JSON.parse(opened) : null;
+      if (grant?.refreshToken && grant?.clientId) grants.push(grant);
+      else unreadable++;
+    } catch {
+      unreadable++;
+    }
+  }
+  return { grants, unreadable };
+}
+
+// Permanent. Deleting the user row removes, through the database's cascades,
+// every sign-in method, session and refresh token that belongs to it.
+export async function deleteUser(userId: string): Promise<boolean> {
+  const deleted = await getDb().delete(users).where(eq(users.id, userId)).returning({ id: users.id });
+  return deleted.length === 1;
 }
 
 export async function updateUser(userId: string, changes: { timezone?: string; displayName?: string }): Promise<PublicUser | null> {

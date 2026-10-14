@@ -88,7 +88,7 @@ describe.skipIf(!hasDb)('sign-in API', () => {
     useGoogleKeys(undefined);
     useAppleKeys(undefined);
     useAppleFetch(undefined);
-    const mine = await getDb().select({ userId: identities.userId }).from(identities).where(inArray(identities.subject, ['a', 'b', 'native', 'race', 'apple1', 'apple2', 'relay', 'shared', 'shared2'].map((w) => `${RUN}-${w}`)));
+    const mine = await getDb().select({ userId: identities.userId }).from(identities).where(inArray(identities.subject, ['a', 'b', 'native', 'race', 'apple1', 'apple2', 'relay', 'shared', 'shared2', 'del1', 'del2', 'del3', 'delapple', 'delapple2'].map((w) => `${RUN}-${w}`)));
     const ids = mine.map((m) => m.userId);
     if (!ids.length) return;
     await getDb().delete(users).where(inArray(users.id, ids));
@@ -255,7 +255,10 @@ describe.skipIf(!hasDb)('sign-in API', () => {
     expect(identity.provider).toBe('apple');
     expect(identity.appleRefreshTokenEnc).toBeTruthy();
     expect(identity.appleRefreshTokenEnc).not.toContain('apple-refresh-for-test');
-    expect(unseal(identity.appleRefreshTokenEnc!, connectionsKey()!)).toBe('apple-refresh-for-test');
+    expect(JSON.parse(unseal(identity.appleRefreshTokenEnc!, connectionsKey()!)!)).toEqual({
+      refreshToken: 'apple-refresh-for-test',
+      clientId: SERVICES_ID,
+    });
 
     // Apple sends the name only once; a later sign-in without it keeps the account as it is.
     const again = await signInApple('apple1', {}, { code: 'another-code' });
@@ -291,6 +294,84 @@ describe.skipIf(!hasDb)('sign-in API', () => {
     const res = await signInApple('relay', { email: 'relay@example.com', is_private_email: 'true', sub: `${RUN}-relay-apple` });
     expect(res.status).toBe(200);
     await getDb().delete(users).where(eq(users.id, res.body.user.id));
+  });
+
+  describe('account deletion', () => {
+    const del = (cookies: string[], body: object = { confirm: true }) =>
+      request(app).delete('/api/me').set('Cookie', named(cookies, 'pv_at')).send(body);
+    const rowsFor = async (userId: string) => ({
+      users: (await getDb().select().from(users).where(eq(users.id, userId))).length,
+      identities: (await getDb().select().from(identities).where(eq(identities.userId, userId))).length,
+      sessions: (await getDb().select().from(sessions).where(eq(sessions.userId, userId))).length,
+      refreshTokens: (await getDb().select().from(refreshTokens).where(eq(refreshTokens.userId, userId))).length,
+    });
+
+    it('requires an explicit confirmation, a signed-in user, and the same site', async () => {
+      const { cookies } = await signInWeb('del1');
+      expect((await del(cookies, {})).body).toEqual({ error: 'confirmation_required' });
+      expect((await del(cookies, { confirm: 'yes' })).status).toBe(400);
+      expect((await request(app).delete('/api/me').send({ confirm: true })).body).toEqual({ error: 'not_signed_in' });
+      expect((await del(cookies).set('Origin', 'https://evil.example')).status).toBe(403);
+      expect((await request(app).get('/api/me').set('Cookie', named(cookies, 'pv_at'))).status).toBe(200);
+    });
+
+    it('removes the account and everything attached to it, on every device', async () => {
+      const laptop = await signInWeb('del2');
+      const phone = await signInWeb('del2');
+      const userId = laptop.res.body.user.id;
+      expect(await rowsFor(userId)).toMatchObject({ users: 1, identities: 1, sessions: 2 });
+
+      const res = await del(laptop.cookies);
+      expect(res.status).toBe(204);
+      expect(([] as string[]).concat(res.headers['set-cookie']).every((c) => c.includes('Max-Age=0'))).toBe(true);
+      expect(await rowsFor(userId)).toEqual({ users: 0, identities: 0, sessions: 0, refreshTokens: 0 });
+
+      // The other device's still-unexpired access token no longer gets in, and its refresh fails.
+      expect((await request(app).get('/api/me').set('Cookie', named(phone.cookies, 'pv_at'))).status).toBe(401);
+      expect((await request(app).post('/api/auth/refresh').set('Cookie', named(phone.cookies, 'pv_rt')).send({})).status).toBe(401);
+    });
+
+    it('starts a brand-new account if the same person signs in again later', async () => {
+      const first = await signInWeb('del3');
+      await del(first.cookies);
+      const again = await signInWeb('del3');
+      expect(again.res.status).toBe(200);
+      expect(again.res.body.user.id).not.toBe(first.res.body.user.id);
+    });
+
+    it('revokes Apple’s token for an Apple account before deleting it', async () => {
+      const revoked: URLSearchParams[] = [];
+      useAppleFetch(async (input, init) => {
+        if (String(input).endsWith('/auth/revoke')) {
+          revoked.push(new URLSearchParams(init?.body as URLSearchParams));
+          return new Response(null, { status: 200 });
+        }
+        return new Response(JSON.stringify({ refresh_token: 'apple-refresh-for-test' }), { status: 200 });
+      });
+      const signedIn = await signInApple('delapple', {}, { code: 'one-time-code' });
+      const res = await request(app)
+        .delete('/api/me')
+        .set('Cookie', named(cookiesOf(signedIn), 'pv_at'))
+        .send({ confirm: true });
+      expect(res.status).toBe(204);
+      expect(revoked).toHaveLength(1);
+      expect(revoked[0].get('token')).toBe('apple-refresh-for-test');
+      expect(revoked[0].get('client_id')).toBe(SERVICES_ID);
+      expect(await rowsFor(signedIn.body.user.id)).toMatchObject({ users: 0 });
+    });
+
+    it('still deletes the account when Apple cannot be reached', async () => {
+      useAppleFetch(async (input) =>
+        String(input).endsWith('/auth/revoke')
+          ? new Response(null, { status: 503 })
+          : new Response(JSON.stringify({ refresh_token: 'apple-refresh-for-test' }), { status: 200 })
+      );
+      const signedIn = await signInApple('delapple2', {}, { code: 'one-time-code' });
+      const res = await request(app).delete('/api/me').set('Cookie', named(cookiesOf(signedIn), 'pv_at')).send({ confirm: true });
+      expect(res.status).toBe(204);
+      expect(await rowsFor(signedIn.body.user.id)).toMatchObject({ users: 0 });
+      useAppleFetch(async () => new Response(JSON.stringify({ refresh_token: 'apple-refresh-for-test' }), { status: 200 }));
+    });
   });
 
   it('answers unknown auth paths with a JSON 404', async () => {

@@ -13,6 +13,7 @@ import type { VerifiedIdentity } from './google.js';
 
 const ISSUER = 'https://appleid.apple.com';
 const TOKEN_URL = 'https://appleid.apple.com/auth/token';
+const REVOKE_URL = 'https://appleid.apple.com/auth/revoke';
 
 export interface AppleIdentity extends VerifiedIdentity {
   clientId: string; // which of our ids the token was issued for
@@ -106,5 +107,28 @@ export async function exchangeAppleCode(code: string, clientId: string): Promise
   } catch (err: any) {
     console.warn('[auth] Apple code exchange failed:', err?.message || err);
     return null;
+  }
+}
+
+// Account deletion: tells Apple to end PranaVeda's access, which also removes
+// the app from the person's "Sign in with Apple" list. Returns whether Apple
+// confirmed it; deletion goes ahead either way.
+export async function revokeAppleToken(refreshToken: string, clientId: string): Promise<boolean> {
+  try {
+    const response = await fetchImpl(REVOKE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: await appleClientSecret(clientId),
+        token: refreshToken,
+        token_type_hint: 'refresh_token',
+      }),
+    });
+    if (!response.ok) console.warn('[auth] Apple revoke failed:', response.status);
+    return response.ok;
+  } catch (err: any) {
+    console.warn('[auth] Apple revoke failed:', err?.message || err);
+    return false;
   }
 }

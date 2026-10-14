@@ -1,7 +1,15 @@
 import { createHash } from 'node:crypto';
 import { SignJWT, createLocalJWKSet, exportJWK, exportPKCS8, generateKeyPair, jwtVerify } from 'jose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { AppleTokenError, appleClientSecret, exchangeAppleCode, useAppleFetch, useAppleKeys, verifyAppleIdToken } from '../api/_lib/apple.js';
+import {
+  AppleTokenError,
+  appleClientSecret,
+  exchangeAppleCode,
+  revokeAppleToken,
+  useAppleFetch,
+  useAppleKeys,
+  verifyAppleIdToken,
+} from '../api/_lib/apple.js';
 import { later } from './helpers.js';
 
 const SERVICES_ID = 'com.pranaveda.web';
@@ -124,5 +132,32 @@ describe('Apple client secret and code exchange', () => {
     delete process.env.APPLE_KEY_ID;
     useAppleFetch(async () => new Response('{}'));
     expect(await exchangeAppleCode('the-code', SERVICES_ID)).toBeNull();
+  });
+});
+
+describe('revokeAppleToken', () => {
+  it('asks Apple to revoke the refresh token for the client it was issued to', async () => {
+    let url = '';
+    let sent: URLSearchParams | undefined;
+    useAppleFetch(async (input, init) => {
+      url = String(input);
+      sent = new URLSearchParams(init?.body as URLSearchParams);
+      return new Response(null, { status: 200 });
+    });
+    expect(await revokeAppleToken('apple-refresh', BUNDLE_ID)).toBe(true);
+    expect(url).toBe('https://appleid.apple.com/auth/revoke');
+    expect(sent?.get('token')).toBe('apple-refresh');
+    expect(sent?.get('token_type_hint')).toBe('refresh_token');
+    expect(sent?.get('client_id')).toBe(BUNDLE_ID);
+    expect(sent?.get('client_secret')).toMatch(/^ey/);
+  });
+
+  it('reports failure without throwing', async () => {
+    useAppleFetch(async () => new Response('{}', { status: 400 }));
+    expect(await revokeAppleToken('apple-refresh', SERVICES_ID)).toBe(false);
+    useAppleFetch(async () => {
+      throw new Error('offline');
+    });
+    expect(await revokeAppleToken('apple-refresh', SERVICES_ID)).toBe(false);
   });
 });
