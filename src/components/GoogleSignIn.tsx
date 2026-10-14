@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GOOGLE_CLIENT_ID, loadGoogleIdentity } from '../hooks/googleAuth';
-import { fetchNonce } from '../lib/auth';
+import { SignInRequest, fetchNonce } from '../lib/auth';
 
 // A sign-in nonce is good for ten minutes; the button is re-armed before then
 // so a page left open still signs in on the first click.
@@ -8,7 +8,7 @@ const REARM_MS = 8 * 60 * 1000;
 
 // Google's own "Continue with Google" button. Google renders it, so its look
 // is theirs; everything around it is ours.
-export default function GoogleSignIn({ signIn }: { signIn: (credential: string, nonce: string) => Promise<void> }) {
+export default function GoogleSignIn({ signIn }: { signIn: (request: SignInRequest) => Promise<void> }) {
   const buttonRef = useRef<HTMLDivElement>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [armed, setArmed] = useState(0);
@@ -26,7 +26,7 @@ export default function GoogleSignIn({ signIn }: { signIn: (credential: string, 
           callback: ({ credential }: { credential?: string }) => {
             if (!credential) return;
             setMessage(null);
-            signIn(credential, nonce).catch((err: Error) => {
+            signIn({ provider: 'google', credential, nonce }).catch((err: Error) => {
               setMessage(err.message);
               setArmed((n) => n + 1); // a nonce is single-attempt: arm a fresh one
             });

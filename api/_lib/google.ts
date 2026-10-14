@@ -11,6 +11,9 @@ export interface VerifiedIdentity {
   subject: string; // the provider's stable id for this person
   email?: string;
   emailVerified: boolean;
+  // Apple "Hide My Email" addresses are unique per app and never match
+  // another provider's email.
+  emailIsRelay?: boolean;
   name?: string;
 }
 

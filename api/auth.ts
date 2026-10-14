@@ -1,16 +1,19 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import { sql } from 'drizzle-orm';
+import { AppleTokenError, exchangeAppleCode, verifyAppleIdToken } from './_lib/apple.js';
 import { authenticate } from './_lib/auth.js';
 import { getDb } from './_lib/db.js';
 import { deviceFromClient, deviceFromUserAgent } from './_lib/device.js';
 import { IdentityTokenError, verifyGoogleIdToken } from './_lib/google.js';
+import type { VerifiedIdentity } from './_lib/google.js';
 import { clearSessionCookies, isSameOrigin, refreshCookie, setSessionCookies } from './_lib/http.js';
 import { isValidNonce, issueNonce } from './_lib/nonce.js';
 import { RefreshError, issueSession, revokeSession, rotateSession } from './_lib/refresh.js';
 import type { SessionTokens } from './_lib/refresh.js';
 import { dbRefreshStore } from './_lib/refreshStore.js';
-import { endSession, findOrCreateUser, getUser, recordSession, touchSession, updateUser } from './_lib/users.js';
+import { connectionsKey, seal } from './_lib/tokens.js';
+import { AccountExistsError, endSession, findOrCreateUser, getUser, recordSession, saveAppleRefreshToken, touchSession, updateUser } from './_lib/users.js';
 import type { PublicUser } from './_lib/users.js';
 
 // Accounts and sign-in: /api/auth/*, /api/me. A separate function from
@@ -45,6 +48,33 @@ function sendSession(req: Request, res: Response, tokens: SessionTokens, user: P
     return res.json({ user });
   }
   res.json({ user, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, expiresIn: tokens.expiresIn });
+}
+
+// Shared by every sign-in method once the provider has vouched for the person.
+async function startSession(
+  req: Request,
+  res: Response,
+  provider: 'apple' | 'google',
+  identity: VerifiedIdentity,
+  afterAccount?: () => Promise<void>
+) {
+  let user;
+  try {
+    user = await findOrCreateUser(provider, identity);
+  } catch (err) {
+    if (!(err instanceof AccountExistsError)) throw err;
+    return res.status(409).json({ error: 'account_exists', provider: err.provider });
+  }
+  await afterAccount?.();
+  const client = isWeb(req) ? 'web' : (req.body.client as 'ios' | 'android');
+  const tokens = await issueSession(dbRefreshStore, { userId: user.id, client, aud: 'app' });
+  await recordSession(
+    tokens.sessionId,
+    user.id,
+    client,
+    client === 'web' ? deviceFromUserAgent(req) : deviceFromClient(req.body.device, client)
+  );
+  sendSession(req, res, tokens, user);
 }
 
 // Proves routing and database reachability; says nothing about the database.
@@ -83,16 +113,43 @@ app.post(
       return res.status(401).json({ error: 'invalid_identity_token' });
     }
 
-    const client = isWeb(req) ? 'web' : (req.body.client as 'ios' | 'android');
-    const user = await findOrCreateUser('google', identity);
-    const tokens = await issueSession(dbRefreshStore, { userId: user.id, client, aud: 'app' });
-    await recordSession(
-      tokens.sessionId,
-      user.id,
-      client,
-      client === 'web' ? deviceFromUserAgent(req) : deviceFromClient(req.body.device, client)
-    );
-    sendSession(req, res, tokens, user);
+    await startSession(req, res, 'google', identity);
+  })
+);
+
+app.post(
+  '/api/auth/apple',
+  route(async (req, res) => {
+    if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
+    const { idToken, code, nonce, name } = req.body ?? {};
+    if (typeof idToken !== 'string' || !idToken) return res.status(400).json({ error: 'credential_required' });
+    if (!isValidNonce(nonce)) return res.status(400).json({ error: 'nonce_expired' });
+
+    let identity;
+    try {
+      identity = await verifyAppleIdToken(idToken, nonce);
+    } catch (err) {
+      if (!(err instanceof AppleTokenError)) throw err;
+      console.warn('[auth] Apple token rejected:', err.message);
+      return res.status(401).json({ error: 'invalid_identity_token' });
+    }
+
+    // Apple sends the person's name only on their very first sign-in, and
+    // only to the browser — so it arrives from the client, unsigned. It is
+    // used for nothing but the display name of a new account.
+    const displayName = [name?.firstName, name?.lastName]
+      .filter((part: unknown) => typeof part === 'string' && part.trim())
+      .join(' ')
+      .slice(0, 80);
+
+    // Best effort: kept only so Apple's tokens can be revoked on deletion.
+    const key = connectionsKey();
+    const appleRefresh = typeof code === 'string' && code && key ? await exchangeAppleCode(code, identity.clientId) : null;
+    if (!key) console.warn('[auth] CONNECTIONS_ENC_KEY is not set; Apple refresh token not stored');
+
+    await startSession(req, res, 'apple', { ...identity, name: displayName || undefined }, async () => {
+      if (appleRefresh && key) await saveAppleRefreshToken(identity.subject, seal(appleRefresh, key));
+    });
   })
 );
 

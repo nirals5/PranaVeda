@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ACCOUNTS_ENABLED, AuthUser, hasSessionHint, restoreSession, saveTimezone, signInWithGoogle, signOut as endSession } from '../lib/auth';
+import { ACCOUNTS_ENABLED, AuthUser, SignInRequest, hasSessionHint, restoreSession, saveTimezone, signIn as startSession, signOut as endSession } from '../lib/auth';
 
 export type AuthStatus = 'guest' | 'checking' | 'user';
 
@@ -34,8 +34,8 @@ export function useAuth() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const signIn = useCallback(async (credential: string, nonce: string) => {
-    const signedIn = await signInWithGoogle(credential, nonce);
+  const signIn = useCallback(async (request: SignInRequest) => {
+    const signedIn = await startSession(request);
     setUser(signedIn);
     setStatus('user');
     syncTimezone(signedIn, setUser);

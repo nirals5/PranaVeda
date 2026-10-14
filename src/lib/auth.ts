@@ -5,6 +5,9 @@ import { GOOGLE_CLIENT_ID } from '../hooks/googleAuth';
 // client id is configured.
 export const ACCOUNTS_ENABLED = import.meta.env.VITE_ACCOUNTS_ENABLED === 'true' && !!GOOGLE_CLIENT_ID;
 
+// Sign in with Apple appears only once its Services ID is configured.
+export const APPLE_SERVICES_ID = (import.meta.env.VITE_APPLE_SERVICES_ID as string | undefined) || '';
+
 export interface AuthUser {
   id: string;
   email: string | null;
@@ -62,12 +65,23 @@ export async function restoreSession(): Promise<AuthUser | null> {
   return userFrom(response);
 }
 
-export async function signInWithGoogle(credential: string, nonce: string): Promise<AuthUser> {
-  const response = await fetch('/api/auth/google', json('POST', { credential, nonce, client: 'web' }));
+export type SignInRequest =
+  | { provider: 'google'; credential: string; nonce: string }
+  | { provider: 'apple'; idToken: string; code: string; nonce: string; name?: { firstName?: string; lastName?: string } };
+
+const PROVIDER_NAMES = { google: 'Google', apple: 'Apple' } as const;
+
+export async function signIn(request: SignInRequest): Promise<AuthUser> {
+  const { provider, ...body } = request;
+  const response = await fetch(`/api/auth/${provider}`, json('POST', { ...body, client: 'web' }));
   const user = await userFrom(response);
   if (!user) {
-    const code = response.ok ? '' : (await response.json().catch(() => ({}))).error;
-    throw new Error(code === 'nonce_expired' ? 'That took a little long. Please try again.' : 'Sign-in did not complete. Please try again.');
+    const failure = response.ok ? {} : await response.json().catch(() => ({}));
+    if (failure.error === 'account_exists') {
+      const existing = PROVIDER_NAMES[failure.provider as keyof typeof PROVIDER_NAMES] ?? 'your other sign-in';
+      throw new Error(`This email already has a PranaVeda account. Please continue with ${existing} instead.`);
+    }
+    throw new Error(failure.error === 'nonce_expired' ? 'That took a little long. Please try again.' : 'Sign-in did not complete. Please try again.');
   }
   setSessionHint(true);
   return user;

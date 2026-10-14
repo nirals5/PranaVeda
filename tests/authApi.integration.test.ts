@@ -1,12 +1,13 @@
 import 'dotenv/config';
 import { eq, inArray } from 'drizzle-orm';
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from 'jose';
+import { SignJWT, createLocalJWKSet, exportJWK, exportPKCS8, generateKeyPair } from 'jose';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import app from '../api/auth.js';
 import { getDb, schema } from '../api/_lib/db.js';
+import { useAppleFetch, useAppleKeys } from '../api/_lib/apple.js';
 import { useGoogleKeys } from '../api/_lib/google.js';
-import { signAccessToken } from '../api/_lib/tokens.js';
+import { connectionsKey, signAccessToken, unseal } from '../api/_lib/tokens.js';
 import { SECRET_A, later, useSecrets } from './helpers.js';
 
 // The sign-in endpoints end to end, against the real database, with a local
@@ -17,11 +18,13 @@ import { SECRET_A, later, useSecrets } from './helpers.js';
 const hasDb = !!(process.env.DATABASE_URL_POOLED || process.env.DATABASE_URL);
 const { users, identities, sessions, refreshTokens } = schema;
 const CLIENT_ID = 'test-client.apps.googleusercontent.com';
+const SERVICES_ID = 'com.pranaveda.test';
 const RUN = `vitest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const CHROME_MAC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
 
 describe.skipIf(!hasDb)('sign-in API', () => {
   let googleKey: CryptoKey;
+  let appleKey: CryptoKey;
 
   const nonce = async () => (await request(app).get('/api/auth/nonce')).body.nonce as string;
 
@@ -33,6 +36,20 @@ describe.skipIf(!hasDb)('sign-in API', () => {
       .setIssuedAt()
       .setExpirationTime('1h')
       .sign(googleKey);
+
+  const appleToken = async (n: string, who: string, extra: Record<string, unknown> = {}) =>
+    new SignJWT({ sub: `${RUN}-${who}`, email: `${who}@example.com`, email_verified: 'true', nonce: n, ...extra })
+      .setProtectedHeader({ alg: 'RS256', kid: 'apple-test' })
+      .setIssuer('https://appleid.apple.com')
+      .setAudience(SERVICES_ID)
+      .setIssuedAt()
+      .setExpirationTime('10m')
+      .sign(appleKey);
+
+  const signInApple = async (who: string, extra: Record<string, unknown> = {}, body: Record<string, unknown> = {}) => {
+    const n = await nonce();
+    return request(app).post('/api/auth/apple').send({ idToken: await appleToken(n, who, extra), nonce: n, ...body });
+  };
 
   // What a browser does: keep the cookies the server sets, send them back.
   const cookiesOf = (res: request.Response) =>
@@ -54,11 +71,24 @@ describe.skipIf(!hasDb)('sign-in API', () => {
     const pair = await generateKeyPair('RS256');
     googleKey = pair.privateKey;
     useGoogleKeys(createLocalJWKSet({ keys: [{ ...(await exportJWK(pair.publicKey)), kid: 'test-key', alg: 'RS256' }] }));
+
+    process.env.APPLE_SERVICES_ID = SERVICES_ID;
+    const applePair = await generateKeyPair('RS256');
+    appleKey = applePair.privateKey;
+    useAppleKeys(createLocalJWKSet({ keys: [{ ...(await exportJWK(applePair.publicKey)), kid: 'apple-test', alg: 'RS256' }] }));
+    // Apple's token endpoint, faked: any code gets a refresh token.
+    process.env.APPLE_TEAM_ID = 'TEAM123456';
+    process.env.APPLE_KEY_ID = 'KEY1234567';
+    process.env.APPLE_PRIVATE_KEY = await exportPKCS8((await generateKeyPair('ES256', { extractable: true })).privateKey);
+    process.env.CONNECTIONS_ENC_KEY = 'test-connections-key-0123456789abcdef0123456789';
+    useAppleFetch(async () => new Response(JSON.stringify({ refresh_token: 'apple-refresh-for-test' }), { status: 200 }));
   });
 
   afterAll(async () => {
     useGoogleKeys(undefined);
-    const mine = await getDb().select({ userId: identities.userId }).from(identities).where(inArray(identities.subject, ['a', 'b', 'native', 'race'].map((w) => `${RUN}-${w}`)));
+    useAppleKeys(undefined);
+    useAppleFetch(undefined);
+    const mine = await getDb().select({ userId: identities.userId }).from(identities).where(inArray(identities.subject, ['a', 'b', 'native', 'race', 'apple1', 'apple2', 'relay', 'shared', 'shared2'].map((w) => `${RUN}-${w}`)));
     const ids = mine.map((m) => m.userId);
     if (!ids.length) return;
     await getDb().delete(users).where(inArray(users.id, ids));
@@ -214,6 +244,53 @@ describe.skipIf(!hasDb)('sign-in API', () => {
     // The same request from the site itself is fine.
     const own = await request(app).post('/api/auth/refresh').set('Host', 'app.test').set('Origin', 'https://app.test').set('Cookie', named(cookies, 'pv_rt')).send({});
     expect(own.status).toBe(200);
+  });
+
+  it('signs in with Apple, names a new account from the first sign-in, and stores Apple’s token encrypted', async () => {
+    const res = await signInApple('apple1', {}, { code: 'one-time-code', name: { firstName: 'Ada', lastName: 'Lovelace' } });
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({ email: 'apple1@example.com', displayName: 'Ada Lovelace' });
+
+    const [identity] = await getDb().select().from(identities).where(eq(identities.subject, `${RUN}-apple1`));
+    expect(identity.provider).toBe('apple');
+    expect(identity.appleRefreshTokenEnc).toBeTruthy();
+    expect(identity.appleRefreshTokenEnc).not.toContain('apple-refresh-for-test');
+    expect(unseal(identity.appleRefreshTokenEnc!, connectionsKey()!)).toBe('apple-refresh-for-test');
+
+    // Apple sends the name only once; a later sign-in without it keeps the account as it is.
+    const again = await signInApple('apple1', {}, { code: 'another-code' });
+    expect(again.body.user).toMatchObject({ id: res.body.user.id, displayName: 'Ada Lovelace' });
+  });
+
+  it('still signs in with Apple when the code exchange is unavailable', async () => {
+    useAppleFetch(async () => new Response('{}', { status: 400 }));
+    const res = await signInApple('apple2', {}, { code: 'bad-code' });
+    useAppleFetch(async () => new Response(JSON.stringify({ refresh_token: 'apple-refresh-for-test' }), { status: 200 }));
+    expect(res.status).toBe(200);
+    const [identity] = await getDb().select().from(identities).where(eq(identities.subject, `${RUN}-apple2`));
+    expect(identity.appleRefreshTokenEnc).toBeNull();
+  });
+
+  it('rejects an Apple token minted for a different sign-in attempt', async () => {
+    const res = await request(app).post('/api/auth/apple').send({ idToken: await appleToken('someone-elses-nonce', 'apple1'), nonce: await nonce() });
+    expect(res.status).toBe(401);
+  });
+
+  it('does not create a second account for an email that already has one', async () => {
+    const google = await signInWeb('shared');
+    const apple = await signInApple('shared2', { email: 'shared@example.com' });
+    expect(apple.status).toBe(409);
+    expect(apple.body).toEqual({ error: 'account_exists', provider: 'google' });
+    expect(await getDb().select().from(identities).where(eq(identities.subject, `${RUN}-shared2`))).toHaveLength(0);
+    // The existing account is untouched and still signs in.
+    expect((await signInWeb('shared')).res.body.user.id).toBe(google.res.body.user.id);
+  });
+
+  it('treats a Hide My Email address as never matching another account', async () => {
+    await signInWeb('relay');
+    const res = await signInApple('relay', { email: 'relay@example.com', is_private_email: 'true', sub: `${RUN}-relay-apple` });
+    expect(res.status).toBe(200);
+    await getDb().delete(users).where(eq(users.id, res.body.user.id));
   });
 
   it('answers unknown auth paths with a JSON 404', async () => {

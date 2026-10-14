@@ -121,19 +121,29 @@ export function deriveKey(purpose: string): Buffer {
 // (see refresh.ts), so a retried request can be handed the same successor.
 const sealingKey = () => deriveKey('refresh-successor');
 
-export function seal(plain: string): string {
+// Tokens from other services (Apple's refresh token; later, calendar links)
+// are stored under their own key, so rotating the session secret does not
+// make them unreadable. Null when CONNECTIONS_ENC_KEY is not configured.
+export function connectionsKey(): Buffer | null {
+  const raw = process.env.CONNECTIONS_ENC_KEY;
+  if (!raw) return null;
+  if (raw.length < 32) throw new AuthConfigError('CONNECTIONS_ENC_KEY must be at least 32 characters');
+  return Buffer.from(hkdfSync('sha256', raw, '', 'pranaveda/connections', 32));
+}
+
+export function seal(plain: string, key: Buffer = sealingKey()): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', sealingKey(), iv);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
   const body = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
   return Buffer.concat([iv, cipher.getAuthTag(), body]).toString('base64url');
 }
 
 // Returns null when the value cannot be opened (tampered, or sealed under a
 // secret that has since been rotated out).
-export function unseal(sealed: string): string | null {
+export function unseal(sealed: string, key?: Buffer): string | null {
   try {
     const buf = Buffer.from(sealed, 'base64url');
-    const decipher = createDecipheriv('aes-256-gcm', sealingKey(), buf.subarray(0, 12));
+    const decipher = createDecipheriv('aes-256-gcm', key ?? sealingKey(), buf.subarray(0, 12));
     decipher.setAuthTag(buf.subarray(12, 28));
     return Buffer.concat([decipher.update(buf.subarray(28)), decipher.final()]).toString('utf8');
   } catch {

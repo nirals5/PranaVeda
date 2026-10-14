@@ -6,7 +6,8 @@ import CalendarConnections from './CalendarConnections';
 import WearableConnections from './WearableConnections';
 import LocationSettings from './LocationSettings';
 import GoogleSignIn from './GoogleSignIn';
-import { ACCOUNTS_ENABLED } from '../lib/auth';
+import AppleSignIn from './AppleSignIn';
+import { ACCOUNTS_ENABLED, APPLE_SERVICES_ID } from '../lib/auth';
 import { Auth } from '../hooks/useAuth';
 import { Place } from '../hooks/usePlace';
 import { HeartRateMonitor } from '../hooks/useHeartRateMonitor';
@@ -155,7 +156,10 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
             <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
               Signing in is optional. PranaVeda works fully without an account, and signing in does not move your data off this device yet.
             </p>
-            <GoogleSignIn signIn={auth.signIn} />
+            <div className="flex flex-col gap-3">
+              <GoogleSignIn signIn={auth.signIn} />
+              {APPLE_SERVICES_ID && <AppleSignIn signIn={auth.signIn} />}
+            </div>
           </div>
         )}
       </section>
