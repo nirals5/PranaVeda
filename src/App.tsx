@@ -120,12 +120,18 @@ export default function App() {
     }
   }, []);
 
-  // Determine time of day greeting
+  // Time-of-day greeting. A signed-in person is greeted by first name: the
+  // name they gave Amrita if any, else the first word of their account name.
+  // While a session is still being restored the greeting stays neutral, so a
+  // returning user never sees a guest phrase flash before their name.
   const getGreeting = () => {
     const hours = new Date().getHours();
-    if (hours < 12) return "Good morning, seeker.";
-    if (hours < 17) return "Good afternoon, reflective heart.";
-    return "Good evening, peaceful traveler.";
+    const time = hours < 12 ? 'morning' : hours < 17 ? 'afternoon' : 'evening';
+    if (auth.status === 'checking') return `Good ${time}.`;
+    const firstName =
+      auth.status === 'user' ? (profile.name || auth.user?.displayName || '').trim().split(/\s+/)[0] : '';
+    if (firstName) return `Good ${time}, ${firstName}.`;
+    return { morning: 'Good morning, seeker.', afternoon: 'Good afternoon, reflective heart.', evening: 'Good evening, peaceful traveler.' }[time];
   };
 
   // Every consultation flows through the Amrita conversation. Structured
