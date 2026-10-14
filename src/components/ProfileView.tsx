@@ -82,7 +82,7 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
     try {
       await auth.deleteAccount();
       setConfirmingDelete(false);
-      setAccountNotice('Your account has been deleted. Everything on this device is still here.');
+      setAccountNotice('Your account has been deleted.');
     } catch (err: any) {
       setAccountNotice(err?.message || 'Your account could not be deleted just now. Please try again.');
     } finally {
@@ -159,7 +159,7 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
             <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
               {profile.prakriti ? `${profile.prakriti} constitution · ` : ''}
               {auth.status === 'user'
-                ? `${auth.user?.email ? `Signed in as ${auth.user.email}. ` : 'Signed in. '}Your profile and practice history are still kept on this device.`
+                ? `${auth.user?.email ? `Signed in as ${auth.user.email}. ` : 'Signed in. '}Your wellness profile and practice history are saved to your account.`
                 : `Kept on this device.${ACCOUNTS_ENABLED ? '' : ' Accounts and sign-in are not available yet.'}`}
             </p>
           </div>
@@ -173,7 +173,7 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
             {confirmingDelete ? (
               <div className="space-y-3">
                 <p className="text-[13.5px] text-stone-700 font-sans leading-relaxed">
-                  Delete your PranaVeda account? Your account and sign-in are removed from our servers for good, and you are signed out on every device. Your profile and practice history on this device are kept.
+                  Delete your PranaVeda account? Your account, your sign-in, and the wellness profile and practice history saved to it are removed from our servers for good, and you are signed out on every device. This device goes back to how it was before you signed in.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -218,7 +218,7 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
         {ACCOUNTS_ENABLED && auth.status === 'guest' && (
           <div className="pt-5 border-t border-stone-200/50 space-y-3">
             <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
-              Signing in is optional. PranaVeda works fully without an account, and signing in does not move your data off this device yet.
+              Signing in is optional. It saves the wellness profile Amrita builds and your practice history to your account, so they follow you to your other devices.
             </p>
             <div className="flex flex-col gap-3">
               <GoogleSignIn signIn={auth.signIn} />

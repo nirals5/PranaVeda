@@ -4,6 +4,7 @@ import { useSpeech } from './useSpeech';
 import { CalendarContext } from './useExternalCalendar';
 import { HealthContext } from './useWearableHealth';
 import { LocationContext } from './usePlace';
+import { fetchWithSession } from '../lib/auth';
 
 const CHAT_KEY = 'pranaveda_chat';
 const CHAT_TS_KEY = 'pranaveda_chat_ts';
@@ -67,10 +68,16 @@ function loadJson<T>(key: string, fallback: T): T {
   }
 }
 
-// The wellness profile lives on-device only: the server receives it per
-// request, updates it via Amrita's tools, and returns it — nothing is stored
-// remotely.
-export function useAmritaChat(calendar?: CalendarContext | null, health?: HealthContext | null, location?: LocationContext | null) {
+// Signed out, the wellness profile lives on the device only: the server
+// receives it per request, updates it via Amrita's tools, and returns it.
+// Signed in, the server reads and saves it in the account instead (the copy
+// sent is ignored), and the copy here is a cache of it — see useProfileSync.
+export function useAmritaChat(
+  calendar?: CalendarContext | null,
+  health?: HealthContext | null,
+  location?: LocationContext | null,
+  onSessionEnded?: () => void
+) {
   const [items, setItems] = useState<ChatItem[]>(() => {
     const stored = loadJson<ChatItem[]>(CHAT_KEY, []);
     const lastActivity = loadJson<number>(CHAT_TS_KEY, 0);
@@ -141,12 +148,13 @@ export function useAmritaChat(calendar?: CalendarContext | null, health?: Health
       abortRef.current = controller;
 
       try {
-        const response = await fetch('/api/chat', {
+        const { response, sessionEnded } = await fetchWithSession('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages: history, profile, localTime: new Date().toLocaleString(), inputMode, previousSession, calendar: calendar ?? undefined, health: health ?? undefined, location: location ?? undefined }),
           signal: controller.signal,
         });
+        if (sessionEnded) onSessionEnded?.();
         if (!response.ok || !response.body) throw new Error(`Chat request failed (${response.status})`);
 
         const reader = response.body.getReader();
@@ -208,7 +216,7 @@ export function useAmritaChat(calendar?: CalendarContext | null, health?: Health
         abortRef.current = null;
       }
     },
-    [items, profile, isStreaming, voiceMuted, speak, stopSpeaking, calendar, health, location]
+    [items, profile, isStreaming, voiceMuted, speak, stopSpeaking, calendar, health, location, onSessionEnded]
   );
 
   const resetConversation = useCallback(() => {
@@ -221,5 +229,5 @@ export function useAmritaChat(calendar?: CalendarContext | null, health?: Health
     setIsStreaming(false);
   }, [stopSpeaking]);
 
-  return { items, profile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted, stopSpeaking };
+  return { items, profile, replaceProfile: setProfile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted, stopSpeaking };
 }

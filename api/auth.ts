@@ -2,12 +2,11 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import { sql } from 'drizzle-orm';
 import { AppleTokenError, exchangeAppleCode, revokeAppleToken, verifyAppleIdToken } from './_lib/apple.js';
-import { authenticate } from './_lib/auth.js';
 import { getDb } from './_lib/db.js';
 import { deviceFromClient, deviceFromUserAgent } from './_lib/device.js';
 import { IdentityTokenError, verifyGoogleIdToken } from './_lib/google.js';
 import type { VerifiedIdentity } from './_lib/google.js';
-import { clearSessionCookies, isSameOrigin, refreshCookie, setSessionCookies } from './_lib/http.js';
+import { clearSessionCookies, isSameOrigin, refreshCookie, requireUser, setSessionCookies } from './_lib/http.js';
 import { isValidNonce, issueNonce } from './_lib/nonce.js';
 import { RefreshError, issueSession, revokeSession, rotateSession } from './_lib/refresh.js';
 import type { SessionTokens } from './_lib/refresh.js';
@@ -169,7 +168,12 @@ app.post(
   route(async (req, res) => {
     if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
     const presented = isWeb(req) ? refreshCookie(req) : req.body?.refreshToken;
-    if (typeof presented !== 'string' || !presented) return res.status(401).json({ error: 'not_signed_in' });
+    if (typeof presented !== 'string' || !presented) {
+      // Any leftover access cookie is cleared too, so the browser's next
+      // request goes out cleanly signed out instead of failing again.
+      if (isWeb(req)) clearSessionCookies(req, res);
+      return res.status(401).json({ error: 'not_signed_in' });
+    }
 
     let tokens;
     try {
@@ -200,21 +204,7 @@ app.post(
 
 // Signed-in only. A guest gets 401 here by design — the web app never calls
 // this unless it believes a session exists.
-async function currentUser(req: Request, res: Response): Promise<PublicUser | null> {
-  res.setHeader('Cache-Control', 'no-store');
-  const auth = await authenticate(req);
-  if (auth.kind === 'guest') {
-    res.status(401).json({ error: 'not_signed_in' });
-    return null;
-  }
-  if (auth.kind === 'invalid') {
-    res.status(401).json({ error: auth.reason === 'expired' ? 'token_expired' : 'invalid_token' });
-    return null;
-  }
-  const user = await getUser(auth.userId);
-  if (!user) res.status(401).json({ error: 'not_signed_in' });
-  return user;
-}
+const currentUser = requireUser;
 
 const isTimeZone = (value: unknown): value is string => {
   if (typeof value !== 'string' || value.length > 64) return false;

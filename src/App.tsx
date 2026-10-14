@@ -13,6 +13,8 @@ import { RecommendationResult, SavedPractice } from './types';
 import RecoveryTrends from './components/RecoveryTrends';
 import ProfileView from './components/ProfileView';
 import { useAuth } from './hooks/useAuth';
+import { useProfileSync } from './hooks/useProfileSync';
+import { usePracticeSync } from './hooks/usePracticeSync';
 import { usePracticeLog } from './hooks/usePracticeLog';
 import { useExternalCalendar, describeCalendar } from './hooks/useExternalCalendar';
 import FreeTimeNudge from './components/FreeTimeNudge';
@@ -52,7 +54,7 @@ export default function App() {
     () => (calendar.connected ? describeCalendar(calendar.busy, calendar.now) : null),
     [calendar.connected, calendar.busy, calendar.now]
   );
-  const { entries: practiceLog, streak, logPractice } = usePracticeLog();
+  const { entries: practiceLog, streak, logPractice, merge: mergePractices, retainOnly: retainPractices } = usePracticeLog();
   const heart = useHeartRateMonitor();
   const health = useWearableHealth();
   const healthContext = useMemo(
@@ -61,10 +63,17 @@ export default function App() {
   );
   const place = usePlace();
   const locationContext = useMemo(() => (place.current ? { place: place.current } : null), [place.current]);
-  const { items: chatItems, profile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat(calendarContext, healthContext, locationContext);
   // Optional sign-in. Held here so it survives moving between screens; inert
   // (no requests, always "guest") where accounts are switched off.
   const auth = useAuth();
+  const { items: chatItems, profile, replaceProfile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat(
+    calendarContext,
+    healthContext,
+    locationContext,
+    auth.sessionEnded
+  );
+  useProfileSync(auth, profile, replaceProfile);
+  usePracticeSync(auth, practiceLog, mergePractices, retainPractices);
   const lastPracticeAt = practiceLog.length ? Date.parse(practiceLog[practiceLog.length - 1].completedAt) : null;
   const notifications = useNudgeNotifications({
     connected: calendar.connected,

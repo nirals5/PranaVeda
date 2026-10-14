@@ -64,7 +64,13 @@ export function useAuth() {
     setStatus('guest');
   }, []);
 
-  return { status, user, signIn, signOut, deleteAccount };
+  // The server ended the session (it expired or was revoked) while in use.
+  const sessionEnded = useCallback(() => {
+    setUser(null);
+    setStatus('guest');
+  }, []);
+
+  return { status, user, signIn, signOut, deleteAccount, sessionEnded };
 }
 
 export type Auth = ReturnType<typeof useAuth>;

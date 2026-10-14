@@ -178,6 +178,12 @@ describe.skipIf(!hasDb)('sign-in API', () => {
     expect(me.status).toBe(200);
   });
 
+  it('clears a leftover access cookie when there is no refresh cookie to renew it', async () => {
+    const res = await request(app).post('/api/auth/refresh').set('Cookie', 'pv_at=expired-or-stale').send({});
+    expect(res.status).toBe(401);
+    expect(([] as string[]).concat(res.headers['set-cookie'] ?? []).some((c) => c.startsWith('pv_at=;') && c.includes('Max-Age=0'))).toBe(true);
+  });
+
   it('signs out: the session is gone and its refresh token no longer works', async () => {
     const { res, cookies } = await signInWeb();
     const rt = named(cookies, 'pv_rt');
