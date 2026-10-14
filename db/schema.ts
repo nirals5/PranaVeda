@@ -88,3 +88,26 @@ export const oauthCodes = pgTable(
   },
   (t) => [index('oauth_codes_expires_at_idx').on(t.expiresAt)]
 );
+
+// One row per sign-in (a refresh-token family): which kind of device it is.
+// Coarse on purpose — enough for a "signed-in devices" list and for knowing
+// which platforms people use, with nothing that fingerprints a device.
+export const sessions = pgTable(
+  'sessions',
+  {
+    familyId: uuid('family_id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    client: text('client', { enum: ['web', 'ios', 'android', 'alexa'] }).notNull(),
+    deviceClass: text('device_class', { enum: ['desktop', 'phone', 'tablet', 'speaker'] }),
+    os: text('os'),
+    osVersion: text('os_version'), // major version only
+    browser: text('browser'), // web only
+    deviceModel: text('device_model'), // native only
+    appVersion: text('app_version'),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+    lastSeenAt: timestamptz('last_seen_at').notNull().defaultNow(),
+  },
+  (t) => [index('sessions_user_id_idx').on(t.userId)]
+);

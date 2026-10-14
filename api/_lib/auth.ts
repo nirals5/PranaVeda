@@ -16,16 +16,23 @@ export type AuthResult =
   | { kind: 'invalid'; reason: 'expired' | 'invalid' };
 
 // Web sessions carry the access token in an httpOnly cookie; native apps send
-// it as a Bearer header.
+// it as a Bearer header. The "__Host-" prefix makes browsers refuse the cookie
+// unless it is Secure and host-only, which plain-http local dev cannot satisfy
+// in every browser — so local dev uses an unprefixed name, and that name is
+// never read on an https request.
 export const ACCESS_COOKIE = '__Host-pv_at';
+export const DEV_ACCESS_COOKIE = 'pv_at';
 
-interface RequestLike {
+export const isHttps = (req: RequestLike) => first(req.headers['x-forwarded-proto'])?.split(',')[0].trim() === 'https';
+export const accessCookieName = (req: RequestLike) => (isHttps(req) ? ACCESS_COOKIE : DEV_ACCESS_COOKIE);
+
+export interface RequestLike {
   headers: Record<string, string | string[] | undefined>;
 }
 
-const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+export const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
-function readCookie(header: string | undefined, name: string): string | undefined {
+export function readCookie(header: string | undefined, name: string): string | undefined {
   if (!header) return undefined;
   for (const part of header.split(';')) {
     const eq = part.indexOf('=');
@@ -39,7 +46,7 @@ function readCookie(header: string | undefined, name: string): string | undefine
 function presentedToken(req: RequestLike): string | undefined {
   const bearer = /^Bearer(?:\s+(.*))?$/i.exec(first(req.headers.authorization)?.trim() ?? '');
   if (bearer) return bearer[1]?.trim() ?? '';
-  return readCookie(first(req.headers.cookie), ACCESS_COOKIE);
+  return readCookie(first(req.headers.cookie), accessCookieName(req));
 }
 
 export async function authenticate(

@@ -11,7 +11,7 @@ export interface GoogleToken {
 }
 
 let gisLoading: Promise<void> | null = null;
-function loadGoogleIdentity(): Promise<void> {
+export function loadGoogleIdentity(): Promise<void> {
   if ((window as any).google?.accounts?.oauth2) return Promise.resolve();
   gisLoading ??= new Promise<void>((resolve, reject) => {
     const script = document.createElement('script');

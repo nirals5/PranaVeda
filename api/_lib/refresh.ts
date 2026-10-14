@@ -137,8 +137,11 @@ export async function rotateSession(store: RefreshStore, presented: string, now:
   throw new RefreshError('reused');
 }
 
-// Sign-out: ends this device's session and nothing else.
-export async function revokeSession(store: RefreshStore, presented: string, now: Date = new Date()): Promise<void> {
+// Sign-out: ends this device's session and nothing else. Returns the session
+// that was ended, if the token was one of ours.
+export async function revokeSession(store: RefreshStore, presented: string, now: Date = new Date()): Promise<string | null> {
   const row = await store.findByHash(hashToken(presented));
-  if (row) await store.revokeFamily(row.familyId, now);
+  if (!row) return null;
+  await store.revokeFamily(row.familyId, now);
+  return row.familyId;
 }

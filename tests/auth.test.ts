@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ACCESS_COOKIE, authenticate } from '../api/_lib/auth.js';
+import { ACCESS_COOKIE, DEV_ACCESS_COOKIE, authenticate } from '../api/_lib/auth.js';
 import { signAccessToken } from '../api/_lib/tokens.js';
 import { SECRET_A, later, minutes, useSecrets } from './helpers.js';
 
@@ -8,7 +8,10 @@ const now = new Date('2026-10-13T12:00:00Z');
 const user = { kind: 'user', ...claims };
 
 const bearer = (token: string) => ({ headers: { authorization: `Bearer ${token}` } });
-const cookie = (token: string, extra = '') => ({ headers: { cookie: `theme=dark; ${ACCESS_COOKIE}=${token}${extra}` } });
+// A deployed (https) request, as Vercel presents it.
+const cookie = (token: string, extra = '') => ({
+  headers: { 'x-forwarded-proto': 'https', cookie: `theme=dark; ${ACCESS_COOKIE}=${token}${extra}` },
+});
 
 let valid: string;
 let expired: string;
@@ -47,7 +50,17 @@ describe('authenticate', () => {
   it('reports a malformed or empty token as invalid', async () => {
     expect(await authenticate(bearer('garbage'), 'app', now)).toEqual({ kind: 'invalid', reason: 'invalid' });
     expect(await authenticate({ headers: { authorization: 'Bearer' } }, 'app', now)).toEqual({ kind: 'invalid', reason: 'invalid' });
-    expect(await authenticate({ headers: { cookie: `${ACCESS_COOKIE}=` } }, 'app', now)).toEqual({ kind: 'invalid', reason: 'invalid' });
+    expect(await authenticate(cookie(''), 'app', now)).toEqual({ kind: 'invalid', reason: 'invalid' });
+  });
+
+  it('uses the unprefixed cookie name only on plain-http local dev', async () => {
+    const dev = { headers: { cookie: `${DEV_ACCESS_COOKIE}=${valid}` } };
+    expect(await authenticate(dev, 'app', now)).toEqual(user);
+    // Over https that name is ignored, so nothing can plant a session by it.
+    const deployed = { headers: { 'x-forwarded-proto': 'https', cookie: `${DEV_ACCESS_COOKIE}=${valid}` } };
+    expect(await authenticate(deployed, 'app', now)).toEqual({ kind: 'guest' });
+    // And the production name is ignored on plain http.
+    expect(await authenticate({ headers: { cookie: `${ACCESS_COOKIE}=${valid}` } }, 'app', now)).toEqual({ kind: 'guest' });
   });
 
   it('rejects a speaker token on a first-party endpoint', async () => {
@@ -57,7 +70,7 @@ describe('authenticate', () => {
   });
 
   it('does not fall back to the cookie when the Bearer token is bad', async () => {
-    const req = { headers: { authorization: 'Bearer garbage', cookie: `${ACCESS_COOKIE}=${valid}` } };
+    const req = { headers: { 'x-forwarded-proto': 'https', authorization: 'Bearer garbage', cookie: `${ACCESS_COOKIE}=${valid}` } };
     expect(await authenticate(req, 'app', now)).toEqual({ kind: 'invalid', reason: 'invalid' });
   });
 

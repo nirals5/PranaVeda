@@ -134,6 +134,6 @@ describe('revokeSession', () => {
   });
 
   it('ignores an unknown token', async () => {
-    await expect(revokeSession(store, 'never-issued', now)).resolves.toBeUndefined();
+    await expect(revokeSession(store, 'never-issued', now)).resolves.toBeNull();
   });
 });

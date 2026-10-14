@@ -112,11 +112,14 @@ export function hashToken(token: string): string {
   return sha256(token).toString('hex');
 }
 
+// Separate keys for separate jobs, all derived from the one configured secret.
+export function deriveKey(purpose: string): Buffer {
+  return Buffer.from(hkdfSync('sha256', currentSecret().raw, '', `pranaveda/${purpose}`, 32));
+}
+
 // A rotated token's successor is kept encrypted for the short retry window
 // (see refresh.ts), so a retried request can be handed the same successor.
-function sealingKey(): Buffer {
-  return Buffer.from(hkdfSync('sha256', currentSecret().raw, '', 'pranaveda/refresh-successor', 32));
-}
+const sealingKey = () => deriveKey('refresh-successor');
 
 export function seal(plain: string): string {
   const iv = randomBytes(12);
