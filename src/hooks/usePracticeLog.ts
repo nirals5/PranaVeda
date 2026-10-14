@@ -41,6 +41,15 @@ function trimLog(entries: PracticeLogEntry[]): PracticeLogEntry[] {
   return kept.map((e, i) => (i < snapshotFrom && e.result ? { ...e, result: undefined } : e));
 }
 
+// Adds entries from elsewhere (another device, via the account). Entries are
+// never edited, so an id seen twice is the same practice and is kept once.
+export function mergeLogs(local: PracticeLogEntry[], incoming: PracticeLogEntry[]): PracticeLogEntry[] {
+  const known = new Set(local.map((e) => e.id));
+  const added = incoming.filter((e) => !known.has(e.id));
+  if (!added.length) return local;
+  return trimLog([...local, ...added].sort((a, b) => Date.parse(a.completedAt) - Date.parse(b.completedAt)));
+}
+
 function loadLog(): PracticeLogEntry[] {
   try {
     const raw = localStorage.getItem(LOG_KEY);
@@ -78,7 +87,10 @@ export function usePracticeLog() {
     );
   }, []);
 
+  const merge = useCallback((incoming: PracticeLogEntry[]) => setEntries((prev) => mergeLogs(prev, incoming)), []);
+  const retainOnly = useCallback((keep: (entry: PracticeLogEntry) => boolean) => setEntries((prev) => prev.filter(keep)), []);
+
   const streak = useMemo(() => currentStreak(entries), [entries]);
 
-  return { entries, streak, logPractice };
+  return { entries, streak, logPractice, merge, retainOnly };
 }

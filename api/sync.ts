@@ -3,12 +3,14 @@ import type { Request, Response } from 'express';
 import { isSameOrigin, requireUser } from './_lib/http.js';
 import { parseProfile } from './_lib/profileSchema.js';
 import { loadAccountProfile, saveProfile } from './_lib/profiles.js';
+import { MAX_UPLOAD, entriesAfter, parseEntries, storeEntries } from './_lib/practiceLog.js';
 
 // Keeping a signed-in user's data the same on every device: /api/sync/*.
 // Signed-in only; a guest's data never leaves their device.
 
 const app = express();
-app.use(express.json({ limit: '64kb' }));
+// Practice uploads carry ritual snapshots; each route caps its own content.
+app.use(express.json({ limit: '2mb' }));
 
 type Handler = (req: Request, res: Response) => Promise<unknown>;
 
@@ -50,6 +52,35 @@ app.put(
     // (Narrowed by property: this project compiles without strict null checks.)
     if ('current' in result) return res.status(409).json({ error: 'version_conflict', ...result.current });
     res.json({ profile, version: result.version });
+  })
+);
+
+// New practices from a device, up to MAX_UPLOAD at a time. Sending one that is
+// already stored is fine — it is simply not stored twice.
+app.post(
+  '/api/sync/practice-log',
+  route(async (req, res) => {
+    if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const parsed = parseEntries(req.body?.entries);
+    if ('invalidAt' in parsed) {
+      return res.status(400).json({ error: 'invalid_entries', invalidAt: parsed.invalidAt, maxPerRequest: MAX_UPLOAD });
+    }
+    res.json({ stored: await storeEntries(user.id, parsed.entries) });
+  })
+);
+
+// Practices the server has received after `after` (a cursor from an earlier
+// call; 0 for everything), a page at a time, oldest first.
+app.get(
+  '/api/sync/practice-log',
+  route(async (req, res) => {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const after = Number(req.query.after ?? 0);
+    if (!Number.isSafeInteger(after) || after < 0) return res.status(400).json({ error: 'invalid_cursor' });
+    res.json(await entriesAfter(user.id, after));
   })
 );
 

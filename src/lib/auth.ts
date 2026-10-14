@@ -136,3 +136,14 @@ export async function saveAccountProfile<P>(profile: P, baseVersion: number): Pr
   }
   return null;
 }
+
+// Practice log. Upload is safe to repeat: the server keeps one of each entry.
+export async function uploadPractices<E>(entries: E[]): Promise<boolean> {
+  const { response } = await fetchWithSession('/api/sync/practice-log', json('POST', { entries }));
+  return response.ok;
+}
+
+export async function fetchPracticesAfter<E>(cursor: number): Promise<{ entries: E[]; cursor: number; hasMore: boolean } | null> {
+  const { response } = await fetchWithSession(`/api/sync/practice-log?after=${cursor}`, { method: 'GET' });
+  return response.ok ? response.json() : null;
+}

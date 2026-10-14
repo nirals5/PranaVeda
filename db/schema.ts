@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { bigserial, boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 // Accounts are additive: the app works signed out, and nothing here is read
 // for a request that carries no credentials.
@@ -124,3 +124,27 @@ export const wellnessProfiles = pgTable('wellness_profiles', {
   version: integer('version').notNull().default(1),
   updatedAt: timestamptz('updated_at').notNull().defaultNow(),
 });
+
+// Finished practices, for signed-in users. Append-only: an entry is never
+// changed or removed (except with the account), and its id is made on the
+// device, so uploading the same entry twice is harmless. `seq` is the order
+// entries reached the server — devices ask for "everything after seq N".
+export const practiceLogEntries = pgTable(
+  'practice_log_entries',
+  {
+    seq: bigserial('seq', { mode: 'number' }).primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    entryId: text('entry_id').notNull(),
+    completedAt: timestamptz('completed_at').notNull(),
+    localDate: text('local_date').notNull(), // YYYY-MM-DD in the user's own timezone
+    kind: text('kind', { enum: ['ritual', 'breathwork'] }).notNull(),
+    data: jsonb('data').notNull(), // the whole entry, as the device keeps it
+    receivedAt: timestamptz('received_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('practice_log_entries_user_entry_key').on(t.userId, t.entryId),
+    index('practice_log_entries_user_seq_idx').on(t.userId, t.seq),
+  ]
+);
