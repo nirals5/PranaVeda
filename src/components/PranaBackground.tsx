@@ -45,9 +45,12 @@ export default function PranaBackground() {
         />
       </div>
 
-      {/* Artistic arc lines & circles */}
+      {/* Artistic arc lines & circles. Every animated SVG attribute also gets an
+          `initial` value: without one, motion writes "undefined" to cx/cy/d on
+          its first frame and the browser logs an error for each. */}
       <svg className="absolute inset-0 w-full h-full opacity-20 md:opacity-60 text-white" viewBox="0 0 1024 768" preserveAspectRatio="none" fill="none">
         <motion.path
+          initial={{ d: 'M-50,400 Q200,300 400,450 T800,400 T1100,500' }}
           d="M-50,400 Q200,300 400,450 T800,400 T1100,500"
           stroke="currentColor" strokeWidth="2.5" opacity="0.6"
           animate={{ d: [
@@ -58,6 +61,7 @@ export default function PranaBackground() {
           transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.path
+          initial={{ d: 'M-100,600 Q300,500 500,650 T900,550 T1200,700' }}
           d="M-100,600 Q300,500 500,650 T900,550 T1200,700"
           stroke="currentColor" strokeWidth="1.8" opacity="0.4"
           animate={{ d: [
@@ -68,10 +72,12 @@ export default function PranaBackground() {
           transition={{ duration: 28, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
         />
         <motion.circle cx="800" cy="200" r="120" fill="currentColor" opacity="0.12"
+          initial={{ cx: 800, cy: 200 }}
           animate={{ cx: [800, 820, 800], cy: [200, 185, 200] }}
           transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.circle cx="200" cy="600" r="150" fill="currentColor" opacity="0.12"
+          initial={{ cx: 200, cy: 600 }}
           animate={{ cx: [200, 180, 200], cy: [600, 615, 600] }}
           transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut', delay: 4 }}
         />
@@ -80,6 +86,7 @@ export default function PranaBackground() {
       {/* Flowing wave lines */}
       <svg className="absolute inset-0 w-full h-full opacity-[0.16] md:opacity-[0.24] text-stone-300 stroke-current" fill="none">
         <motion.path
+          initial={{ d: 'M -100 200 C 600 80, 1400 440, 2100 300' }}
           d="M -100 200 C 600 80, 1400 440, 2100 300"
           strokeWidth="1.2"
           animate={{ d: [
@@ -90,6 +97,7 @@ export default function PranaBackground() {
           transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.path
+          initial={{ d: 'M -100 450 C 600 300, 1400 560, 2100 420' }}
           d="M -100 450 C 600 300, 1400 560, 2100 420"
           strokeWidth="1"
           animate={{ d: [
