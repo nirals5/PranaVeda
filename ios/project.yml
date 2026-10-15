@@ -11,17 +11,19 @@ settings:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
-    # Where the PranaVeda API lives. The iOS Simulator reaches the Mac's own
-    # localhost, so the local dev server (npm run dev) works unchanged.
-    PV_API_BASE_URL: "http://localhost:3000"
 targets:
   PranaVeda:
     type: application
     platform: iOS
     sources: [PranaVeda]
+    # The server address, app identifier and signing team come from here, so
+    # each machine can set its own in the git-ignored Local.xcconfig.
+    configFiles:
+      Debug: Configuration/App.xcconfig
+      Release: Configuration/App.xcconfig
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.pranaveda.app
+        PRODUCT_BUNDLE_IDENTIFIER: $(PV_BUNDLE_ID)
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
@@ -36,6 +38,8 @@ targets:
         # everything on the internet still needs https.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        # Shown by iOS the first time a phone build reaches the Mac.
+        NSLocalNetworkUsageDescription: PranaVeda connects to the PranaVeda server running on your Mac while the app is in development.
   PranaVedaTests:
     type: bundle.unit-test
     platform: iOS

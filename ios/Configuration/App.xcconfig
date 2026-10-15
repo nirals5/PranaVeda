@@ -1,0 +1,15 @@
+// Build settings for the PranaVeda app. Per-machine values (your signing
+// team, a phone-reachable server address) go in Local.xcconfig next to this
+// file, which git ignores; copy Local.xcconfig.example to start one.
+
+// Where the PranaVeda API lives. The iOS Simulator shares the Mac's network,
+// so the local dev server (npm run dev) is reachable at localhost. A real
+// iPhone is not: Local.xcconfig sets the Mac's address for phone builds.
+// ("/$()/" keeps "//" from starting a comment in this file format.)
+PV_API_BASE_URL = http:/$()/localhost:3000
+
+// The app's identifier. A free (personal) Apple account may need a unique
+// one; override it in Local.xcconfig.
+PV_BUNDLE_ID = com.pranaveda.app
+
+#include? "Local.xcconfig"

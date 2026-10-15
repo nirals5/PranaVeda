@@ -24,8 +24,22 @@ open PranaVeda.xcodeproj
 
 Run the `PranaVeda` scheme on an iPhone simulator. The simulator reaches the
 Mac's own `localhost`, so the app talks to the local server at
-`http://localhost:3000`. To point it elsewhere, change `PV_API_BASE_URL` in
-`project.yml` (or pass `PV_API_BASE_URL=…` to `xcodebuild`).
+`http://localhost:3000`. The address is `PV_API_BASE_URL` in
+`Configuration/App.xcconfig`; `xcodebuild PV_API_BASE_URL=…` overrides it for
+one build.
+
+## On your own iPhone
+
+A free Apple ID is enough to run the app on your own phone (it stops opening
+after 7 days; run it from Xcode again to refresh it).
+
+1. Copy `Configuration/Local.xcconfig.example` to `Configuration/Local.xcconfig`
+   (git ignores it) and fill in your signing team, and your Mac's network name
+   for `PV_API_BASE_URL[sdk=iphoneos*]`. Phone builds then reach the dev server
+   at `http://<your-mac>.local:3000`; the phone must be on the same Wi-Fi.
+2. Run `xcodegen` again, connect the iPhone, turn on Developer Mode on it
+   (Settings → Privacy & Security), and run the app on it from Xcode.
+3. The first time, iOS asks to allow access to the local network: allow it.
 
 Tests (stream parsing and decoding of the server's events and cards):
 
