@@ -1219,13 +1219,45 @@ function conditionConflicts(contraindications: string[], conditions: string[] | 
   return contraindications.filter((tag) => normalized.some((c) => c.includes(tag) || tag.includes(c)));
 }
 
-function applyProfileUpdate(profile: WellnessProfile, input: any): WellnessProfile {
+// Strip JSON punctuation the model sometimes leaves on a value, e.g.
+// `foo"]` or `["foo` when it half-serialises an array into a string.
+// Quotes are only dropped when they wrap the value or are left unpaired, so
+// `"Om" chanting` keeps its quotes.
+function cleanProfileText(s: string): string {
+  let t = s.trim().replace(/^\[\s*/, '').replace(/\s*\]\s*,?$/, '').trim();
+  if (t.length > 1 && t.startsWith('"') && t.endsWith('"') && !t.slice(1, -1).includes('"')) t = t.slice(1, -1);
+  else if ((t.match(/"/g) ?? []).length % 2 === 1) {
+    if (t.startsWith('"')) t = t.slice(1);
+    else if (t.endsWith('"')) t = t.slice(0, -1);
+  }
+  return t.trim();
+}
+
+// The model occasionally sends a string where the schema wants an array:
+// a bare value, or a JSON-encoded (sometimes truncated) array. Coerce it to
+// a clean list instead of storing the JSON fragments or spreading characters.
+export function normalizeProfileList(v: unknown): string[] {
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (s.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed)) return normalizeProfileList(parsed);
+      } catch {
+        // Not valid JSON — fall through and split it by hand.
+      }
+      return normalizeProfileList(s.split(/"\s*,\s*"/));
+    }
+    v = [s];
+  }
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is string => typeof x === 'string').map(cleanProfileText).filter(Boolean);
+}
+
+export function applyProfileUpdate(profile: WellnessProfile, input: any): WellnessProfile {
   const next: WellnessProfile = { ...profile };
   const uniq = (arr: string[]) => [...new Set(arr.filter(Boolean))];
-  // The model occasionally sends a bare string where the schema wants an
-  // array — coerce instead of spreading a string into characters.
-  const asList = (v: unknown): string[] =>
-    Array.isArray(v) ? v.filter((x) => typeof x === 'string') : typeof v === 'string' && v.trim() ? [v] : [];
+  const asList = normalizeProfileList;
   if (input.set) {
     for (const k of ['name', 'prakriti', 'vikriti', 'prakritiConfidence'] as const) {
       if (input.set[k] !== undefined) (next as any)[k] = input.set[k];
@@ -1242,8 +1274,9 @@ function applyProfileUpdate(profile: WellnessProfile, input: any): WellnessProfi
   merge('goals', input.addGoals, input.removeGoals);
   merge('conditions', input.addConditions, input.removeConditions);
   merge('preferences', input.addPreferences, input.removePreferences);
-  if (input.addObservation) {
-    next.observations = [...(next.observations ?? []), { date: todayStamp(), note: input.addObservation }].slice(-30);
+  const observation = normalizeProfileList(input.addObservation).join('; ');
+  if (observation) {
+    next.observations = [...(next.observations ?? []), { date: todayStamp(), note: observation }].slice(-30);
   }
   return next;
 }
