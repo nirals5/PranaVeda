@@ -8,6 +8,7 @@ export interface YogaPose {
   benefits: string;
   instructions: string;
   poseImageUrl?: string;
+  sceneImageUrl?: string; // Niral's room scene, when the pose has one
   videoUrl?: string;
 }
 

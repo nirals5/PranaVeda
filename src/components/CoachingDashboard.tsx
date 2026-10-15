@@ -45,16 +45,15 @@ const getFallbackPoseImage = (pose: { nameEnglish: string; nameSanskrit?: string
   return placeholders[charSum % placeholders.length];
 };
 
-// Niral's composited room scenes (public/poses_with_background/{poseId}.png)
-// are her final art, shown verbatim. Three asanas ship a 16:9 "_wide" version
-// for these landscape cards (their unsuffixed files are 9:16 portrait). If a
-// pose has no composite, onError falls back to the flat photo.
+// Niral's composited room scenes are her final art, shown verbatim. The
+// server names the right file for each pose (sceneImageUrl). Rituals saved
+// before it did are worked out here the same way; if a pose has no scene,
+// onError falls back to the flat photo.
 const WIDE_SCENES = new Set(['triangle', 'dancer', 'seated_twist']);
 
-const poseSceneUrl = (pose: { poseId?: string }) =>
-  pose.poseId
-    ? `/poses_with_background/web/${pose.poseId}${WIDE_SCENES.has(pose.poseId) ? '_wide' : ''}.webp`
-    : undefined;
+const poseSceneUrl = (pose: { poseId?: string; sceneImageUrl?: string }) =>
+  pose.sceneImageUrl ??
+  (pose.poseId ? `/poses_with_background/web/${pose.poseId}${WIDE_SCENES.has(pose.poseId) ? '_wide' : ''}.webp` : undefined);
 
 const fallbackToFlatImage = (e: React.SyntheticEvent<HTMLImageElement>, flatUrl: string) => {
   if (e.currentTarget.src !== flatUrl && !e.currentTarget.dataset.fellBack) {
