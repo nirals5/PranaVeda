@@ -6,3 +6,5 @@ xcuserdata/
 DerivedData/
 build/
 *.xcresult
+# Per-machine build settings (see Configuration/Local.xcconfig.example).
+Configuration/Local.xcconfig

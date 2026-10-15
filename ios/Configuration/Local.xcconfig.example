@@ -1,0 +1,15 @@
+// Per-machine build settings. Copy to Local.xcconfig (git ignores it), fill
+// in, then run `xcodegen` again.
+
+// Your Apple signing team (10 characters). Xcode shows it after you add your
+// Apple ID under Settings → Accounts and pick the team for the target once.
+DEVELOPMENT_TEAM =
+
+// A free Apple account may refuse com.pranaveda.app as already taken;
+// pick something unique to you.
+// PV_BUNDLE_ID = com.pranaveda.app.yourname
+
+// Builds for a real iPhone reach the dev server on your Mac by its network
+// name (System Settings → General → Sharing → Local hostname), on the same
+// Wi-Fi. Simulator builds keep using localhost.
+PV_API_BASE_URL[sdk=iphoneos*] = http:/$()/Your-Mac-Name.local:3000
