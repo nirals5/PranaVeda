@@ -10,6 +10,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import com.pranaveda.app.ui.account.AccountScreen
+import kotlinx.coroutines.launch
 import com.pranaveda.app.config.AppConfig
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -51,18 +54,27 @@ class MainActivity : ComponentActivity() {
             PranaVedaTheme {
                 val chat: ChatViewModel = viewModel()
                 val catalog: CatalogViewModel = viewModel()
+                val auth = (application as PranaVedaApplication).auth
+                val scope = rememberCoroutineScope()
                 var tab by rememberSaveable { mutableIntStateOf(0) }
 
                 // Talking to the dev server on the Mac: from Android 17 the
                 // user must allow local-network access first (debug builds).
                 val askForLocalNetwork = rememberLauncherForActivityResult(RequestPermission()) { granted ->
-                    if (granted) catalog.load()
+                    if (granted) {
+                        catalog.load()
+                        scope.launch { auth.restore() }
+                    }
                 }
                 LaunchedEffect(Unit) {
                     if (AppConfig.apiIsOnLocalNetwork && Build.VERSION.SDK_INT >= 37 &&
                         checkSelfPermission(LOCAL_NETWORK) != PackageManager.PERMISSION_GRANTED
                     ) {
                         askForLocalNetwork.launch(LOCAL_NETWORK)
+                    } else {
+                        // A session saved on an earlier launch: confirm it and
+                        // bring the profile in line with the account.
+                        auth.restore()
                     }
                 }
 
@@ -92,13 +104,21 @@ class MainActivity : ComponentActivity() {
                                     label = { Text("Library") },
                                     colors = itemColors,
                                 )
+                                NavigationBarItem(
+                                    selected = tab == 2,
+                                    onClick = { tab = 2 },
+                                    icon = { Icon(painterResource(R.drawable.ic_person), contentDescription = null) },
+                                    label = { Text("You") },
+                                    colors = itemColors,
+                                )
                             }
                         },
                     ) { padding ->
                         Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
                             when (tab) {
                                 0 -> ChatScreen(chat)
-                                else -> LibraryScreen(catalog)
+                                1 -> LibraryScreen(catalog)
+                                else -> AccountScreen(auth)
                             }
                         }
                     }

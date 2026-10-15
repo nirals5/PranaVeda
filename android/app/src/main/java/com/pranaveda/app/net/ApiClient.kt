@@ -54,18 +54,22 @@ data class ChatRequest(
 )
 
 class ApiClient(
-    private val baseUrl: HttpUrl = AppConfig.apiBaseUrl,
-    private val http: OkHttpClient = sharedHttp,
+    internal val baseUrl: HttpUrl = AppConfig.apiBaseUrl,
+    internal val http: OkHttpClient = sharedHttp,
 ) {
     /**
      * Streams Amrita's reply. Signed out, the device sends its profile and
      * receives the updated one, exactly as the web app does.
+     *
+     * With a [bearer] token the request is sent as the signed-in person; an
+     * expired or invalid one gets [HttpStatusException] 401 before anything streams.
      */
-    fun chat(request: ChatRequest): Flow<ChatEvent> = flow {
+    fun chat(request: ChatRequest, bearer: String? = null): Flow<ChatEvent> = flow {
         val call = http.newCall(
             Request.Builder()
                 .url(baseUrl.resolve("api/chat")!!)
                 .header("Accept", "text/event-stream")
+                .apply { if (bearer != null) header("Authorization", "Bearer $bearer") }
                 .post(PvJson.encodeToString(ChatRequest.serializer(), request).toRequestBody(JSON))
                 .build(),
         )
@@ -102,7 +106,7 @@ class ApiClient(
     }
 
     companion object {
-        private val JSON = "application/json".toMediaType()
+        internal val JSON = "application/json".toMediaType()
 
         val sharedHttp: OkHttpClient by lazy {
             OkHttpClient.Builder()

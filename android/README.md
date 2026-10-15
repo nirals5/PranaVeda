@@ -4,7 +4,8 @@ A Jetpack Compose prototype of the native Android app, matching the iOS
 prototype before sign-in: Amrita's chat streaming from the existing
 `/api/chat` (as a guest, with the wellness profile kept on the device), ritual,
 breathwork, dosha and answer-option cards, and a Library of every pose from
-`/api/catalog` with Niral's room scenes. Google sign-in comes later.
+`/api/catalog` with Niral's room scenes, and optional Google sign-in (the "You"
+tab) that shares the wellness profile with the website and the iOS app.
 
 ## Requirements
 
@@ -48,6 +49,13 @@ client against a stand-in server):
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
 ```
+
+## Google sign-in
+
+- The app asks Google for an ID token issued to the **web** OAuth client (`pv.googleWebClientId`, defaulting to the one in `app/build.gradle.kts`). Android's Credential Manager requires that, and the server already accepts it, so the server needs no Android-specific setting.
+- Google recognises the app through a separate **Android** OAuth client in the same Google Cloud project, registered for package `com.pranaveda.app` and the SHA-1 of the signing key. The one there now is for the debug key (`~/.android/debug.keystore`); a release build signed with another key needs its own Android client. Without a matching one, sign-in fails with a "developer error".
+- The emulator needs a Google account signed in. Use a system image "with Google Play" or "with Google APIs".
+- The session's refresh token is encrypted with a key in the Android Keystore and is left out of backups. The access token is kept only in memory.
 
 ## Notes
 
