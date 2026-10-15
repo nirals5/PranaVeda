@@ -31,11 +31,11 @@ final class ChatViewModel {
 
     /// The device's calendar day as "YYYY-MM-DD", in whatever timezone it is
     /// in right now.
-    private static func localDate(_ date: Date) -> String {
+    nonisolated static func localDate(_ date: Date, in timeZone: TimeZone = .current) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
+        formatter.timeZone = timeZone
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
     }
