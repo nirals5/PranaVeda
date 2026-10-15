@@ -7,6 +7,7 @@ import { BlockList, isIP } from 'node:net';
 import { authenticate } from './_lib/auth.js';
 import { applyProfileChanges, loadAccountProfile } from './_lib/profiles.js';
 import type { VersionedProfile } from './_lib/profiles.js';
+import { getUser } from './_lib/users.js';
 
 // IMPORTANT: relative imports here (and anywhere under api/) must end in
 // ".js". Vercel runs these files as native ES modules, where an
@@ -1213,13 +1214,41 @@ function todayStamp() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// The calendar day the user is living in, for dating what Amrita records.
+// todayStamp() is UTC, which files an evening ritual west of UTC under
+// tomorrow — and Amrita then reads it back as "tomorrow". Prefers the
+// client's own `localDate` (YYYY-MM-DD), then the account's IANA timezone,
+// then UTC. A localDate more than a day from the server's UTC date is no
+// timezone's today, so it is ignored.
+export function userToday(localDate: unknown, timeZone?: string | null, now = new Date()): string {
+  if (typeof localDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(localDate)) {
+    const [y, m, d] = localDate.split('-').map(Number);
+    const at = Date.UTC(y, m - 1, d);
+    const real = new Date(at).toISOString().slice(0, 10) === localDate;
+    const utcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    if (real && Math.abs(at - utcMidnight) <= DAY_MS) return localDate;
+  }
+  if (timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+      const part = (type: string) => parts.find((p) => p.type === type)?.value;
+      return `${part('year')}-${part('month')}-${part('day')}`;
+    } catch {
+      // Unknown timezone: fall through to UTC.
+    }
+  }
+  return now.toISOString().slice(0, 10);
+}
+
 function conditionConflicts(contraindications: string[], conditions: string[] | undefined): string[] {
   if (!conditions?.length) return [];
   const normalized = conditions.map((c) => c.toLowerCase().replace(/\s+/g, '_'));
   return contraindications.filter((tag) => normalized.some((c) => c.includes(tag) || tag.includes(c)));
 }
 
-function applyProfileUpdate(profile: WellnessProfile, input: any): WellnessProfile {
+function applyProfileUpdate(profile: WellnessProfile, input: any, today = todayStamp()): WellnessProfile {
   const next: WellnessProfile = { ...profile };
   const uniq = (arr: string[]) => [...new Set(arr.filter(Boolean))];
   // The model occasionally sends a bare string where the schema wants an
@@ -1243,7 +1272,7 @@ function applyProfileUpdate(profile: WellnessProfile, input: any): WellnessProfi
   merge('conditions', input.addConditions, input.removeConditions);
   merge('preferences', input.addPreferences, input.removePreferences);
   if (input.addObservation) {
-    next.observations = [...(next.observations ?? []), { date: todayStamp(), note: input.addObservation }].slice(-30);
+    next.observations = [...(next.observations ?? []), { date: today, note: input.addObservation }].slice(-30);
   }
   return next;
 }
@@ -1331,7 +1360,7 @@ function buildBreathworkCard(input: any, profile: WellnessProfile): { error?: st
 
 export function registerChatRoute(app: import('express').Express, client: Anthropic, apiKey: string | undefined) {
   app.post('/api/chat', async (req: Request, res: Response) => {
-    const { messages, profile: rawProfile, localTime, inputMode, previousSession, calendar, health, location } = req.body ?? {};
+    const { messages, profile: rawProfile, localTime, localDate, inputMode, previousSession, calendar, health, location } = req.body ?? {};
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages array is required' });
     }
@@ -1369,6 +1398,17 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       });
       send(res, { type: 'done' });
       return res.end();
+    }
+
+    // Dates for what Amrita records. Clients that don't send localDate yet
+    // (older builds, the iOS prototype) fall back to the account's timezone.
+    let today = userToday(localDate);
+    if (today !== localDate && account) {
+      try {
+        today = userToday(undefined, (await getUser(account.userId))?.timezone);
+      } catch (err: any) {
+        console.error('[chat] timezone lookup failed:', err?.message || err);
+      }
     }
 
     let profile: WellnessProfile = account
@@ -1427,7 +1467,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
 
           if (block.name === 'update_wellness_profile') {
             const input = block.input;
-            changeProfile((p) => applyProfileUpdate(p, input));
+            changeProfile((p) => applyProfileUpdate(p, input, today));
             resultText = 'Profile updated.';
           } else if (block.name === 'show_answer_options') {
             const input: any = block.input;
@@ -1467,7 +1507,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
                   confidence: input.confidence,
                 },
               });
-              const assessedDate = todayStamp();
+              const assessedDate = today;
               changeProfile((p) => ({
                 ...p,
                 prakriti: input.secondary ? `${input.primary}-${input.secondary}` : input.primary,
@@ -1493,7 +1533,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
               isError = true;
             } else {
               send(res, { type: 'card', card });
-              const entry = { date: todayStamp(), title: (block.input as any).title, kind: 'ritual' as const };
+              const entry = { date: today, title: (block.input as any).title, kind: 'ritual' as const };
               changeProfile((p) => ({ ...p, practiceHistory: [...(p.practiceHistory ?? []), entry].slice(-30) }));
               resultText = 'Ritual card shown to the user. Continue with one or two warm sentences; do not restate its contents.';
             }
@@ -1504,7 +1544,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
               isError = true;
             } else {
               send(res, { type: 'card', card });
-              const entry = { date: todayStamp(), title: (card as any).pattern.name, kind: 'breathwork' as const };
+              const entry = { date: today, title: (card as any).pattern.name, kind: 'breathwork' as const };
               changeProfile((p) => ({ ...p, practiceHistory: [...(p.practiceHistory ?? []), entry].slice(-30) }));
               resultText = 'Breathwork card shown to the user. Continue with one warm sentence; do not restate its contents.';
             }
