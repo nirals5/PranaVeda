@@ -15,13 +15,17 @@ View your app in AI Studio: https://ai.studio/apps/8cc0863b-b75e-48c1-a990-c33be
 
 1. Install dependencies:
    `npm install`
-2. Copy `.env.example` to `.env` and add `ANTHROPIC_API_KEY` (Amrita; not yet listed in `.env.example`). `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` are optional and enable the spoken voice; `VITE_GOOGLE_CLIENT_ID` is optional and enables the Google connectors
+2. Copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY` (Amrita). `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` are optional and enable the spoken voice; `VITE_GOOGLE_CLIENT_ID` is optional and enables the Google connectors.
 3. Run the app:
    `npm run dev`
 
+Accounts and sync are optional and off by default; see [Accounts and sync](#accounts-and-sync-optional-off-by-default) to switch them on.
+
+Checks: `npm run lint` (type check) and `npm test` (Vitest). The tests that need a database run when `DATABASE_URL` is set and are skipped otherwise; they create throwaway accounts and delete them afterwards, so point `DATABASE_URL` at a development database, never production.
+
 ## Features: practice calendar, connectors, wearables, and location
 
-Everything below lives under the profile button at the right end of the top navigation: **Profile → Connectors**. There are no user accounts yet; the profile is a placeholder that shows the name and constitution Amrita has learned, or "Guest".
+Everything below lives under the profile button at the right end of the top navigation: **Profile → Connectors**. The Profile header shows the name and constitution Amrita has learned, or "Guest". Where accounts are switched on it also holds sign-in (see [Accounts and sync](#accounts-and-sync-optional-off-by-default)); the connectors below work the same signed in or out.
 
 | Connector | Status | What it does |
 |---|---|---|
@@ -42,7 +46,7 @@ Things to know:
 
 - Tapping the next arrow through every pose counts as finishing the ritual.
 - The breathwork card inside the Amrita chat has no timer, so only breathwork run inside a ritual is logged.
-- The log keeps 500 entries; only the 40 most recent keep the ritual snapshot behind "Open ritual".
+- The log on a device keeps 500 entries; only the 40 most recent keep the ritual snapshot behind "Open ritual". When signed in, the account keeps every entry.
 - Opening a ritual from the calendar and pressing Back returns to the Amrita view, not the calendar.
 
 ### Outside calendar and free time
@@ -87,7 +91,7 @@ Limits of browser notifications:
 
 - **Desktop browsers only, in practice.** Android Chrome and iPhone Safari do not allow this kind of notification from a plain web page.
 - **The tab must stay open.** Closing the tab or the browser stops them. Browsers slow background tabs, so one can arrive a minute or so late.
-- Reaching users with the app closed needs push notifications and a backend, which is not built.
+- Reaching users with the app closed needs push notifications, which are not built.
 
 Pacing values are constants: the 15-minute and 3-hour rules at the top of `src/hooks/useNudgeNotifications.ts`, and the 10-minute, waking-hours, and rest-after-practice rules beside `findOpenSlot` in `src/hooks/useExternalCalendar.ts`.
 
@@ -148,12 +152,61 @@ Limits:
 
 The 150-metre match radius and the 2 km accuracy cut-off are constants at the top of `src/hooks/usePlace.ts`; the per-place guidance is `PLACE_GUIDANCE` in `api/index.ts`.
 
+### Accounts and sync (optional, off by default)
+
+Signing in is optional, and only offered where `VITE_ACCOUNTS_ENABLED` is `"true"`. With it unset (production today), the sign-in code is left out of the build and the app behaves exactly as a signed-out app always has.
+
+What signing in does:
+
+- **Wellness profile:** the profile Amrita builds is saved to the account and follows the person to other devices. While signed in, Amrita reads it from the account and saves her changes there.
+- **Practice history:** every finished practice is saved to the account, so the calendar, streak and trends show practices from all devices. A practice finished offline is uploaded later.
+- **Greeting:** the home screen greets the person by first name.
+
+Not synced: calendar connections, location settings, wearable readings and the chat conversation stay on the device.
+
+- **First sign-in on a device:** if the account has no profile yet, this device's profile becomes the account's. Otherwise the account's replaces the device's copy.
+- **Sign-out:** by any route (signing out, a session that ended, account deletion), the device goes back to how it was before sign-in. The account's profile and practices are removed from it, and its own pre-sign-in data is put back, so the next person on a shared device does not see them. A practice that never reached the account is kept rather than lost.
+- **Account deletion:** "Delete account" in the Profile header removes the account, its sign-in methods, sessions, profile and practice history from the server, and signs out every device.
+
+Sign-in methods:
+
+- **Google:** live. Uses the same `VITE_GOOGLE_CLIENT_ID` as the Google connectors.
+- **Apple:** built but hidden until `VITE_APPLE_SERVICES_ID` and the Apple signing key are configured. Apple does not accept `localhost`, so it can only be tried on a deployed site.
+
+How sessions work:
+
+- **Web:** web sessions live in httpOnly cookies, so page scripts never see a token. Native apps (to come) get tokens in the response and keep them in the platform keystore.
+- **Lifetime:** access tokens last 15 minutes and refresh automatically. A sign-in lasts 60 days from last use.
+- **Device type:** each sign-in records a coarse device description (web or app, desktop/phone/tablet, operating system and major version, browser) for a signed-in-devices list and platform analytics. Browsers do not reveal the device model, so it is only recorded for the native apps.
+
+Switching it on (locally, on a preview, or in production):
+
+1. Create a Neon Postgres database, using a separate branch for each environment. Set `DATABASE_URL` (direct connection) and `DATABASE_URL_POOLED` (pooled).
+2. Create the tables with `npm run db:migrate`. After changing `db/schema.ts`, run `npm run db:generate` first.
+3. Set `AUTH_JWT_SECRET` to a new random value for each environment, for example from `openssl rand -base64 48`.
+4. Set `VITE_GOOGLE_CLIENT_ID`, and add the site's address to the OAuth client's "Authorized JavaScript origins". For anyone other than listed test users to sign in, the OAuth consent screen must be published.
+5. Set `VITE_ACCOUNTS_ENABLED` to `"true"`, then rebuild. `VITE_` settings are read at build time.
+
+Server endpoints:
+
+- **`/api/auth/*`** and **`/api/me`:** sign-in, refresh, sign-out, the current user, and account deletion (`api/auth.ts`).
+- **`/api/sync/*`:** profile and practice-log sync (`api/sync.ts`).
+- **Shared code:** lives in `api/_lib/`, and relative imports under `api/` must end in `.js`. Vercel runs these files as native ES modules, where an import without the extension fails at the first request.
+
+### Practice catalog API
+
+`GET /api/catalog` returns the poses and breathwork patterns Amrita composes rituals from, for clients that do not carry their own copy (the planned iOS and Android apps). Every image is a full address.
+
+Pose images and Niral's room scenes are referenced as site paths (`/poses/cobra.jpg`). Set `PUBLIC_ASSET_BASE_URL` to the live site's address (or, later, a CDN) so ritual cards carry full addresses too. Rituals are saved and synced, so without that setting they keep site paths rather than the address of whichever copy of the site served them.
+
 ### Where data is stored
 
-Everything is kept in the browser on the user's device. The server stores nothing.
+Signed out, or with accounts switched off, everything is kept in the browser on the user's device and the server stores nothing.
 
 | What | Browser storage key |
 |---|---|
+| Wellness profile Amrita has built | `pranaveda_profile` |
+| Current conversation, and the end of the previous one | `pranaveda_chat`, `pranaveda_chat_ts`, `pranaveda_last_session` |
 | Practice log | `pranaveda_practice_log` |
 | Calendar connections (including the private link) | `pranaveda_calendar_connections` |
 | Notification preference and last notification | `pranaveda_nudge_notifications`, `pranaveda_nudge_notified` |
@@ -163,6 +216,21 @@ Everything is kept in the browser on the user's device. The server stores nothin
 | Google access tokens (this tab only, about an hour) | `pranaveda_google_token`, `pranaveda_google_health_token` |
 
 Disconnecting Google Health also clears its saved readings.
+
+Signed in, the browser also keeps a few markers so sync can hand the device back on sign-out: `pranaveda_signed_in`, `pranaveda_profile_owner`, `pranaveda_profile_before_signin`, and `pranaveda_practice_owner`, `pranaveda_practice_own_ids`, `pranaveda_practice_synced_ids`, `pranaveda_practice_cursor`.
+
+Signed in, the server (Neon Postgres) also stores:
+
+| What | Table |
+|---|---|
+| Account: email, display name, timezone | `users` |
+| Sign-in methods (Google, Apple) | `identities` |
+| Sign-ins with coarse device type | `sessions` |
+| Session tokens, stored hashed | `refresh_tokens` |
+| Wellness profile | `wellness_profiles` |
+| Practice history, including heart readings and ritual snapshots | `practice_log_entries` |
+
+Everything is removed when the account is deleted.
 
 ### Setup for the Google connectors
 
@@ -175,6 +243,8 @@ Without the client ID, both Google options show "Not set up yet for this site". 
 
 ### Verification status
 
+`npm test` covers sign-in, sessions, account deletion, profile and practice-log sync, the catalog, and the signed-in chat (with a scripted stand-in for Claude), against a real database when one is configured.
+
 Tested in a browser with simulated data:
 
 - Practice logging, calendar, and streak.
@@ -184,10 +254,16 @@ Tested in a browser with simulated data:
 - The Bluetooth and Google Health flows, session heart-rate saving, the Trends card, and the summary sent to Amrita, using a simulated strap and simulated Google Health responses.
 - Location: place matching, saving spots, the place-aware suggestion, and the chat request carrying only the kind of place, using a simulated position.
 
+Tested against the real thing:
+
+- Google sign-in with a real client ID, locally: account, session and timezone recorded, and the session restored on a later visit.
+- Amrita with the live model, signed in and signed out: profile updates saved to the account, and returned to the device for a guest.
+
 Not yet tested against the real thing:
 
-- Google Calendar and Google Health sign-in with a real client ID. The Google Health field names and filters come from Google's documentation, not a live call.
+- Google Calendar and Google Health connectors with a real client ID. The Google Health field names and filters come from Google's documentation, not a live call.
+- Sign in with Apple (needs an Apple Developer account).
 - A real Bluetooth heart-rate device.
 - A real system notification appearing on screen.
 - Location with a real device position and the browser's real permission prompt.
-- Amrita's replies using calendar and wearable context, which needs an Anthropic API key.
+- Amrita's replies using calendar, wearable and location context with the live model.
