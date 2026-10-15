@@ -1,0 +1,10 @@
+.gradle/
+.kotlin/
+build/
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+# Machine-specific: the SDK location and an optional pv.apiBaseUrl override.
+local.properties

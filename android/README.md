@@ -1,0 +1,58 @@
+# PranaVeda for Android (prototype)
+
+A Jetpack Compose prototype of the native Android app, matching the iOS
+prototype before sign-in: Amrita's chat streaming from the existing
+`/api/chat` (as a guest, with the wellness profile kept on the device), ritual,
+breathwork, dosha and answer-option cards, and a Library of every pose from
+`/api/catalog` with Niral's room scenes. Google sign-in comes later.
+
+## Requirements
+
+- Android Studio (its bundled JDK runs Gradle) with the Android SDK. The build
+  compiles against API 37.2 and fetches that platform itself the first time.
+- An emulator or phone on Android 8.0 (API 26) or later
+- The PranaVeda server running locally (`npm run dev` in the repo root, with `ANTHROPIC_API_KEY` set)
+
+## Build and run
+
+Open the `android/` folder in Android Studio and run the `app` configuration,
+or from a terminal:
+
+```bash
+cd android
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew installDebug
+```
+
+The emulator reaches the Mac at `10.0.2.2`, so by default the app talks to the
+local server at `http://10.0.2.2:3000`.
+
+On Android 17 (API 37) and later, the first launch asks to allow access to
+devices on the local network (shown as "Nearby devices"): allow it, or the app
+cannot reach the dev server. Only debug builds ask for this permission, and
+only when the server address is on the local network.
+
+## On your own phone
+
+Put your Mac's network name in `android/local.properties` (git ignores it):
+
+```properties
+pv.apiBaseUrl=http://Your-Mac.local:3000
+```
+
+Then turn on USB debugging on the phone, connect it, and run `./gradlew installDebug`.
+The phone must be on the same Wi-Fi as the Mac.
+
+Tests (stream parsing, decoding of the server's events and cards, and the API
+client against a stand-in server):
+
+```bash
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
+```
+
+## Notes
+
+- The app icon is the website's lotus (`src/assets/pranaveda_icon.svg`), converted to vector drawables, on the app's soft gradient (an adaptive icon with a monochrome layer for themed icons).
+- Light only, as on iOS: the system's dark theme does not change the design. All text sizes are in `sp`, so text follows the system font size.
+- Plain `http` is allowed only for `10.0.2.2`, `localhost` and `*.local` (`res/xml/network_security_config.xml`); everything else needs https.
+- Image addresses from the API are either full addresses or site paths (`/poses/cobra.jpg`); paths are resolved against the API's address (`AppConfig.resolve`).
+- The web app's fonts (Playfair Display, Plus Jakarta Sans) are not bundled yet; the system serif and sans stand in.

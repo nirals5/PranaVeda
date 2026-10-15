@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds talk to the dev server on the Mac (10.0.2.2 from the
+     emulator, Your-Mac.local from a phone). From Android 17 (API 37) reaching
+     a private address needs this permission, or connections are silently
+     dropped. Release builds use the public https server and do not ask. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+</manifest>

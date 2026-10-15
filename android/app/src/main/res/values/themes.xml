@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light only, as on iOS: the design is a light one, so the system's dark
+         mode must not invert it. The window starts in the app's warm white. -->
+    <style name="Theme.PranaVeda" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/warm_white</item>
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+</resources>
