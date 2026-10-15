@@ -722,6 +722,59 @@ export const BREATHWORK: CatalogBreathwork[] = [
 export const poseById = new Map(POSES.map((p) => [p.id, p]));
 export const breathworkById = new Map(BREATHWORK.map((b) => [b.id, b]));
 
+// ============================== Catalog artwork ==============================
+
+// Niral's composited room scenes (public/poses_with_background/web/), shown on
+// pose cards in preference to the flat photo. Three asanas ship a 16:9 "_wide"
+// version for landscape cards because their unsuffixed files are 9:16
+// portrait. Kept here, not in a client, so every client shows the same art.
+const SCENE_POSE_IDS = new Set([
+  'bow', 'bridge', 'cat_cow', 'chair', 'childs_pose', 'cobra', 'corpse_pose', 'cow_face', 'dancer',
+  'downward_dog', 'forearm_plank', 'half_moon', 'legs_up_the_wall', 'lizard', 'pigeon', 'seated_twist',
+  'side_plank', 'sphinx', 'standing_forward_fold', 'thread_the_needle', 'triangle', 'warrior_1', 'warrior_3',
+  'wide_legged_forward_fold', 'wind_relieving',
+]);
+const WIDE_SCENE_POSE_IDS = new Set(['triangle', 'dancer', 'seated_twist']);
+
+export function sceneImagePath(poseId: string): string | undefined {
+  if (!SCENE_POSE_IDS.has(poseId)) return undefined;
+  return `/poses_with_background/web/${poseId}${WIDE_SCENE_POSE_IDS.has(poseId) ? '_wide' : ''}.webp`;
+}
+
+// Image URLs in the catalog are either absolute (third-party) or paths on this
+// site ("/poses/cobra.jpg"). Paths only work for a page served by this site,
+// so anything handed to other clients is made absolute against a base:
+//   - PUBLIC_ASSET_BASE_URL when set (the production site today; a CDN later),
+//   - otherwise, for the catalog, the address the request came in on.
+// Ritual cards are saved (chat history, practice log) and synced between
+// devices and environments, so they use PUBLIC_ASSET_BASE_URL or stay as
+// paths — never a request's own address, which may be a short-lived preview.
+// Clients resolve any remaining path against the API's own origin.
+const configuredAssetBase = () => (process.env.PUBLIC_ASSET_BASE_URL || '').replace(/\/+$/, '');
+
+export function assetUrl(url: string | undefined, base: string): string | undefined {
+  return url && url.startsWith('/') && base ? `${base}${url}` : url;
+}
+
+function requestOrigin(req: Request): string {
+  const header = (name: string) => String(req.headers[name] ?? '').split(',')[0].trim();
+  const proto = header('x-forwarded-proto') || req.protocol || 'https';
+  const host = header('x-forwarded-host') || header('host');
+  return host ? `${proto}://${host}` : '';
+}
+
+// The catalog as clients see it: every image as a full address.
+export function publicCatalog(base: string) {
+  return {
+    poses: POSES.map((pose) => ({
+      ...pose,
+      poseImageUrl: assetUrl(pose.poseImageUrl, base),
+      sceneImageUrl: assetUrl(sceneImagePath(pose.id), base),
+    })),
+    breathwork: BREATHWORK,
+  };
+}
+
 // Compact catalog summaries injected into Amrita's system prompt so she can
 // select by id without seeing every field.
 export function catalogPromptSummary(): string {
@@ -1195,7 +1248,7 @@ function applyProfileUpdate(profile: WellnessProfile, input: any): WellnessProfi
   return next;
 }
 
-function buildRitual(input: any, profile: WellnessProfile): { error?: string; card?: any } {
+function buildRitual(input: any, profile: WellnessProfile, assetBase = configuredAssetBase()): { error?: string; card?: any } {
   const conflicts: string[] = [];
   const poses: any[] = [];
   for (const p of input.poses ?? []) {
@@ -1211,7 +1264,8 @@ function buildRitual(input: any, profile: WellnessProfile): { error?: string; ca
       duration: `${mins} minute${mins === 1 ? '' : 's'}`,
       benefits: pose.benefits,
       instructions: pose.cues.join('. ') + '.' + (p.note ? ` ${p.note}` : ''),
-      poseImageUrl: pose.poseImageUrl,
+      poseImageUrl: assetUrl(pose.poseImageUrl, assetBase),
+      sceneImageUrl: assetUrl(sceneImagePath(pose.id), assetBase),
       videoUrl: pose.videoUrl,
     });
   }
@@ -1743,6 +1797,14 @@ async function handleInsight(req: Request, res: Response) {
   return res.json(result);
 }
 app.get('/api/insight', handleInsight);
+
+// The practice catalog (poses and breathwork) for clients that do not carry
+// their own copy — the iOS and Android apps. The same data Amrita composes
+// rituals from, with every image as a full address.
+app.get('/api/catalog', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.json(publicCatalog(configuredAssetBase() || requestOrigin(req)));
+});
 app.post('/api/insight', handleInsight);
 
 // ====================== Calendar: private iCal link → busy ======================
