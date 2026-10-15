@@ -3,8 +3,9 @@
 A SwiftUI prototype of the native iPhone app: Amrita's chat streaming from the
 existing `/api/chat` (as a guest, with the wellness profile kept on the
 device), ritual, breathwork, dosha and answer-option cards, and a Library of
-every pose from `/api/catalog` with Niral's room scenes, and optional Google
-sign-in (the "You" tab) that shares the wellness profile with the website.
+every pose from `/api/catalog` with Niral's room scenes, a Dosha tab (the
+Prakriti Amrita assessed, with the balancing guide from `/api/dosha-guide`, as
+on the website's Dosha Profile screen), and optional Google sign-in (the "You" tab) that shares the wellness profile with the website.
 
 ## Requirements
 

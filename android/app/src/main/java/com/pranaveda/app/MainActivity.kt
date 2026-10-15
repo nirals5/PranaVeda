@@ -12,6 +12,8 @@ import androidx.activity.result.contract.ActivityResultContracts.RequestPermissi
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import com.pranaveda.app.ui.account.AccountScreen
+import com.pranaveda.app.ui.dosha.DoshaGuideViewModel
+import com.pranaveda.app.ui.dosha.DoshaScreen
 import kotlinx.coroutines.launch
 import com.pranaveda.app.config.AppConfig
 import androidx.activity.enableEdgeToEdge
@@ -54,6 +56,7 @@ class MainActivity : ComponentActivity() {
             PranaVedaTheme {
                 val chat: ChatViewModel = viewModel()
                 val catalog: CatalogViewModel = viewModel()
+                val doshaGuide: DoshaGuideViewModel = viewModel()
                 val auth = (application as PranaVedaApplication).auth
                 val scope = rememberCoroutineScope()
                 var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -90,34 +93,32 @@ class MainActivity : ComponentActivity() {
                                     unselectedIconColor = Pv.stone500,
                                     unselectedTextColor = Pv.stone500,
                                 )
-                                NavigationBarItem(
-                                    selected = tab == 0,
-                                    onClick = { tab = 0 },
-                                    icon = { Icon(painterResource(R.drawable.ic_lotus), contentDescription = null) },
-                                    label = { Text("Amrita") },
-                                    colors = itemColors,
-                                )
-                                NavigationBarItem(
-                                    selected = tab == 1,
-                                    onClick = { tab = 1 },
-                                    icon = { Icon(painterResource(R.drawable.ic_library), contentDescription = null) },
-                                    label = { Text("Library") },
-                                    colors = itemColors,
-                                )
-                                NavigationBarItem(
-                                    selected = tab == 2,
-                                    onClick = { tab = 2 },
-                                    icon = { Icon(painterResource(R.drawable.ic_person), contentDescription = null) },
-                                    label = { Text("You") },
-                                    colors = itemColors,
-                                )
+                                listOf(
+                                    R.drawable.ic_lotus to "Amrita",
+                                    R.drawable.ic_vata to "Dosha",
+                                    R.drawable.ic_library to "Library",
+                                    R.drawable.ic_person to "You",
+                                ).forEachIndexed { index, (icon, label) ->
+                                    NavigationBarItem(
+                                        selected = tab == index,
+                                        onClick = { tab = index },
+                                        icon = { Icon(painterResource(icon), contentDescription = null) },
+                                        label = { Text(label) },
+                                        colors = itemColors,
+                                    )
+                                }
                             }
                         },
                     ) { padding ->
                         Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
                             when (tab) {
                                 0 -> ChatScreen(chat)
-                                1 -> LibraryScreen(catalog)
+                                1 -> DoshaScreen(chat.profile, doshaGuide) { message ->
+                                    // As on the website: over to the chat, with the question asked.
+                                    tab = 0
+                                    chat.send(message)
+                                }
+                                2 -> LibraryScreen(catalog)
                                 else -> AccountScreen(auth)
                             }
                         }

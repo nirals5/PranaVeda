@@ -199,6 +199,8 @@ Server endpoints:
 
 Pose images and Niral's room scenes are referenced as site paths (`/poses/cobra.jpg`). Set `PUBLIC_ASSET_BASE_URL` to the live site's address (or, later, a CDN) so ritual cards carry full addresses too. Rituals are saved and synced, so without that setting they keep site paths rather than the address of whichever copy of the site served them.
 
+`GET /api/dosha-guide` returns the classical balancing reference shown on the Dosha Profile screen (qualities, diet, daily rhythm, practice and breath per dosha). The website imports the same file (`api/_lib/doshaGuide.ts`), so the text has one home.
+
 ### Where data is stored
 
 Signed out, or with accounts switched off, everything is kept in the browser on the user's device and the server stores nothing.
