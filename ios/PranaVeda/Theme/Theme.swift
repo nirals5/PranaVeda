@@ -5,6 +5,10 @@ import SwiftUI
 /// Prototype note: the web app uses Playfair Display (headings) and Plus
 /// Jakarta Sans (body). Until those font files are bundled, the system serif
 /// (New York) and the system sans stand in.
+///
+/// Every font is an iOS text style, never a fixed size, so all text follows
+/// the reader's text-size setting (Settings → Display & Brightness → Text
+/// Size), including the larger accessibility sizes.
 enum Theme {
     static let lavender = Color(hex: 0x8A79A5)
     static let lavenderDeep = Color(hex: 0x71608E)
@@ -19,12 +23,15 @@ enum Theme {
     static let stone200 = Color(hex: 0xCFD8DC)
     static let warmWhite = Color(hex: 0xF5F3EF)
 
-    static func display(_ size: CGFloat = 34) -> Font { .system(size: size, weight: .regular, design: .serif) }
-    static func heading(_ size: CGFloat = 20) -> Font { .system(size: size, weight: .regular, design: .serif) }
-    static let body = Font.system(size: 16, weight: .light)
-    static let bodySmall = Font.system(size: 14, weight: .light)
+    static let display = Font.system(.largeTitle, design: .serif, weight: .regular)
+    static func heading(_ style: Font.TextStyle = .title3) -> Font { .system(style, design: .serif, weight: .regular) }
+    static let body = Font.system(.body)
+    static let bodySmall = Font.system(.subheadline)
+    /// Names under pose pictures and on answer options.
+    static let itemTitle = Font.system(.subheadline, weight: .medium)
+    static let caption = Font.system(.caption)
     /// Small uppercase monospace labels, as on the web app's cards.
-    static let label = Font.system(size: 11, weight: .bold, design: .monospaced)
+    static let label = Font.system(.caption, design: .monospaced, weight: .bold)
 
     /// The soft wash behind every screen.
     static let background = LinearGradient(

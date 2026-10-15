@@ -49,6 +49,8 @@ xcodebuild -project PranaVeda.xcodeproj -scheme PranaVeda -destination 'platform
 
 ## Notes
 
+- The app icon is the website's lotus (`src/assets/pranaveda_icon.svg`) on the app's soft background. Regenerate it with `swift scripts/make-app-icon.swift` (run in `ios/`) if the artwork changes.
+
 - Plain `http` is allowed for the local network only (`NSAllowsLocalNetworking`); everything else needs https.
 - Image addresses from the API are either full addresses or site paths (`/poses/cobra.jpg`); paths are resolved against the API's address (`AppConfig.resolve`).
 - The web app's fonts (Playfair Display, Plus Jakarta Sans) are not bundled yet; the system serif and sans stand in.

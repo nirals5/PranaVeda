@@ -38,7 +38,7 @@ struct LibraryView: View {
                 .frame(height: 110)
                 .frame(maxWidth: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            Text(pose.nameEnglish).font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.ink).lineLimit(1)
+            Text(pose.nameEnglish).font(Theme.itemTitle).foregroundStyle(Theme.ink).lineLimit(2)
             Text(pose.level).sectionLabel()
         }
     }

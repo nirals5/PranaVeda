@@ -4,6 +4,8 @@ struct ChatView: View {
     @Bindable var model: ChatViewModel
     @State private var draft = ""
     @FocusState private var inputFocused: Bool
+    /// Grows with the text size, up to 48 points (see the cap on the input bar).
+    @ScaledMetric(relativeTo: .body) private var sendButtonSize: CGFloat = 36
 
     var body: some View {
         NavigationStack {
@@ -42,7 +44,7 @@ struct ChatView: View {
 
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(greeting).font(Theme.display()).foregroundStyle(Theme.ink)
+            Text(greeting).font(Theme.display).foregroundStyle(Theme.ink)
             Text("Tell me how you feel, and I'll suggest a practice that fits your body, energy, and goals.")
                 .font(Theme.body)
                 .foregroundStyle(Theme.stone700)
@@ -67,9 +69,9 @@ struct ChatView: View {
                 .onSubmit(send)
             Button(action: send) {
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
+                    .frame(width: min(sendButtonSize, 48), height: min(sendButtonSize, 48))
                     .background(Theme.ink, in: Circle())
             }
             .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty || model.isStreaming)
@@ -82,6 +84,10 @@ struct ChatView: View {
         .overlay(Capsule().stroke(Theme.stone200.opacity(0.7)))
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
+        // The input bar grows with the text size, but stops at a size where
+        // the field and send button still fit side by side; the conversation
+        // above keeps scaling.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
     private func send() {

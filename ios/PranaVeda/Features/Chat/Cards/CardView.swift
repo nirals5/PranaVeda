@@ -28,7 +28,7 @@ struct RitualCardView: View {
                     Text("\(minutes) min").sectionLabel()
                 }
             }
-            Text(result.yogaPractice.title).font(Theme.heading(22)).foregroundStyle(Theme.ink)
+            Text(result.yogaPractice.title).font(Theme.heading(.title2)).foregroundStyle(Theme.ink)
             if let energy = result.primaryEnergy {
                 Text(energy).font(Theme.bodySmall).italic().foregroundStyle(Theme.lavenderDeep)
             }
@@ -70,9 +70,9 @@ struct PoseThumbnail: View {
             PoseImage(url: pose.imageURL)
                 .frame(width: 150, height: 100)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            Text(pose.nameEnglish).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.ink).lineLimit(1)
+            Text(pose.nameEnglish).font(Theme.itemTitle).foregroundStyle(Theme.ink).lineLimit(2)
             if let duration = pose.duration {
-                Text(duration).font(.system(size: 11)).foregroundStyle(Theme.stone500)
+                Text(duration).font(Theme.caption).foregroundStyle(Theme.stone500)
             }
         }
         .frame(width: 150, alignment: .leading)
@@ -179,7 +179,7 @@ struct DoshaCardView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Your Prakriti").sectionLabel()
             Text([profile.primary, profile.secondary].compactMap { $0 }.joined(separator: "–"))
-                .font(Theme.heading(24))
+                .font(Theme.heading(.title2))
                 .foregroundStyle(Theme.ink)
             bar("Vata", profile.balance.vata, Theme.lavender)
             bar("Pitta", profile.balance.pitta, Theme.terracotta)
@@ -194,7 +194,7 @@ struct DoshaCardView: View {
     // Colour is never the only carrier of meaning: each bar is labelled.
     private func bar(_ name: String, _ percent: Double, _ color: Color) -> some View {
         HStack {
-            Text(name).font(.system(size: 13)).frame(width: 52, alignment: .leading)
+            Text(name).font(Theme.bodySmall).fixedSize()
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Theme.stone200.opacity(0.4))
@@ -202,7 +202,7 @@ struct DoshaCardView: View {
                 }
             }
             .frame(height: 8)
-            Text("\(Int(percent))%").font(.system(size: 12, design: .monospaced)).frame(width: 40, alignment: .trailing)
+            Text("\(Int(percent))%").font(Theme.caption.monospacedDigit()).fixedSize()
         }
         .accessibilityElement(children: .combine)
     }
@@ -221,9 +221,9 @@ struct OptionsView: View {
                     HStack(spacing: 10) {
                         if let emoji = option.emoji { Text(emoji) }
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(option.label).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.ink)
+                            Text(option.label).font(Theme.itemTitle).foregroundStyle(Theme.ink)
                             if let description = option.description {
-                                Text(description).font(.system(size: 12)).foregroundStyle(Theme.stone500)
+                                Text(description).font(Theme.caption).foregroundStyle(Theme.stone500)
                             }
                         }
                         Spacer()
