@@ -3,8 +3,8 @@
 A SwiftUI prototype of the native iPhone app: Amrita's chat streaming from the
 existing `/api/chat` (as a guest, with the wellness profile kept on the
 device), ritual, breathwork, dosha and answer-option cards, and a Library of
-every pose from `/api/catalog` with Niral's room scenes. Sign-in is not in it
-yet.
+every pose from `/api/catalog` with Niral's room scenes, and optional Google
+sign-in (the "You" tab) that shares the wellness profile with the website.
 
 ## Requirements
 
@@ -48,6 +48,8 @@ xcodebuild -project PranaVeda.xcodeproj -scheme PranaVeda -destination 'platform
 ```
 
 ## Notes
+
+- Google sign-in uses the iOS OAuth client in `Configuration/App.xcconfig` (`PV_GOOGLE_CLIENT_ID`). The server must list the same id in `GOOGLE_CLIENT_ID_IOS`, or it refuses the app's sign-ins. The session's refresh token is kept in the Keychain (this device only); the access token only in memory.
 
 - The app icon is the website's lotus (`src/assets/pranaveda_icon.svg`) on the app's soft background. Regenerate it with `swift scripts/make-app-icon.swift` (run in `ios/`) if the artwork changes.
 
