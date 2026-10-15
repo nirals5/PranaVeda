@@ -2,10 +2,10 @@ import 'dotenv/config';
 import { eq } from 'drizzle-orm';
 import express from 'express';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import syncApp from '../api/sync.js';
 import authApp from '../api/auth.js';
-import { registerChatRoute } from '../api/index.js';
+import { registerChatRoute, userToday } from '../api/index.js';
 import { getDb, schema } from '../api/_lib/db.js';
 import { saveProfile } from '../api/_lib/profiles.js';
 import { signAccessToken } from '../api/_lib/tokens.js';
@@ -195,5 +195,105 @@ describe.skipIf(!hasDb)('profile sync and signed-in chat', () => {
       expect(res.status).toBe(401);
       expect(res.body).toEqual({ error: 'not_signed_in' });
     });
+
+    describe('dates in the user’s own day', () => {
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(UTC_15TH_PDT_14TH);
+      });
+      afterEach(() => vi.useRealTimers());
+
+      it('signed in without localDate: uses the account’s timezone', async () => {
+        const user = await newUser();
+        await getDb().update(users).set({ timezone: 'America/Los_Angeles' }).where(eq(users.id, user.id));
+        await ritualChat(user.auth);
+        expect(((await stored(user.id)).data as any).practiceHistory).toEqual([{ date: '2026-10-14', title: 'Evening wind-down', kind: 'ritual' }]);
+      });
+
+      it('signed in: localDate wins over the account’s timezone', async () => {
+        const user = await newUser();
+        await getDb().update(users).set({ timezone: 'Asia/Tokyo' }).where(eq(users.id, user.id));
+        await ritualChat(user.auth, { localDate: '2026-10-14' });
+        expect(((await stored(user.id)).data as any).practiceHistory[0].date).toBe('2026-10-14');
+      });
+    });
+  });
+});
+
+// 7 pm on 2026-10-14 in California is already the 15th in UTC.
+const UTC_15TH_PDT_14TH = new Date('2026-10-15T02:00:00Z');
+
+const ritualInput = {
+  title: 'Evening wind-down',
+  description: 'Slow and grounding',
+  summary: 'For a restless evening',
+  doshaTendency: 'Vata',
+  primaryEnergy: 'Scattered Wind',
+  poses: [{ poseId: 'tadasana', durationMinutes: 2 }],
+  breathworkId: 'sama_vritti',
+  ayurvedic: { assessment: 'x', doshaPrimary: 'Vata', dietaryTips: [], lifestyleTips: [], recommendedHerbs: [] },
+  lifestyleTips: [],
+};
+
+const ritualChat = async (auth?: string, extra: object = {}) => {
+  const req = request(chatApp([toolTurn('create_ritual', ritualInput), endTurn])).post('/api/chat');
+  if (auth) req.set('Authorization', auth);
+  const res = await req.send({ messages: [{ role: 'user', content: 'Something for tonight' }], profile: {}, ...extra });
+  return sse(res).find((e) => e.type === 'profile')?.profile;
+};
+
+describe('/api/chat dates what Amrita records in the user’s own day', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(UTC_15TH_PDT_14TH);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('a ritual created with localDate 2026-10-14 is recorded on the 14th, though it is the 15th in UTC', async () => {
+    const profile = await ritualChat(undefined, { localDate: '2026-10-14' });
+    expect(profile.practiceHistory).toEqual([{ date: '2026-10-14', title: 'Evening wind-down', kind: 'ritual' }]);
+  });
+
+  it('dates breathwork, observations and the dosha profile the same way', async () => {
+    const app = chatApp([
+      toolTurn('suggest_breathwork', { breathworkId: 'sama_vritti' }),
+      toolTurn('update_wellness_profile', { addObservation: 'Restless after work' }),
+      toolTurn('present_dosha_profile', { primary: 'Vata', balance: { vata: 50, pitta: 30, kapha: 20 }, confidence: 'medium' }),
+      endTurn,
+    ]);
+    const res = await request(app)
+      .post('/api/chat')
+      .send({ messages: [{ role: 'user', content: 'hi' }], profile: {}, localDate: '2026-10-14' });
+    const profile = sse(res).find((e) => e.type === 'profile').profile;
+    expect(profile.practiceHistory[0].date).toBe('2026-10-14');
+    expect(profile.observations).toEqual([{ date: '2026-10-14', note: 'Restless after work' }]);
+    expect(profile.doshaProfile.assessedDate).toBe('2026-10-14');
+  });
+
+  it('falls back to the UTC date when localDate is missing (older clients)', async () => {
+    expect((await ritualChat()).practiceHistory[0].date).toBe('2026-10-15');
+  });
+
+  it.each([
+    ['malformed', '10/14/2026'],
+    ['not a real day', '2026-02-30'],
+    ['more than a day from UTC', '2026-10-12'],
+    ['not a string', 20261014],
+  ])('falls back to the UTC date when localDate is %s', async (_, localDate) => {
+    expect((await ritualChat(undefined, { localDate })).practiceHistory[0].date).toBe('2026-10-15');
+  });
+});
+
+describe('userToday', () => {
+  const now = UTC_15TH_PDT_14TH;
+  it('accepts a localDate within a day either side of the UTC date', () => {
+    expect(userToday('2026-10-14', null, now)).toBe('2026-10-14');
+    expect(userToday('2026-10-16', null, now)).toBe('2026-10-16');
+    expect(userToday('2026-10-17', null, now)).toBe('2026-10-15');
+  });
+  it('uses the timezone when localDate is unusable, and UTC for an unknown timezone', () => {
+    expect(userToday(undefined, 'America/Los_Angeles', now)).toBe('2026-10-14');
+    expect(userToday('nope', 'Asia/Tokyo', now)).toBe('2026-10-15');
+    expect(userToday(undefined, 'Not/AZone', now)).toBe('2026-10-15');
   });
 });
