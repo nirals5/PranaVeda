@@ -1,0 +1,55 @@
+# The Xcode project is generated from this file (`xcodegen` in this folder),
+# so it stays readable in reviews. Do not edit PranaVeda.xcodeproj by hand.
+name: PranaVeda
+options:
+  bundleIdPrefix: com.pranaveda
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # Where the PranaVeda API lives. The iOS Simulator reaches the Mac's own
+    # localhost, so the local dev server (npm run dev) works unchanged.
+    PV_API_BASE_URL: "http://localhost:3000"
+targets:
+  PranaVeda:
+    type: application
+    platform: iOS
+    sources: [PranaVeda]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pranaveda.app
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_CFBundleDisplayName: PranaVeda
+    info:
+      path: PranaVeda/Info.plist
+      properties:
+        PVAPIBaseURL: $(PV_API_BASE_URL)
+        # Plain http is allowed for the local network only (the dev server);
+        # everything on the internet still needs https.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+  PranaVedaTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [PranaVedaTests]
+    dependencies:
+      - target: PranaVeda
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  PranaVeda:
+    build:
+      targets:
+        PranaVeda: all
+        PranaVedaTests: [test]
+    test:
+      targets: [PranaVedaTests]
