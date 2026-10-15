@@ -8,12 +8,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.pranaveda.app.PranaVedaApplication
+import com.pranaveda.app.auth.AccountApi
+import com.pranaveda.app.auth.AccountUser
+import com.pranaveda.app.auth.AuthStore
 import com.pranaveda.app.model.ChatItem
 import com.pranaveda.app.model.PvJson
 import com.pranaveda.app.net.ApiClient
 import com.pranaveda.app.net.ChatEvent
 import com.pranaveda.app.net.ChatMessage
 import com.pranaveda.app.net.ChatRequest
+import com.pranaveda.app.net.HttpStatusException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -30,9 +35,10 @@ import java.util.Locale
 /**
  * The conversation with Amrita.
  *
- * Signed out (the only mode so far on Android), the wellness profile lives on
- * this device and travels with each message, as in the signed-out web app;
- * Amrita sends back the updated profile, which is stored here.
+ * Signed out, the wellness profile lives on this device and travels with each
+ * message, as in the signed-out web app. Signed in, the server reads and saves
+ * the profile in the account instead (the copy sent is ignored), and the copy
+ * here is kept in step with it.
  */
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
     var items by mutableStateOf(listOf<ChatItem>())
@@ -43,17 +49,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     private val api = ApiClient()
+    private val accounts = AccountApi(api)
+    private val auth: AuthStore = (application as PranaVedaApplication).auth
     private val prefs = application.getSharedPreferences("pranaveda", Context.MODE_PRIVATE)
     private var streamJob: Job? = null
 
     init {
-        profile = prefs.getString(PROFILE_KEY, null)
-            ?.let { runCatching { PvJson.parseToJsonElement(it).jsonObject }.getOrNull() }
-            ?: JsonObject(emptyMap())
+        profile = readProfile(PROFILE_KEY) ?: JsonObject(emptyMap())
+        auth.onSignedIn = { adoptAccountProfile(it) }
+        auth.onSignedOut = { handBackDevice() }
     }
 
     val profileName: String?
         get() = runCatching { profile["name"]?.jsonPrimitive?.contentOrNull }.getOrNull()?.takeIf { it.isNotBlank() }
+
+    /**
+     * Who to greet: the name they gave Amrita, else (signed in) their account
+     * name, as on the website. Guests are greeted by name only if they told Amrita.
+     */
+    val greetingName: String?
+        get() = profileName ?: auth.user?.displayName?.takeIf { it.isNotBlank() }
 
     fun send(text: String) {
         val trimmed = text.trim()
@@ -78,7 +93,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         streamJob = viewModelScope.launch {
             try {
-                api.chat(request).collect { apply(it, reply.id) }
+                val token = auth.validAccessToken()
+                try {
+                    api.chat(request, token).collect { apply(it, reply.id) }
+                } catch (e: HttpStatusException) {
+                    if (e.status != 401 || token == null) throw e
+                    // The sign-in had expired: refresh once and resend. If the
+                    // session is over, the resend goes out signed out.
+                    api.chat(request, auth.tokenAfterRejection()).collect { apply(it, reply.id) }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -96,6 +119,60 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Profile and the account. While signed in, the profile here is a copy of
+    // the account's. OWNER_KEY records whose, and BACKUP_KEY the device's own
+    // profile from before sign-in, which is put back on sign-out (as on the
+    // website and iOS).
+
+    /**
+     * After sign-in: if the account has no profile yet, this device's becomes
+     * the account's; otherwise the account's replaces the copy here.
+     */
+    private suspend fun adoptAccountProfile(user: AccountUser) {
+        val token = auth.validAccessToken() ?: return
+        try {
+            val account = accounts.fetchAccountProfile(token)
+            // Only the first time this device's profile is taken over is it the
+            // device's own, worth keeping to put back later.
+            if (prefs.getString(OWNER_KEY, null) == null) {
+                prefs.edit().apply {
+                    if (profile.isEmpty()) remove(BACKUP_KEY) else putString(BACKUP_KEY, profile.toString())
+                }.apply()
+            }
+            prefs.edit().putString(OWNER_KEY, user.id).apply()
+
+            if (account.version == 0) {
+                if (profile.isEmpty()) return
+                storeProfile(accounts.saveAccountProfile(profile, baseVersion = 0, accessToken = token).profile)
+            } else {
+                storeProfile(account.profile)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Offline or unavailable: the copy here stays; sync runs again next launch.
+            Log.w("PranaVeda", "Profile sync failed", e)
+        }
+    }
+
+    /**
+     * After sign-out (by any route): the account's profile leaves this device,
+     * and the device's own pre-sign-in profile comes back.
+     */
+    private fun handBackDevice() {
+        if (prefs.getString(OWNER_KEY, null) == null) return
+        storeProfile(readProfile(BACKUP_KEY) ?: JsonObject(emptyMap()))
+        prefs.edit().remove(OWNER_KEY).remove(BACKUP_KEY).apply()
+    }
+
+    private fun storeProfile(value: JsonObject) {
+        profile = value
+        prefs.edit().putString(PROFILE_KEY, value.toString()).apply()
+    }
+
+    private fun readProfile(key: String): JsonObject? =
+        prefs.getString(key, null)?.let { runCatching { PvJson.parseToJsonElement(it).jsonObject }.getOrNull() }
+
     /** Starts a fresh conversation. The wellness profile is kept. */
     fun reset() {
         streamJob?.cancel()
@@ -108,10 +185,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         when (event) {
             is ChatEvent.Text -> update(id) { it.copy(text = it.text + event.delta) }
             is ChatEvent.Card -> update(id) { it.copy(cards = it.cards + event.card) }
-            is ChatEvent.Profile -> {
-                profile = event.profile
-                prefs.edit().putString(PROFILE_KEY, event.profile.toString()).apply()
-            }
+            is ChatEvent.Profile -> storeProfile(event.profile)
             is ChatEvent.Error -> update(id) { it.copy(failed = true, text = it.text.ifEmpty { event.message }) }
             ChatEvent.Done -> Unit
         }
@@ -123,6 +197,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val PROFILE_KEY = "pranaveda_profile"
+        private const val OWNER_KEY = "pranaveda_profile_owner"
+        private const val BACKUP_KEY = "pranaveda_profile_before_signin"
 
         /** Like the iOS app's "10/14/2026, 3:04:05 PM". */
         private val LOCAL_TIME = DateTimeFormatter.ofPattern("M/d/yyyy, h:mm:ss a", Locale.US)

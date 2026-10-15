@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and earlier. The signed-in session stays on this device: its
+     encryption key lives in this device's Keystore and cannot be restored
+     elsewhere. The guest profile may be backed up. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="pranaveda_session.xml" />
+</full-backup-content>

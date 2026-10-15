@@ -15,6 +15,14 @@ val localProperties = Properties().apply {
 }
 val apiBaseUrl: String = localProperties.getProperty("pv.apiBaseUrl") ?: "http://10.0.2.2:3000"
 
+// Google sign-in. Android's Credential Manager issues ID tokens for the WEB
+// OAuth client (the server accepts it as VITE_GOOGLE_CLIENT_ID), so that is the
+// id the app asks for. Google recognises the app itself through the separate
+// Android OAuth client (package com.pranaveda.app + the signing key's SHA-1),
+// which is not referenced here. Client ids are public, not secrets.
+val googleWebClientId: String = localProperties.getProperty("pv.googleWebClientId")
+    ?: "163737232285-a82gbd3vfmlmles1v6cnlnn5ub21vld1.apps.googleusercontent.com"
+
 android {
     namespace = "com.pranaveda.app"
     compileSdk {
@@ -28,6 +36,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         buildConfigField("String", "PV_API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "PV_GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
     }
 
     buildTypes {
@@ -44,6 +53,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    // JVM unit tests: Android framework calls return defaults instead of
+    // throwing, so a stand-in Context can be passed where one is required.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 }
 
@@ -63,6 +78,9 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

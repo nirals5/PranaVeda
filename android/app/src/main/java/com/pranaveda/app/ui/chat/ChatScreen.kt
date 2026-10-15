@@ -115,7 +115,7 @@ fun ChatScreen(model: ChatViewModel) {
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            if (model.items.isEmpty()) item { Welcome(model.profileName) }
+            if (model.items.isEmpty()) item { Welcome(model.greetingName) }
             items(model.items, key = { it.id }) { item ->
                 MessageRow(item, onOption = model::send)
             }
@@ -128,7 +128,6 @@ fun ChatScreen(model: ChatViewModel) {
 private fun Welcome(name: String?) {
     val hour = LocalTime.now().hour
     val time = if (hour < 12) "morning" else if (hour < 17) "afternoon" else "evening"
-    // Greeted by name only if they told Amrita (as a guest on the website).
     val greeting = name?.split(" ")?.firstOrNull()?.let { "Good $time, $it." }
         ?: mapOf(
             "morning" to "Good morning, seeker.",
