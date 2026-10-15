@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ChatView: View {
     @Bindable var model: ChatViewModel
+    var auth: AuthStore? = nil
     @State private var draft = ""
     @FocusState private var inputFocused: Bool
     /// Grows with the text size, up to 48 points (see the cap on the input bar).
@@ -32,11 +33,16 @@ struct ChatView: View {
             .navigationTitle("Amrita")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("New") { model.reset() }
-                        .font(Theme.label)
-                        .disabled(model.items.isEmpty)
-                        .accessibilityLabel("Begin a new conversation (your wellness profile is kept)")
+                // Starts a fresh conversation (the wellness profile is kept),
+                // like the website's "Begin a new conversation". Only shown
+                // when there is a conversation to clear.
+                if !model.items.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { model.reset() } label: {
+                            Label("New conversation", systemImage: "square.and.pencil")
+                        }
+                        .accessibilityHint("Your wellness profile is kept")
+                    }
                 }
             }
         }
@@ -55,7 +61,10 @@ struct ChatView: View {
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
         let time = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening"
-        if let first = model.profileName?.split(separator: " ").first { return "Good \(time), \(first)." }
+        // Signed in, the name they gave Amrita, else their account name (as on
+        // the website). Guests are greeted by name only if they told Amrita.
+        let name = model.profileName ?? auth?.user?.displayName
+        if let first = name?.split(separator: " ").first { return "Good \(time), \(first)." }
         return ["morning": "Good morning, seeker.", "afternoon": "Good afternoon, reflective heart.", "evening": "Good evening, peaceful traveler."][time]!
     }
 

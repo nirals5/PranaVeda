@@ -36,7 +36,10 @@ struct APIClient: Sendable {
 
     /// Streams Amrita's reply. Signed out, the device sends its profile and
     /// receives the updated one, exactly as the web app does.
-    func chat(_ request: ChatRequest) -> AsyncThrowingStream<ChatEvent, Error> {
+    ///
+    /// With a `bearer` token the request is sent as the signed-in person; an
+    /// expired or invalid one gets `APIError.http(401)` before anything streams.
+    func chat(_ request: ChatRequest, bearer: String? = nil) -> AsyncThrowingStream<ChatEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -44,6 +47,7 @@ struct APIClient: Sendable {
                     urlRequest.httpMethod = "POST"
                     urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    if let bearer { urlRequest.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
                     urlRequest.httpBody = try JSONEncoder().encode(request)
                     urlRequest.timeoutInterval = 90
 

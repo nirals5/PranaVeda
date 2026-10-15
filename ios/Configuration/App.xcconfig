@@ -12,4 +12,10 @@ PV_API_BASE_URL = http:/$()/localhost:3000
 // one; override it in Local.xcconfig.
 PV_BUNDLE_ID = com.pranaveda.app
 
+// Google sign-in: the iOS OAuth client of the PranaVeda Google Cloud project.
+// Not a secret (it ships inside the app). The URL scheme is the same id
+// reversed; Google returns to the app through it after sign-in.
+PV_GOOGLE_CLIENT_ID = 163737232285-bcks8qr3n3d3a6q01o6h9rm2akn35h8o.apps.googleusercontent.com
+PV_GOOGLE_URL_SCHEME = com.googleusercontent.apps.163737232285-bcks8qr3n3d3a6q01o6h9rm2akn35h8o
+
 #include? "Local.xcconfig"
