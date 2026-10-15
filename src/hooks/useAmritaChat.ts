@@ -5,6 +5,7 @@ import { CalendarContext } from './useExternalCalendar';
 import { HealthContext } from './useWearableHealth';
 import { LocationContext } from './usePlace';
 import { fetchWithSession } from '../lib/auth';
+import { localDateKey } from './usePracticeLog';
 
 const CHAT_KEY = 'pranaveda_chat';
 const CHAT_TS_KEY = 'pranaveda_chat_ts';
@@ -148,10 +149,12 @@ export function useAmritaChat(
       abortRef.current = controller;
 
       try {
+        // localDate dates what Amrita records in the user's own day, not UTC's.
+        const now = new Date();
         const { response, sessionEnded } = await fetchWithSession('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: history, profile, localTime: new Date().toLocaleString(), inputMode, previousSession, calendar: calendar ?? undefined, health: health ?? undefined, location: location ?? undefined }),
+          body: JSON.stringify({ messages: history, profile, localTime: now.toLocaleString(), localDate: localDateKey(now), inputMode, previousSession, calendar: calendar ?? undefined, health: health ?? undefined, location: location ?? undefined }),
           signal: controller.signal,
         });
         if (sessionEnded) onSessionEnded?.();
