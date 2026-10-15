@@ -6,16 +6,30 @@ struct PranaVedaApp: App {
     @State private var chat = ChatViewModel()
     @State private var catalog = CatalogStore()
     @State private var auth = AuthStore()
+    @State private var doshaGuide = DoshaGuideStore()
+    @State private var tab = AppTab.amrita
+
+    enum AppTab: Hashable { case amrita, dosha, library, you }
 
     var body: some Scene {
         WindowGroup {
-            TabView {
+            TabView(selection: $tab) {
                 ChatView(model: chat, auth: auth)
                     .tabItem { Label("Amrita", systemImage: "sparkles") }
+                    .tag(AppTab.amrita)
+                DoshaProfileView(profile: chat.profile, guide: doshaGuide) { message in
+                    // As on the website: over to the chat, with the question asked.
+                    tab = .amrita
+                    chat.send(message)
+                }
+                    .tabItem { Label("Dosha", systemImage: "wind") }
+                    .tag(AppTab.dosha)
                 LibraryView(catalog: catalog)
                     .tabItem { Label("Library", systemImage: "figure.mind.and.body") }
+                    .tag(AppTab.library)
                 AccountView(auth: auth)
                     .tabItem { Label("You", systemImage: "person.crop.circle") }
+                    .tag(AppTab.you)
             }
             .tint(Theme.lavenderDeep)
             .onOpenURL { url in GIDSignIn.sharedInstance.handle(url) }

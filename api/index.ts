@@ -8,6 +8,7 @@ import { authenticate } from './_lib/auth.js';
 import { applyProfileChanges, loadAccountProfile } from './_lib/profiles.js';
 import type { VersionedProfile } from './_lib/profiles.js';
 import { getUser } from './_lib/users.js';
+import { DOSHA_GUIDE, DOSHA_GUIDE_NOTE } from './_lib/doshaGuide.js';
 
 // IMPORTANT: relative imports here (and anywhere under api/) must end in
 // ".js". Vercel runs these files as native ES modules, where an
@@ -1877,6 +1878,13 @@ app.get('/api/insight', handleInsight);
 app.get('/api/catalog', (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.json(publicCatalog(configuredAssetBase() || requestOrigin(req)));
+});
+// The balancing reference behind the Dosha Profile screen, for the native
+// apps (the website imports the same file). Public: it is general guidance,
+// nothing about the person.
+app.get('/api/dosha-guide', (_req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.json({ doshas: DOSHA_GUIDE, note: DOSHA_GUIDE_NOTE });
 });
 app.post('/api/insight', handleInsight);
 

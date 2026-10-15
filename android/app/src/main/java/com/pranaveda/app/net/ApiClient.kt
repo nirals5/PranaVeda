@@ -3,6 +3,7 @@ package com.pranaveda.app.net
 import com.pranaveda.app.config.AppConfig
 import com.pranaveda.app.model.Catalog
 import com.pranaveda.app.model.ChatCard
+import com.pranaveda.app.model.DoshaGuide
 import com.pranaveda.app.model.PvJson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -102,6 +103,13 @@ class ApiClient(
         http.newCall(Request.Builder().url(baseUrl.resolve("api/catalog")!!).build()).execute().use { response ->
             if (response.code != 200) throw HttpStatusException(response.code)
             PvJson.decodeFromString(Catalog.serializer(), response.body.string())
+        }
+    }
+
+    suspend fun doshaGuide(): DoshaGuide = withContext(Dispatchers.IO) {
+        http.newCall(Request.Builder().url(baseUrl.resolve("api/dosha-guide")!!).build()).execute().use { response ->
+            if (response.code != 200) throw HttpStatusException(response.code)
+            PvJson.decodeFromString(DoshaGuide.serializer(), response.body.string())
         }
     }
 
