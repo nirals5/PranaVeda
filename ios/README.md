@@ -5,7 +5,9 @@ existing `/api/chat` (as a guest, with the wellness profile kept on the
 device), ritual, breathwork, dosha and answer-option cards, and a Library of
 every pose from `/api/catalog` with Niral's room scenes, a Dosha tab (the
 Prakriti Amrita assessed, with the balancing guide from `/api/dosha-guide`, as
-on the website's Dosha Profile screen), and optional Google sign-in (the "You" tab) that shares the wellness profile with the website.
+on the website's Dosha Profile screen), guided practice (a ritual's poses one at a time with
+a timer and spoken guidance, and a breathwork pacer) with a practice log and
+streak that sync with the account, and optional Google sign-in (the "You" tab) that shares the wellness profile with the website.
 
 ## Requirements
 
@@ -77,3 +79,4 @@ Sign in with Apple), as Apple asks.
 - Plain `http` is allowed for the local network only (`NSAllowsLocalNetworking`); everything else needs https.
 - Image addresses from the API are either full addresses or site paths (`/poses/cobra.jpg`); paths are resolved against the API's address (`AppConfig.resolve`).
 - The web app's fonts (Playfair Display, Plus Jakarta Sans) are not bundled yet; the system serif and sans stand in.
+- Spoken guidance uses the phone's built-in voice (the website uses ElevenLabs when it is configured); the speaker button on the practice screen turns it off. Practice timing follows the clock, so it stays right if the screen sleeps or the app goes to the background briefly.

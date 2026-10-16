@@ -5,6 +5,7 @@ import SwiftUI
 /// Optional sign-in, and the account once signed in.
 struct AccountView: View {
     let auth: AuthStore
+    let practice: PracticeStore
     @State private var confirmingDelete = false
     @State private var deleting = false
     @State private var notice: String?
@@ -16,6 +17,7 @@ struct AccountView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         if let user = auth.user { signedIn(user) } else { signedOut }
+                        PracticeHistoryView(practice: practice)
                         if let message = auth.problem ?? notice {
                             Text(message).font(Theme.bodySmall).foregroundStyle(Theme.terracotta)
                         }

@@ -7,6 +7,7 @@ struct PranaVedaApp: App {
     @State private var catalog = CatalogStore()
     @State private var auth = AuthStore()
     @State private var doshaGuide = DoshaGuideStore()
+    @State private var practice = PracticeStore()
     @State private var tab = AppTab.amrita
 
     enum AppTab: Hashable { case amrita, dosha, library, you }
@@ -27,16 +28,25 @@ struct PranaVedaApp: App {
                 LibraryView(catalog: catalog)
                     .tabItem { Label("Library", systemImage: "figure.mind.and.body") }
                     .tag(AppTab.library)
-                AccountView(auth: auth)
+                AccountView(auth: auth, practice: practice)
                     .tabItem { Label("You", systemImage: "person.crop.circle") }
                     .tag(AppTab.you)
             }
             .tint(Theme.lavenderDeep)
+            // Every screen that can finish a practice logs it here.
+            .environment(practice)
             .onOpenURL { url in GIDSignIn.sharedInstance.handle(url) }
             .task {
                 chat.auth = auth
-                auth.onSignedIn = { [chat] user in await chat.adoptAccountProfile(for: user) }
-                auth.onSignedOut = { [chat] in chat.handBackDevice() }
+                practice.auth = auth
+                auth.onSignedIn = { [chat, practice] user in
+                    await chat.adoptAccountProfile(for: user)
+                    await practice.adoptAccount(user)
+                }
+                auth.onSignedOut = { [chat, practice] in
+                    chat.handBackDevice()
+                    practice.handBackDevice()
+                }
                 await auth.restore()
             }
             .task { await catalog.loadIfNeeded() }

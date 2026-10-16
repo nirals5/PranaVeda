@@ -56,8 +56,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         profile = readProfile(PROFILE_KEY) ?: JsonObject(emptyMap())
-        auth.onSignedIn = { adoptAccountProfile(it) }
-        auth.onSignedOut = { handBackDevice() }
+        // The profile and the practice log both follow the account.
+        val practice = (application as PranaVedaApplication).practice
+        auth.onSignedIn = {
+            adoptAccountProfile(it)
+            practice.adoptAccount(it)
+        }
+        auth.onSignedOut = {
+            handBackDevice()
+            practice.handBackDevice()
+        }
     }
 
     val profileName: String?

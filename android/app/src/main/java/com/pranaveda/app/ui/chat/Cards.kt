@@ -45,6 +45,8 @@ import com.pranaveda.app.model.ChatCard
 import com.pranaveda.app.model.DoshaProfileCard
 import com.pranaveda.app.model.RecommendationResult
 import com.pranaveda.app.model.YogaPose
+import com.pranaveda.app.practice.BreathworkPacerScreen
+import com.pranaveda.app.practice.GuidedPracticeScreen
 import com.pranaveda.app.ui.theme.Pv
 import com.pranaveda.app.ui.theme.cardSurface
 import kotlin.math.roundToInt
@@ -92,15 +94,22 @@ private fun RitualCard(result: RecommendationResult) {
             Text("BEGIN PRACTICE", style = Pv.label)
         }
     }
-    if (showingDetail) {
-        ModalBottomSheet(
-            onDismissRequest = { showingDetail = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = Pv.warmWhite,
-        ) {
-            RitualDetail(result)
-        }
+    if (showingDetail) RitualSheet(result) { showingDetail = false }
+}
+
+/** The whole ritual in a sheet, with the way into its guided practice. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RitualSheet(result: RecommendationResult, onDismiss: () -> Unit) {
+    var guiding by remember { mutableStateOf(false) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Pv.warmWhite,
+    ) {
+        RitualDetail(result, onBegin = { guiding = true })
     }
+    if (guiding) GuidedPracticeScreen(result) { guiding = false }
 }
 
 @Composable
@@ -134,13 +143,23 @@ fun PoseImage(url: String?, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun RitualDetail(result: RecommendationResult) {
+private fun RitualDetail(result: RecommendationResult, onBegin: () -> Unit) {
     LazyColumn(
         Modifier.fillMaxHeight(0.95f),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         item { Text(result.yogaPractice.title, style = Pv.display, color = Pv.ink) }
+        item {
+            Button(
+                onClick = onBegin,
+                enabled = result.yogaPractice.poses.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Pv.lavender, contentColor = Color.White),
+            ) {
+                Text("▶  BEGIN GUIDED PRACTICE", style = Pv.label, modifier = Modifier.padding(vertical = 6.dp))
+            }
+        }
         result.summary?.let { item { Text(it, style = Pv.body, color = Pv.stone700) } }
         itemsIndexed(result.yogaPractice.poses) { index, pose ->
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -151,19 +170,28 @@ private fun RitualDetail(result: RecommendationResult) {
                 pose.instructions?.let { Text(it, style = Pv.bodySmall, color = Pv.stone700) }
             }
         }
-        result.breathwork?.let { item { BreathworkCard(null, it) } }
+        result.breathwork?.let { item { BreathworkCard(null, it, result) } }
     }
 }
 
 @Composable
-private fun BreathworkCard(note: String?, pattern: BreathworkPattern) {
+private fun BreathworkCard(note: String?, pattern: BreathworkPattern, result: RecommendationResult? = null) {
+    var pacing by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionLabel("Breathwork")
         Text(pattern.name, style = Pv.heading, color = Pv.ink)
         pattern.sanskritName?.let { Text(it, style = italicSmall, color = Pv.lavenderDeep) }
         Text("${pattern.rhythm} · ${pattern.cycles} cycles", style = Pv.bodySmall, color = Pv.stone700)
         note?.let { Text(it, style = Pv.bodySmall, color = Pv.stone700) }
+        Button(
+            onClick = { pacing = true },
+            colors = ButtonDefaults.buttonColors(containerColor = Pv.lavender, contentColor = Color.White),
+        ) {
+            Text("BEGIN BREATHWORK", style = Pv.label)
+        }
     }
+    // The ritual it belongs to, if any, is saved with the practice log.
+    if (pacing) BreathworkPacerScreen(pattern, result) { pacing = false }
 }
 
 @Composable

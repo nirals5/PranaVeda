@@ -1,6 +1,9 @@
 package com.pranaveda.app.auth
 
+import com.pranaveda.app.model.PracticeLogEntry
+import com.pranaveda.app.model.PracticePage
 import com.pranaveda.app.model.PvJson
+import com.pranaveda.app.net.HttpStatusException
 import com.pranaveda.app.net.ApiClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -124,6 +127,24 @@ class AccountApi(private val api: ApiClient = ApiClient()) {
         val reply = send("PUT", "api/sync/profile", bearer = accessToken, body = body)
         if (reply.status != 200 && reply.status != 409) throw AccountException.Unavailable(reply.status)
         return PvJson.decodeFromString(VersionedProfile.serializer(), reply.body)
+    }
+
+    @Serializable private data class UploadBody(val entries: List<PracticeLogEntry>)
+
+    /**
+     * Sends practices the account may not have yet (at most 25). Sending one it
+     * already has is fine. Throws [HttpStatusException] 401 for an expired sign-in.
+     */
+    suspend fun uploadPractices(entries: List<PracticeLogEntry>, accessToken: String) {
+        val reply = send("POST", "api/sync/practice-log", bearer = accessToken, body = PvJson.encodeToString(UploadBody.serializer(), UploadBody(entries)))
+        if (reply.status != 200) throw HttpStatusException(reply.status)
+    }
+
+    /** The account's practices received after [cursor] (0 for all), oldest first. */
+    suspend fun practicesAfter(cursor: Long, accessToken: String): PracticePage {
+        val reply = send("GET", "api/sync/practice-log?after=$cursor", bearer = accessToken)
+        if (reply.status != 200) throw HttpStatusException(reply.status)
+        return PvJson.decodeFromString(PracticePage.serializer(), reply.body)
     }
 
     private companion object {

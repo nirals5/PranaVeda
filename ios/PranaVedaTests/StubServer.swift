@@ -7,6 +7,7 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
     struct Recorded: @unchecked Sendable {
         let method: String
         let path: String
+        let query: String?
         let authorization: String?
         let body: [String: Any]?
     }
@@ -43,6 +44,7 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
         let recorded = Recorded(
             method: request.httpMethod ?? "GET",
             path: request.url?.path ?? "",
+            query: request.url?.query,
             authorization: request.value(forHTTPHeaderField: "Authorization"),
             body: body
         )

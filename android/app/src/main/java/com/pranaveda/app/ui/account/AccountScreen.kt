@@ -33,7 +33,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.pranaveda.app.PranaVedaApplication
 import com.pranaveda.app.R
+import com.pranaveda.app.model.RecommendationResult
+import com.pranaveda.app.practice.PracticeHistory
+import com.pranaveda.app.ui.chat.RitualSheet
 import com.pranaveda.app.auth.AccountUser
 import com.pranaveda.app.auth.AuthStore
 import com.pranaveda.app.ui.chat.SectionLabel
@@ -69,6 +73,10 @@ fun AccountScreen(auth: AuthStore) {
                 SignedOut(auth, onStart = { notice = null })
             }
             (auth.problem ?: notice)?.let { Text(it, style = Pv.bodySmall, color = Pv.terracotta) }
+            val practice = (LocalContext.current.applicationContext as PranaVedaApplication).practice
+            var reopening by remember { mutableStateOf<RecommendationResult?>(null) }
+            PracticeHistory(practice, onOpenRitual = { reopening = it })
+            reopening?.let { RitualSheet(it) { reopening = null } }
         }
     }
 }

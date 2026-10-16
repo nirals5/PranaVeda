@@ -110,11 +110,23 @@ struct PoseImage: View {
 struct RitualDetailView: View {
     let result: RecommendationResult
     @Environment(\.dismiss) private var dismiss
+    @State private var guiding = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    Button { guiding = true } label: {
+                        Label("Begin guided practice", systemImage: "play.fill")
+                            .font(Theme.label)
+                            .tracking(0.9)
+                            .textCase(.uppercase)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Theme.lavender, in: Capsule())
+                    }
+                    .disabled(result.yogaPractice.poses.isEmpty)
                     if let summary = result.summary {
                         Text(summary).font(Theme.body).foregroundStyle(Theme.stone700)
                     }
@@ -136,7 +148,7 @@ struct RitualDetailView: View {
                         .cardSurface()
                     }
                     if let breath = result.breathwork {
-                        BreathworkCardView(note: nil, pattern: breath)
+                        BreathworkCardView(note: nil, pattern: breath, result: result)
                     }
                 }
                 .padding(16)
@@ -147,6 +159,7 @@ struct RitualDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
+            .fullScreenCover(isPresented: $guiding) { GuidedPracticeView(result: result) }
         }
     }
 }
@@ -154,6 +167,9 @@ struct RitualDetailView: View {
 struct BreathworkCardView: View {
     let note: String?
     let pattern: BreathworkPattern
+    /// The ritual it belongs to, if any, saved with the practice log.
+    var result: RecommendationResult? = nil
+    @State private var pacing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -166,9 +182,21 @@ struct BreathworkCardView: View {
             if let note {
                 Text(note).font(Theme.bodySmall).foregroundStyle(Theme.stone700)
             }
+            Button { pacing = true } label: {
+                Label("Begin breathwork", systemImage: "wind")
+                    .font(Theme.label)
+                    .tracking(0.9)
+                    .textCase(.uppercase)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(Theme.lavender, in: Capsule())
+            }
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
+        .fullScreenCover(isPresented: $pacing) { BreathworkPacerView(pattern: pattern, result: result) }
     }
 }
 
