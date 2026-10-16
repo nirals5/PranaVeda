@@ -24,6 +24,7 @@ final class AuthStore {
     private let api: APIClient
     private let storage: SessionStorage
     private let google: GoogleIdentityProvider
+    private let apple: AppleIdentityProvider
     private let now: () -> Date
     private var accessToken: String?
     private var accessTokenExpiry = Date.distantPast
@@ -31,10 +32,12 @@ final class AuthStore {
     private var restoredThisLaunch = false
 
     init(api: APIClient = APIClient(), storage: SessionStorage = KeychainSessionStorage(),
-         google: GoogleIdentityProvider = GoogleSignInFlow(), now: @escaping () -> Date = Date.init) {
+         google: GoogleIdentityProvider = GoogleSignInFlow(), apple: AppleIdentityProvider = AppleSignInFlow(),
+         now: @escaping () -> Date = Date.init) {
         self.api = api
         self.storage = storage
         self.google = google
+        self.apple = apple
         self.now = now
         // A stored session shows as signed in at once, even offline; it is
         // checked with the server in restore().
@@ -44,6 +47,12 @@ final class AuthStore {
     /// At launch: confirms a stored session with the server.
     func restore() async {
         guard isSignedIn, !restoredThisLaunch else { return }
+        // Signed in with Apple, then stopped using the Apple ID with
+        // PranaVeda (in Settings): Apple asks apps to sign the person out.
+        if let appleUserID = storage.appleUserID, await apple.isRevoked(userID: appleUserID) {
+            await signOut()
+            return
+        }
         if await validAccessToken() != nil, let user {
             restoredThisLaunch = true
             await onSignedIn?(user)
@@ -51,15 +60,32 @@ final class AuthStore {
     }
 
     func signInWithGoogle() async {
+        await signIn { [api, google] nonce in
+            let idToken = try await google.idToken(nonce: nonce)
+            return (try await api.signInWithGoogle(idToken: idToken, nonce: nonce, device: Self.deviceDescription()), nil)
+        }
+    }
+
+    func signInWithApple() async {
+        await signIn { [api, apple] nonce in
+            let credential = try await apple.credential(nonce: nonce)
+            return (try await api.signInWithApple(credential, nonce: nonce, device: Self.deviceDescription()), credential.userID)
+        }
+    }
+
+    /// One sign-in attempt: a fresh nonce from the server, the provider's
+    /// token for it, then the server's session. `attempt` also returns the
+    /// person's Apple user id when the provider is Apple.
+    private func signIn(_ attempt: (String) async throws -> (SessionResponse, String?)) async {
         guard !isBusy else { return }
         isBusy = true
         problem = nil
         defer { isBusy = false }
         do {
             let nonce = try await api.signInNonce()
-            let idToken = try await google.idToken(nonce: nonce)
-            let session = try await api.signInWithGoogle(idToken: idToken, nonce: nonce, device: Self.deviceDescription())
+            let (session, appleUserID) = try await attempt(nonce)
             adopt(session)
+            storage.appleUserID = appleUserID
             restoredThisLaunch = true
             if let user { await onSignedIn?(user) }
         } catch is SignInCancelled {
@@ -135,6 +161,7 @@ final class AuthStore {
         let wasSignedIn = isSignedIn
         storage.refreshToken = nil
         storage.user = nil
+        storage.appleUserID = nil
         accessToken = nil
         accessTokenExpiry = .distantPast
         user = nil

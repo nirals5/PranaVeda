@@ -49,6 +49,9 @@ targets:
       path: PranaVeda/Info.plist
       properties:
         PVAPIBaseURL: $(PV_API_BASE_URL)
+        # YES when the build has the Sign in with Apple capability
+        # (PV_APPLE_SIGN_IN in Configuration/App.xcconfig).
+        PVAppleSignInEnabled: $(PV_APPLE_SIGN_IN)
         # Plain http is allowed for the local network only (the dev server);
         # everything on the internet still needs https.
         NSAppTransportSecurity:

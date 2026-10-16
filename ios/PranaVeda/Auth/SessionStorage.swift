@@ -8,12 +8,21 @@ import Security
 protocol SessionStorage: AnyObject, Sendable {
     var refreshToken: String? { get set }
     var user: AccountUser? { get set }
+    /// Apple's id for the person, when they signed in with Apple, so the app
+    /// can check at launch that they still allow it.
+    var appleUserID: String? { get set }
 }
 
 final class KeychainSessionStorage: SessionStorage, @unchecked Sendable {
     private let service = "com.pranaveda.app.session"
     private let account = "refreshToken"
     private let userKey = "pranaveda_account_user"
+    private let appleUserKey = "pranaveda_apple_user_id"
+
+    var appleUserID: String? {
+        get { UserDefaults.standard.string(forKey: appleUserKey) }
+        set { UserDefaults.standard.set(newValue, forKey: appleUserKey) }
+    }
 
     var refreshToken: String? {
         get {
@@ -57,8 +66,10 @@ final class KeychainSessionStorage: SessionStorage, @unchecked Sendable {
 final class InMemorySessionStorage: SessionStorage, @unchecked Sendable {
     var refreshToken: String?
     var user: AccountUser?
-    init(refreshToken: String? = nil, user: AccountUser? = nil) {
+    var appleUserID: String?
+    init(refreshToken: String? = nil, user: AccountUser? = nil, appleUserID: String? = nil) {
         self.refreshToken = refreshToken
         self.user = user
+        self.appleUserID = appleUserID
     }
 }

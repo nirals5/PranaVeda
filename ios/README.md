@@ -48,6 +48,26 @@ Tests (stream parsing and decoding of the server's events and cards):
 xcodebuild -project PranaVeda.xcodeproj -scheme PranaVeda -destination 'platform=iOS Simulator,name=iPhone 18 Pro' test
 ```
 
+## Sign in with Apple (off until a paid Apple Developer team)
+
+The code is in the app, switched off: Apple allows it only for apps signed by a
+paid Apple Developer Program team, and builds signed by a free personal team
+fail if they ask for it. To turn it on:
+
+1. In `Configuration/Local.xcconfig`, set `DEVELOPMENT_TEAM` to the paid team
+   and add `PV_APPLE_SIGN_IN = YES`, then run `xcodegen`. The build then
+   carries the Sign in with Apple capability (`PranaVeda/PranaVeda.entitlements`)
+   and the "You" tab shows Apple's button above Google's.
+2. In developer.apple.com → Keys, create a key with Sign in with Apple for the
+   app id `com.pranaveda.app`; download its `.p8` (keep it outside the project).
+3. In the server's `.env`: `APPLE_BUNDLE_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`,
+   `APPLE_PRIVATE_KEY` (the `.p8` contents) and `CONNECTIONS_ENC_KEY`, which
+   encrypts Apple's token so it can be revoked when an account is deleted.
+
+At launch, a session that was started with Apple is ended if the person has
+since stopped using their Apple ID with PranaVeda (Settings → Apple Account →
+Sign in with Apple), as Apple asks.
+
 ## Notes
 
 - Google sign-in uses the iOS OAuth client in `Configuration/App.xcconfig` (`PV_GOOGLE_CLIENT_ID`). The server must list the same id in `GOOGLE_CLIENT_ID_IOS`, or it refuses the app's sign-ins. The session's refresh token is kept in the Keychain (this device only); the access token only in memory.

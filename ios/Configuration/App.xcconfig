@@ -18,4 +18,13 @@ PV_BUNDLE_ID = com.pranaveda.app
 PV_GOOGLE_CLIENT_ID = 163737232285-bcks8qr3n3d3a6q01o6h9rm2akn35h8o.apps.googleusercontent.com
 PV_GOOGLE_URL_SCHEME = com.googleusercontent.apps.163737232285-bcks8qr3n3d3a6q01o6h9rm2akn35h8o
 
+// Sign in with Apple: off unless a paid Apple Developer team signs the app
+// (personal teams cannot use it). Set PV_APPLE_SIGN_IN = YES in
+// Local.xcconfig to add the capability and show the Apple button; the server
+// also needs the Apple settings in .env (see .env.example).
+PV_APPLE_SIGN_IN = NO
+PV_ENTITLEMENTS_YES = PranaVeda/PranaVeda.entitlements
+PV_ENTITLEMENTS_NO =
+CODE_SIGN_ENTITLEMENTS = $(PV_ENTITLEMENTS_$(PV_APPLE_SIGN_IN))
+
 #include? "Local.xcconfig"

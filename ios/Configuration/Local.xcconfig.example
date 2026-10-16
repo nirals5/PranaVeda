@@ -13,3 +13,7 @@ DEVELOPMENT_TEAM =
 // name (System Settings → General → Sharing → Local hostname), on the same
 // Wi-Fi. Simulator builds keep using localhost.
 PV_API_BASE_URL[sdk=iphoneos*] = http:/$()/Your-Mac-Name.local:3000
+
+// Sign in with Apple needs a paid Apple Developer team (set DEVELOPMENT_TEAM
+// to it above). Then turn it on here, and set the Apple values in .env.
+// PV_APPLE_SIGN_IN = YES

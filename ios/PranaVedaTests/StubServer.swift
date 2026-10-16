@@ -73,6 +73,23 @@ final class FakeGoogle: GoogleIdentityProvider {
     func signOut() { signOuts += 1 }
 }
 
+final class FakeApple: AppleIdentityProvider {
+    var result: Result<AppleCredential, Error> = .success(AppleCredential(
+        idToken: "apple-id-token", authorizationCode: "apple-code", userID: "apple-user-1", givenName: "Meera", familyName: "Iyer"
+    ))
+    var revoked = false
+    private(set) var noncesAskedFor: [String] = []
+    private(set) var revocationChecks: [String] = []
+    func credential(nonce: String) async throws -> AppleCredential {
+        noncesAskedFor.append(nonce)
+        return try result.get()
+    }
+    func isRevoked(userID: String) async -> Bool {
+        revocationChecks.append(userID)
+        return revoked
+    }
+}
+
 func session(_ access: String, _ refresh: String, name: String = "Meera Iyer") -> String {
     #"{"user":{"id":"u1","email":"meera@example.com","displayName":"\#(name)","timezone":null},"accessToken":"\#(access)","refreshToken":"\#(refresh)","expiresIn":900}"#
 }
