@@ -1392,6 +1392,15 @@ function buildBreathworkCard(input: any, profile: WellnessProfile): { error?: st
   };
 }
 
+// A reply can arrive in several text blocks: Amrita writes, calls a tool
+// (option tiles, a ritual card, a profile update), then carries on in a new
+// block. Joined as-is they run together ("…more easily.Let the…"), so a new
+// block starts a new paragraph unless whitespace already separates them.
+export function textBlockSeparator(previous: string, next: string): string {
+  if (!previous || !next || /\s$/.test(previous) || /^\s/.test(next)) return '';
+  return '\n\n';
+}
+
 export function registerChatRoute(app: import('express').Express, client: Anthropic, apiKey: string | undefined) {
   app.post('/api/chat', async (req: Request, res: Response) => {
     const { messages, profile: rawProfile, localTime, localDate, inputMode, previousSession, calendar, health, location } = req.body ?? {};
@@ -1477,6 +1486,10 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       sanitizeLocationContext(location)
     );
 
+    // The last text sent, so that when a reply resumes after a tool call it
+    // can start a new paragraph instead of running on.
+    let lastText = '';
+
     try {
       for (let loop = 0; loop < MAX_LOOPS; loop++) {
         const stream = client.messages.stream({
@@ -1487,7 +1500,16 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
           tools,
         });
 
-        stream.on('text', (delta) => send(res, { type: 'text', delta }));
+        // A text block starts with the first text of each model call, or
+        // (within one call) when the SDK's snapshot of the block is just this delta.
+        let firstTextOfCall = true;
+        stream.on('text', (delta: string, snapshot?: string) => {
+          const startsBlock = firstTextOfCall || snapshot === delta;
+          firstTextOfCall = false;
+          const text = (startsBlock ? textBlockSeparator(lastText, delta) : '') + delta;
+          if (text) lastText = text;
+          send(res, { type: 'text', delta: text });
+        });
 
         const message = await stream.finalMessage();
 
