@@ -1,3 +1,4 @@
+import AuthenticationServices
 import GoogleSignInSwift
 import SwiftUI
 
@@ -32,6 +33,17 @@ struct AccountView: View {
             Text("Signing in is optional. It saves the wellness profile Amrita builds to your account, so it follows you to the website and your other devices.")
                 .font(Theme.body)
                 .foregroundStyle(Theme.stone700)
+            // Apple's guidelines ask for its button to be at least as prominent
+            // as other sign-in options. Only in builds that can use it.
+            if AppConfig.appleSignInEnabled {
+                AppleSignInButton {
+                    notice = nil
+                    Task { await auth.signInWithApple() }
+                }
+                .frame(maxWidth: 320, minHeight: 44, maxHeight: 50)
+                .disabled(auth.isBusy)
+                .accessibilityLabel("Sign in with Apple")
+            }
             GoogleSignInButton(viewModel: GoogleSignInButtonViewModel(scheme: .light, style: .wide, state: auth.isBusy ? .disabled : .normal)) {
                 notice = nil
                 Task { await auth.signInWithGoogle() }
@@ -76,5 +88,32 @@ struct AccountView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
+    }
+}
+
+/// Apple's own "Sign in with Apple" button. SwiftUI's version runs Apple's
+/// request itself; this one only reports the tap, so the app can first fetch
+/// the server's nonce for the request.
+private struct AppleSignInButton: UIViewRepresentable {
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(action: action) }
+
+    func makeUIView(context: Context) -> ASAuthorizationAppleIDButton {
+        let button = ASAuthorizationAppleIDButton(type: .signIn, style: .black)
+        button.cornerRadius = 8
+        button.addTarget(context.coordinator, action: #selector(Coordinator.tapped), for: .touchUpInside)
+        return button
+    }
+
+    func updateUIView(_ button: ASAuthorizationAppleIDButton, context: Context) {
+        context.coordinator.action = action
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var action: () -> Void
+        init(action: @escaping () -> Void) { self.action = action }
+        @objc func tapped() { action() }
     }
 }

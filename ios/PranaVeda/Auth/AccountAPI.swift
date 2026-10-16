@@ -88,6 +88,24 @@ extension APIClient {
         return try JSONDecoder().decode(SessionResponse.self, from: data)
     }
 
+    func signInWithApple(_ credential: AppleCredential, nonce: String, device: DeviceDescription) async throws -> SessionResponse {
+        struct Name: Encodable { let firstName: String?; let lastName: String? }
+        struct Body: Encodable {
+            let idToken: String; let code: String?; let nonce: String; let name: Name?
+            let client = "ios"; let device: DeviceDescription
+        }
+        // Apple gives the name only on the first sign-in; the server uses it
+        // for a new account's display name and ignores it otherwise.
+        let name = (credential.givenName ?? credential.familyName) == nil ? nil : Name(firstName: credential.givenName, lastName: credential.familyName)
+        let body = Body(idToken: credential.idToken, code: credential.authorizationCode, nonce: nonce, name: name, device: device)
+        let (data, status) = try await send(request("POST", "api/auth/apple", body: body))
+        if status == 409, let body = try? JSONDecoder().decode(ErrorBody.self, from: data), body.error == "account_exists" {
+            throw AccountError.accountExists(provider: body.provider ?? "")
+        }
+        guard status == 200 else { throw AccountError.unavailable(status) }
+        return try JSONDecoder().decode(SessionResponse.self, from: data)
+    }
+
     /// A new access token (and rotated refresh token) for a session.
     func refreshSession(refreshToken: String) async throws -> SessionResponse {
         struct Body: Encodable { let client = "ios"; let refreshToken: String }
