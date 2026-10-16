@@ -15,7 +15,7 @@ struct PranaVedaApp: App {
         WindowGroup {
             TabView(selection: $tab) {
                 ChatView(model: chat, auth: auth)
-                    .tabItem { Label("Amrita", systemImage: "sparkles") }
+                    .tabItem { Label("Ask Amrita", systemImage: "sparkles") }
                     .tag(AppTab.amrita)
                 DoshaProfileView(profile: chat.profile, guide: doshaGuide) { message in
                     // As on the website: over to the chat, with the question asked.

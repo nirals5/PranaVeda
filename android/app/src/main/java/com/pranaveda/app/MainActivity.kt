@@ -34,6 +34,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pranaveda.app.ui.chat.ChatScreen
 import com.pranaveda.app.ui.chat.ChatViewModel
@@ -94,7 +95,7 @@ class MainActivity : ComponentActivity() {
                                     unselectedTextColor = Pv.stone500,
                                 )
                                 listOf(
-                                    R.drawable.ic_lotus to "Amrita",
+                                    R.drawable.ic_lotus to "Ask Amrita",
                                     R.drawable.ic_vata to "Dosha",
                                     R.drawable.ic_library to "Library",
                                     R.drawable.ic_person to "You",
@@ -103,7 +104,7 @@ class MainActivity : ComponentActivity() {
                                         selected = tab == index,
                                         onClick = { tab = index },
                                         icon = { Icon(painterResource(icon), contentDescription = null) },
-                                        label = { Text(label) },
+                                        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                         colors = itemColors,
                                     )
                                 }
