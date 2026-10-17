@@ -1,0 +1,51 @@
+# Runs the iOS app's tests on a simulator when a pull request touches ios/.
+# No Local.xcconfig here: simulator builds need no signing team.
+name: iOS
+
+on:
+  pull_request:
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  push:
+    branches: [main]
+    paths: ['ios/**', '.github/workflows/ios.yml']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v5
+      # The newest released Xcode on the runner, and an iPhone simulator from
+      # its newest iOS, so the job doesn't break when the runner image changes.
+      - name: Pick Xcode and a simulator
+        run: |
+          xcode=$(ls -d /Applications/Xcode_*.app | grep -iv beta | sort -V | tail -1)
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+          device=$(xcrun simctl list devices available -j | jq -r '
+            [.devices | to_entries[] | select(.key | contains("iOS")) | {runtime: .key, device: .value[]}
+             | select(.device.name | startswith("iPhone"))]
+            | sort_by(.runtime | sub(".*iOS-"; "") | split("-") | map(tonumber)) | last | .device.udid')
+          echo "Simulator: $device"
+          echo "SIMULATOR=$device" >> "$GITHUB_ENV"
+      - name: Generate the Xcode project
+        run: |
+          command -v xcodegen || brew install xcodegen
+          xcodegen generate
+      - run: xcodebuild -project PranaVeda.xcodeproj -scheme PranaVeda -destination "id=$SIMULATOR" -resultBundlePath TestResults.xcresult test
+      - name: Keep the test results
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: ios-test-results
+          path: ios/TestResults.xcresult

@@ -1,0 +1,41 @@
+# Runs the Android app's unit tests when a pull request touches android/.
+# No local.properties here, so the build uses its defaults (the emulator's
+# server address and the committed Google client id).
+name: Android
+
+on:
+  pull_request:
+    paths: ['android/**', '.github/workflows/android.yml']
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v5
+      # The same JDK that Android Studio bundles.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v5
+      - run: ./gradlew testDebugUnitTest
+      - name: Keep the test reports
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: android-test-reports
+          path: android/app/build/reports/tests/
