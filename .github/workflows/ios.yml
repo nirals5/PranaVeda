@@ -18,6 +18,7 @@ permissions:
 
 jobs:
   test:
+    name: iOS
     runs-on: macos-latest
     timeout-minutes: 45
     defaults:

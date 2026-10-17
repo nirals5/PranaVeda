@@ -19,6 +19,7 @@ permissions:
 
 jobs:
   test:
+    name: Android
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
