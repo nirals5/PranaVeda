@@ -3,6 +3,7 @@ package com.pranaveda.app.net
 import com.pranaveda.app.config.AppConfig
 import com.pranaveda.app.model.Catalog
 import com.pranaveda.app.model.ChatCard
+import com.pranaveda.app.model.DailyInsight
 import com.pranaveda.app.model.DoshaGuide
 import com.pranaveda.app.model.PvJson
 import kotlinx.coroutines.Dispatchers
@@ -112,6 +113,19 @@ class ApiClient(
             PvJson.decodeFromString(DoshaGuide.serializer(), response.body.string())
         }
     }
+
+    /** Amrita's daily reflection, made personal by the wellness [profile]. */
+    suspend fun dailyInsight(profile: JsonObject, localTime: String): DailyInsight = withContext(Dispatchers.IO) {
+        val body = PvJson.encodeToString(InsightRequest.serializer(), InsightRequest(profile, localTime))
+        val request = Request.Builder().url(baseUrl.resolve("api/insight")!!).post(body.toRequestBody(JSON)).build()
+        http.newCall(request).execute().use { response ->
+            if (response.code != 200) throw HttpStatusException(response.code)
+            PvJson.decodeFromString(DailyInsight.serializer(), response.body.string())
+        }
+    }
+
+    @Serializable
+    private data class InsightRequest(val profile: JsonObject, val localTime: String)
 
     companion object {
         internal val JSON = "application/json".toMediaType()

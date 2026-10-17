@@ -59,6 +59,7 @@ class MainActivity : ComponentActivity() {
                 val catalog: CatalogViewModel = viewModel()
                 val doshaGuide: DoshaGuideViewModel = viewModel()
                 val auth = (application as PranaVedaApplication).auth
+                val insight = (application as PranaVedaApplication).insight
                 val scope = rememberCoroutineScope()
                 var tab by rememberSaveable { mutableIntStateOf(0) }
 
@@ -113,7 +114,7 @@ class MainActivity : ComponentActivity() {
                     ) { padding ->
                         Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
                             when (tab) {
-                                0 -> ChatScreen(chat)
+                                0 -> ChatScreen(chat, insight)
                                 1 -> DoshaScreen(chat.profile, doshaGuide) { message ->
                                     // As on the website: over to the chat, with the question asked.
                                     tab = 0

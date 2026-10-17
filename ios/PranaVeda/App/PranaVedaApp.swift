@@ -8,6 +8,7 @@ struct PranaVedaApp: App {
     @State private var auth = AuthStore()
     @State private var doshaGuide = DoshaGuideStore()
     @State private var practice = PracticeStore()
+    @State private var insight = DailyInsightStore()
     @State private var tab = AppTab.amrita
 
     enum AppTab: Hashable { case amrita, dosha, library, you }
@@ -15,7 +16,7 @@ struct PranaVedaApp: App {
     var body: some Scene {
         WindowGroup {
             TabView(selection: $tab) {
-                ChatView(model: chat, auth: auth)
+                ChatView(model: chat, auth: auth, insight: insight)
                     .tabItem { Label("Ask Amrita", systemImage: "sparkles") }
                     .tag(AppTab.amrita)
                 DoshaProfileView(profile: chat.profile, guide: doshaGuide) { message in
