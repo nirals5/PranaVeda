@@ -23,6 +23,8 @@ Accounts and sync are optional and off by default; see [Accounts and sync](#acco
 
 Checks: `npm run lint` (type check) and `npm test` (Vitest). The tests that need a database run when `DATABASE_URL` is set and are skipped otherwise; they create throwaway accounts and delete them afterwards, so point `DATABASE_URL` at a development database, never production.
 
+GitHub Actions runs these checks on every pull request (`.github/workflows/`): the website's type check and tests, and, when a pull request touches `ios/` or `android/`, the iOS tests on a simulator and the Android unit tests. The database tests are skipped there, since CI has no database.
+
 ## Features: practice calendar, connectors, wearables, and location
 
 Everything below lives under the profile button at the right end of the top navigation: **Profile → Connectors**. The Profile header shows the name and constitution Amrita has learned, or "Guest". Where accounts are switched on it also holds sign-in (see [Accounts and sync](#accounts-and-sync-optional-off-by-default)); the connectors below work the same signed in or out.
