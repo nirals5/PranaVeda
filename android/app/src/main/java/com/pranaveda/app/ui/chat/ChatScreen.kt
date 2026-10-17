@@ -55,12 +55,13 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.pranaveda.app.R
 import com.pranaveda.app.model.ChatItem
+import com.pranaveda.app.model.DailyInsightStore
 import com.pranaveda.app.ui.theme.Pv
 import java.time.LocalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(model: ChatViewModel) {
+fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null) {
     var draft by rememberSaveable { mutableStateOf("") }
     val focus = LocalFocusManager.current
     val listState = rememberLazyListState()
@@ -115,7 +116,15 @@ fun ChatScreen(model: ChatViewModel) {
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            if (model.items.isEmpty()) item { Welcome(model.greetingName) }
+            if (model.items.isEmpty()) {
+                item { Welcome(model.greetingName) }
+                if (insight != null) {
+                    item {
+                        LaunchedEffect(Unit) { insight.loadIfNeeded(model.profile) }
+                        DailyInsightCard(insight.state, Modifier.padding(top = 4.dp))
+                    }
+                }
+            }
             items(model.items, key = { it.id }) { item ->
                 MessageRow(item, onOption = model::send)
             }

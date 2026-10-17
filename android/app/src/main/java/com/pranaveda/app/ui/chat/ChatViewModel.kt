@@ -209,7 +209,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         private const val BACKUP_KEY = "pranaveda_profile_before_signin"
 
         /** Like the iOS app's "10/14/2026, 3:04:05 PM". */
-        private val LOCAL_TIME = DateTimeFormatter.ofPattern("M/d/yyyy, h:mm:ss a", Locale.US)
+        internal val LOCAL_TIME = DateTimeFormatter.ofPattern("M/d/yyyy, h:mm:ss a", Locale.US)
 
         /** The device's calendar day as "YYYY-MM-DD". */
         fun localDate(date: LocalDate = LocalDate.now(ZoneId.systemDefault())): String =

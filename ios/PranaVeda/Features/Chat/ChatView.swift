@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatView: View {
     @Bindable var model: ChatViewModel
     var auth: AuthStore? = nil
+    var insight: DailyInsightStore? = nil
     @State private var draft = ""
     @FocusState private var inputFocused: Bool
     /// Grows with the text size, up to 48 points (see the cap on the input bar).
@@ -54,6 +55,11 @@ struct ChatView: View {
             Text("Tell me how you feel, and I'll suggest a practice that fits your body, energy, and goals.")
                 .font(Theme.body)
                 .foregroundStyle(Theme.stone700)
+            if let insight {
+                DailyInsightCard(state: insight.state)
+                    .padding(.top, 14)
+                    .task { await insight.loadIfNeeded(profile: model.profile) }
+            }
         }
         .padding(.top, 24)
     }
