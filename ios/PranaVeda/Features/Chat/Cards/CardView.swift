@@ -27,6 +27,7 @@ struct RitualCardView: View {
                 if let minutes = result.yogaPractice.durationMinutes {
                     Text("\(minutes) min").sectionLabel()
                 }
+                BookmarkButton(result: result).font(.body)
             }
             Text(result.yogaPractice.title).font(Theme.heading(.title2)).foregroundStyle(Theme.ink)
             if let energy = result.primaryEnergy {
@@ -157,6 +158,7 @@ struct RitualDetailView: View {
             .navigationTitle(result.yogaPractice.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) { BookmarkButton(result: result) }
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
             .fullScreenCover(isPresented: $guiding) { GuidedPracticeView(result: result) }

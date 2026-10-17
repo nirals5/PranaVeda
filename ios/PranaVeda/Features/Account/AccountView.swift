@@ -6,6 +6,9 @@ import SwiftUI
 struct AccountView: View {
     let auth: AuthStore
     let practice: PracticeStore
+    let saved: SavedRitualStore
+    /// Over to the chat ("Begin with Amrita" on the calendar).
+    var onBegin: () -> Void = {}
     @State private var confirmingDelete = false
     @State private var deleting = false
     @State private var notice: String?
@@ -17,7 +20,8 @@ struct AccountView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         if let user = auth.user { signedIn(user) } else { signedOut }
-                        PracticeHistoryView(practice: practice)
+                        PracticeCalendarView(practice: practice, onBegin: onBegin)
+                        SavedRitualsView(saved: saved)
                         if let message = auth.problem ?? notice {
                             Text(message).font(Theme.bodySmall).foregroundStyle(Theme.terracotta)
                         }

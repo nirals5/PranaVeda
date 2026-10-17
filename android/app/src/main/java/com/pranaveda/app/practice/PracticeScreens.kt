@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,7 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Text
@@ -69,9 +66,6 @@ import com.pranaveda.app.ui.theme.Pv
 import com.pranaveda.app.ui.theme.cardSurface
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
 private fun practiceStore(): PracticeStore = (LocalContext.current.applicationContext as PranaVedaApplication).practice
@@ -358,58 +352,5 @@ private fun PracticeComplete(detail: String, breathwork: BreathworkPattern?, res
             showingBreathwork = false
             onDone()
         }
-    }
-}
-
-/** The streak and the most recent practices, newest first. A ritual that still has its snapshot opens again when tapped. */
-@Composable
-fun PracticeHistory(practice: PracticeStore, onOpenRitual: (RecommendationResult) -> Unit, limit: Int = 10) {
-    Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionLabel("Your practice")
-        val entries = practice.entries
-        if (entries.isEmpty()) {
-            Text(
-                "Practices you finish appear here. Begin one from a ritual or a breathwork card in your conversation with Amrita.",
-                style = Pv.body,
-                color = Pv.stone700,
-            )
-            return@Column
-        }
-        Text(streakLine(practice.streak, entries.size), style = Pv.headingLarge, color = Pv.ink)
-        val shown = entries.takeLast(limit).reversed()
-        shown.forEachIndexed { index, entry ->
-            val opens = entry.kind == PracticeLogEntry.Kind.Ritual && entry.result != null
-            Row(
-                Modifier.fillMaxWidth()
-                    .then(if (opens) Modifier.clickable { onOpenRitual(entry.result!!) } else Modifier)
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(if (entry.kind == PracticeLogEntry.Kind.Ritual) "🧘" else "🌬", fontSize = 18.sp, modifier = Modifier.width(24.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(entry.title, style = Pv.itemTitle, color = Pv.ink, maxLines = 2)
-                    Text("${dayLabel(entry.localDate)} · ${entry.durationMinutes} min", style = Pv.caption, color = Pv.stone500)
-                }
-                if (opens) Text("›", fontSize = 22.sp, color = Pv.stone500)
-            }
-            if (index < shown.lastIndex) HorizontalDivider(color = Pv.stone200.copy(alpha = 0.6f))
-        }
-    }
-}
-
-/** "3-day streak · 12 practices" */
-fun streakLine(streak: Int, total: Int): String {
-    val practices = if (total == 1) "1 practice" else "$total practices"
-    return if (streak > 0) "$streak-day streak · $practices" else practices
-}
-
-/** "Today", "Yesterday", or "Mon 12 Oct". */
-fun dayLabel(localDate: String, today: LocalDate = LocalDate.now()): String {
-    val date = runCatching { LocalDate.parse(localDate) }.getOrNull() ?: return localDate
-    return when (date) {
-        today -> "Today"
-        today.minusDays(1) -> "Yesterday"
-        else -> date.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()))
     }
 }

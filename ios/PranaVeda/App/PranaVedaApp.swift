@@ -9,6 +9,7 @@ struct PranaVedaApp: App {
     @State private var doshaGuide = DoshaGuideStore()
     @State private var practice = PracticeStore()
     @State private var insight = DailyInsightStore()
+    @State private var saved = SavedRitualStore()
     @State private var tab = AppTab.amrita
 
     enum AppTab: Hashable { case amrita, dosha, library, you }
@@ -16,7 +17,7 @@ struct PranaVedaApp: App {
     var body: some Scene {
         WindowGroup {
             TabView(selection: $tab) {
-                ChatView(model: chat, auth: auth, insight: insight)
+                ChatView(model: chat, auth: auth, insight: insight, saved: saved)
                     .tabItem { Label("Ask Amrita", systemImage: "sparkles") }
                     .tag(AppTab.amrita)
                 DoshaProfileView(profile: chat.profile, guide: doshaGuide) { message in
@@ -29,13 +30,15 @@ struct PranaVedaApp: App {
                 LibraryView(catalog: catalog)
                     .tabItem { Label("Library", systemImage: "figure.mind.and.body") }
                     .tag(AppTab.library)
-                AccountView(auth: auth, practice: practice)
+                AccountView(auth: auth, practice: practice, saved: saved) { tab = .amrita }
                     .tabItem { Label("You", systemImage: "person.crop.circle") }
                     .tag(AppTab.you)
             }
             .tint(Theme.lavenderDeep)
-            // Every screen that can finish a practice logs it here.
+            // Every screen that can finish a practice logs it here, and every
+            // ritual can be saved.
             .environment(practice)
+            .environment(saved)
             .onOpenURL { url in GIDSignIn.sharedInstance.handle(url) }
             .task {
                 chat.auth = auth

@@ -45,6 +45,7 @@ import com.pranaveda.app.model.ChatCard
 import com.pranaveda.app.model.DoshaProfileCard
 import com.pranaveda.app.model.RecommendationResult
 import com.pranaveda.app.model.YogaPose
+import com.pranaveda.app.practice.BookmarkButton
 import com.pranaveda.app.practice.BreathworkPacerScreen
 import com.pranaveda.app.practice.GuidedPracticeScreen
 import com.pranaveda.app.ui.theme.Pv
@@ -75,9 +76,10 @@ private val italicSmall: TextStyle = Pv.bodySmall.copy(fontStyle = FontStyle.Ita
 private fun RitualCard(result: RecommendationResult) {
     var showingDetail by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             SectionLabel("Ritual", Modifier.weight(1f))
             result.yogaPractice.durationMinutes?.let { SectionLabel("$it min") }
+            BookmarkButton(result)
         }
         Text(result.yogaPractice.title, style = Pv.headingLarge, color = Pv.ink)
         result.primaryEnergy?.let { Text(it, style = italicSmall, color = Pv.lavenderDeep) }
@@ -149,7 +151,12 @@ private fun RitualDetail(result: RecommendationResult, onBegin: () -> Unit) {
         contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        item { Text(result.yogaPractice.title, style = Pv.display, color = Pv.ink) }
+        item {
+            Row(verticalAlignment = Alignment.Top) {
+                Text(result.yogaPractice.title, style = Pv.display, color = Pv.ink, modifier = Modifier.weight(1f))
+                BookmarkButton(result)
+            }
+        }
         item {
             Button(
                 onClick = onBegin,

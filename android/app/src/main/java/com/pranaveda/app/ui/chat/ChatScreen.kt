@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -56,6 +57,9 @@ import androidx.compose.ui.unit.dp
 import com.pranaveda.app.R
 import com.pranaveda.app.model.ChatItem
 import com.pranaveda.app.model.DailyInsightStore
+import com.pranaveda.app.model.RecommendationResult
+import com.pranaveda.app.practice.SavedRitualsCard
+import com.pranaveda.app.practice.savedRitualStore
 import com.pranaveda.app.ui.theme.Pv
 import java.time.LocalTime
 
@@ -124,6 +128,7 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null) {
                         DailyInsightCard(insight.state, Modifier.padding(top = 4.dp))
                     }
                 }
+                item { WelcomeSavedRituals() }
             }
             items(model.items, key = { it.id }) { item ->
                 MessageRow(item, onOption = model::send)
@@ -131,6 +136,16 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null) {
             item { Spacer(Modifier.size(1.dp)) }
         }
     }
+}
+
+/** The newest saved rituals under the reflection, as on the website's home page. */
+@Composable
+private fun WelcomeSavedRituals() {
+    val saved = savedRitualStore()
+    if (saved.rituals.isEmpty()) return
+    var opening by remember { mutableStateOf<RecommendationResult?>(null) }
+    SavedRitualsCard(saved, onOpen = { opening = it }, limit = 3)
+    opening?.let { RitualSheet(it) { opening = null } }
 }
 
 @Composable
