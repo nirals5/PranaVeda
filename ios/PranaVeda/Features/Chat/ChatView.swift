@@ -4,6 +4,7 @@ struct ChatView: View {
     @Bindable var model: ChatViewModel
     var auth: AuthStore? = nil
     var insight: DailyInsightStore? = nil
+    var saved: SavedRitualStore? = nil
     @State private var draft = ""
     @FocusState private var inputFocused: Bool
     /// Grows with the text size, up to 48 points (see the cap on the input bar).
@@ -59,6 +60,9 @@ struct ChatView: View {
                 DailyInsightCard(state: insight.state)
                     .padding(.top, 14)
                     .task { await insight.loadIfNeeded(profile: model.profile) }
+            }
+            if let saved, !saved.rituals.isEmpty {
+                SavedRitualsView(saved: saved, limit: 3).padding(.top, 4)
             }
         }
         .padding(.top, 24)

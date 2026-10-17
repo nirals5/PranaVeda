@@ -8,6 +8,7 @@ import com.pranaveda.app.auth.DeviceDescription
 import com.pranaveda.app.auth.GoogleIdentityProvider
 import com.pranaveda.app.auth.InMemorySessionStorage
 import com.pranaveda.app.model.BreathworkPattern
+import com.pranaveda.app.model.PracticeCalendar
 import com.pranaveda.app.model.PracticeLog
 import com.pranaveda.app.model.PracticeLogEntry
 import com.pranaveda.app.model.PracticeStore
@@ -20,9 +21,7 @@ import com.pranaveda.app.practice.BreathPacer
 import com.pranaveda.app.practice.Guidance
 import com.pranaveda.app.practice.PoseSequence
 import com.pranaveda.app.practice.clockString
-import com.pranaveda.app.practice.dayLabel
 import com.pranaveda.app.practice.poseSeconds
-import com.pranaveda.app.practice.streakLine
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.builtins.ListSerializer
@@ -35,16 +34,18 @@ import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 import java.util.Collections
+import java.util.Locale
 
 class PracticeEngineTest {
     @Test fun readsPoseDurationsAsTheWebsiteDoes() {
@@ -166,13 +167,34 @@ class PracticeLogTest {
         assertTrue(entries[1].completedInstant != null)
     }
 
-    @Test fun describesTheStreakAndDays() {
-        assertEquals("3-day streak · 12 practices", streakLine(3, 12))
-        assertEquals("1 practice", streakLine(0, 1))
+    @Test fun laysOutTheMonthUnderItsWeekdays() {
+        val october = YearMonth.of(2026, 10)
+        val sundayFirst = PracticeCalendar(Locale.US, DayOfWeek.SUNDAY)
+        val days = sundayFirst.days(october)
+        assertEquals(31, days.size)
+        assertEquals(LocalDate.parse("2026-10-01"), days.first())
+        assertEquals(4, sundayFirst.leadingBlanks(october)) // 1 Oct 2026 is a Thursday
+        assertEquals("Sunday", sundayFirst.weekdays.first().second)
+        assertEquals(28, sundayFirst.days(YearMonth.of(2026, 2)).size)
+
+        val mondayFirst = PracticeCalendar(Locale.UK, DayOfWeek.MONDAY)
+        assertEquals(3, mondayFirst.leadingBlanks(october))
+        assertEquals("Monday", mondayFirst.weekdays.first().second)
+        assertEquals("Sunday", mondayFirst.weekdays.last().second)
+    }
+
+    @Test fun describesTheMonthAndDays() {
+        val grid = PracticeCalendar(Locale.US, DayOfWeek.SUNDAY)
         val today = LocalDate.parse("2026-10-15")
-        assertEquals("Today", dayLabel("2026-10-15", today))
-        assertEquals("Yesterday", dayLabel("2026-10-14", today))
-        assertNotEquals("2026-10-12", dayLabel("2026-10-12", today))
+        val entries = listOf(entry("a", "2026-10-15"), entry("b", "2026-10-15"), entry("c", "2026-10-12"))
+        assertEquals(listOf("a", "b"), PracticeCalendar.byDay(entries)["2026-10-15"]?.map { it.id })
+        assertEquals("4 practices this month · 3-day streak", PracticeCalendar.monthLine(4, 3))
+        assertEquals("1 practice this month", PracticeCalendar.monthLine(1, 0))
+        assertEquals("Thursday, October 15, today, 2 practices", grid.dayDescription(today, 2, today))
+        assertEquals("Wednesday, October 14, no practice", grid.dayDescription(today.minusDays(1), 0, today))
+        assertEquals("This day has not arrived yet.", PracticeCalendar.emptyDayLine(today.plusDays(1), today))
+        assertTrue(PracticeCalendar.emptyDayLine(today, today).startsWith("Nothing practiced yet today."))
+        assertEquals("No practice was recorded on this day.", PracticeCalendar.emptyDayLine(today.minusDays(14), today))
     }
 }
 

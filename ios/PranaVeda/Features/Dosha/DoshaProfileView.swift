@@ -256,12 +256,3 @@ private struct BalanceBar: View {
         .accessibilityLabel("\(style.name) \(Int(percent.rounded())) percent")
     }
 }
-
-private struct TrailingIconLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 8) {
-            configuration.title
-            configuration.icon
-        }
-    }
-}

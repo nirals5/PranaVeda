@@ -65,13 +65,43 @@ struct PracticeLogTests {
         #expect(entries[1].completedDate != nil) // without fractional seconds too
     }
 
-    @Test func describesTheStreakAndDays() {
-        #expect(PracticeHistoryView.streakLine(3, total: 12) == "3-day streak · 12 practices")
-        #expect(PracticeHistoryView.streakLine(0, total: 1) == "1 practice")
-        let today = PracticeLog.isoFormatter.date(from: "2026-10-15T20:00:00.000Z")!
-        #expect(PracticeHistoryView.dayLabel("2026-10-15", today: today, timeZone: pacific) == "Today")
-        #expect(PracticeHistoryView.dayLabel("2026-10-14", today: today, timeZone: pacific) == "Yesterday")
-        #expect(PracticeHistoryView.dayLabel("2026-10-12", today: today, timeZone: pacific) != "2026-10-12")
+    @Test func laysOutTheMonthUnderItsWeekdays() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = pacific
+        calendar.locale = Locale(identifier: "en_US")
+        calendar.firstWeekday = 1 // Sunday, as on the website
+        let grid = PracticeCalendar(calendar: calendar)
+        let october = grid.date("2026-10-16")!
+        let keys = grid.dayKeys(october)
+        #expect(keys.count == 31)
+        #expect(keys.first == "2026-10-01")
+        #expect(keys.last == "2026-10-31")
+        #expect(grid.leadingBlanks(october) == 4) // 1 Oct 2026 is a Thursday
+        #expect(grid.weekdays.first?.long == "Sunday")
+        #expect(grid.dayKeys(grid.adding(months: 1, to: october)).count == 30)
+        #expect(grid.dayKeys(grid.adding(months: -8, to: october)).count == 28) // February 2026
+
+        calendar.firstWeekday = 2 // Monday-first readers
+        let mondayFirst = PracticeCalendar(calendar: calendar)
+        #expect(mondayFirst.leadingBlanks(october) == 3)
+        #expect(mondayFirst.weekdays.first?.long == "Monday")
+        #expect(mondayFirst.weekdays.last?.long == "Sunday")
+    }
+
+    @Test func describesTheMonthAndDays() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = pacific
+        calendar.locale = Locale(identifier: "en_US")
+        let grid = PracticeCalendar(calendar: calendar)
+        let entries = [entry("a", "2026-10-15"), entry("b", "2026-10-15"), entry("c", "2026-10-12")]
+        #expect(PracticeCalendar.byDay(entries)["2026-10-15"]?.map(\.id) == ["a", "b"])
+        #expect(PracticeCalendar.monthLine(count: 4, streak: 3) == "4 practices this month · 3-day streak")
+        #expect(PracticeCalendar.monthLine(count: 1, streak: 0) == "1 practice this month")
+        #expect(grid.dayDescription("2026-10-15", practices: 2, today: "2026-10-15") == "Thursday, October 15, today, 2 practices")
+        #expect(grid.dayDescription("2026-10-14", practices: 0, today: "2026-10-15") == "Wednesday, October 14, no practice")
+        #expect(PracticeCalendar.emptyDayLine("2026-10-16", today: "2026-10-15") == "This day has not arrived yet.")
+        #expect(PracticeCalendar.emptyDayLine("2026-10-15", today: "2026-10-15").hasPrefix("Nothing practiced yet today."))
+        #expect(PracticeCalendar.emptyDayLine("2026-10-01", today: "2026-10-15") == "No practice was recorded on this day.")
     }
 }
 

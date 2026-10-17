@@ -36,7 +36,8 @@ import androidx.compose.ui.unit.dp
 import com.pranaveda.app.PranaVedaApplication
 import com.pranaveda.app.R
 import com.pranaveda.app.model.RecommendationResult
-import com.pranaveda.app.practice.PracticeHistory
+import com.pranaveda.app.practice.PracticeCalendarCard
+import com.pranaveda.app.practice.SavedRitualsCard
 import com.pranaveda.app.ui.chat.RitualSheet
 import com.pranaveda.app.auth.AccountUser
 import com.pranaveda.app.auth.AuthStore
@@ -48,7 +49,7 @@ import kotlinx.coroutines.launch
 /** Optional sign-in, and the account once signed in. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountScreen(auth: AuthStore) {
+fun AccountScreen(auth: AuthStore, onBegin: () -> Unit = {}) {
     var notice by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
@@ -73,9 +74,10 @@ fun AccountScreen(auth: AuthStore) {
                 SignedOut(auth, onStart = { notice = null })
             }
             (auth.problem ?: notice)?.let { Text(it, style = Pv.bodySmall, color = Pv.terracotta) }
-            val practice = (LocalContext.current.applicationContext as PranaVedaApplication).practice
+            val app = LocalContext.current.applicationContext as PranaVedaApplication
             var reopening by remember { mutableStateOf<RecommendationResult?>(null) }
-            PracticeHistory(practice, onOpenRitual = { reopening = it })
+            PracticeCalendarCard(app.practice, onOpenRitual = { reopening = it }, onBegin = onBegin)
+            SavedRitualsCard(app.saved, onOpen = { reopening = it })
             reopening?.let { RitualSheet(it) { reopening = null } }
         }
     }
