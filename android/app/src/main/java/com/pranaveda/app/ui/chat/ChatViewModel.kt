@@ -54,10 +54,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = application.getSharedPreferences("pranaveda", Context.MODE_PRIVATE)
     private var streamJob: Job? = null
 
+    /** Speaks the reply to a spoken message (the app's AmritaVoice), and stops whatever is still being said. */
+    var speakReply: ((String) -> Unit)? = null
+    var stopSpeaking: (() -> Unit)? = null
+
     init {
         profile = readProfile(PROFILE_KEY) ?: JsonObject(emptyMap())
         // The profile and the practice log both follow the account.
         val practice = (application as PranaVedaApplication).practice
+        val voice = application.voice
+        speakReply = voice::speak
+        stopSpeaking = voice::stop
         auth.onSignedIn = {
             adoptAccountProfile(it)
             practice.adoptAccount(it)
@@ -78,9 +85,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val greetingName: String?
         get() = profileName ?: auth.user?.displayName?.takeIf { it.isNotBlank() }
 
-    fun send(text: String) {
+    /** Sends a message. A [spoken] one is marked as voice for the server, and its reply is read aloud, as on the website. */
+    fun send(text: String, spoken: Boolean = false) {
         val trimmed = text.trim()
         if (trimmed.isEmpty() || isStreaming) return
+        stopSpeaking?.invoke()
 
         items = items + ChatItem(ChatItem.Role.User, trimmed)
         val history = items
@@ -97,6 +106,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             profile = profile,
             localTime = now.format(LOCAL_TIME),
             localDate = localDate(LocalDate.now()),
+            inputMode = if (spoken) "voice" else "text",
         )
 
         streamJob = viewModelScope.launch {
@@ -124,6 +134,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 update(reply.id) { it.copy(streaming = false) }
                 if (streamJob == coroutineContext[Job]) isStreaming = false
             }
+            // Speak in kind: cards stay silent, Amrita's own sentence introduces them.
+            val said = items.firstOrNull { it.id == reply.id }
+            if (spoken && said != null && !said.failed && said.text.isNotBlank()) speakReply?.invoke(said.text)
         }
     }
 
@@ -184,6 +197,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /** Starts a fresh conversation. The wellness profile is kept. */
     fun reset() {
         streamJob?.cancel()
+        stopSpeaking?.invoke()
         streamJob = null
         items = emptyList()
         isStreaming = false

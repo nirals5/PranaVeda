@@ -69,6 +69,10 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLSchemes: [$(PV_GOOGLE_URL_SCHEME)]
         # Shown by iOS the first time a phone build reaches the Mac.
+        # Speaking to Amrita: the words are recognised on the phone where it
+        # can, and only the text is sent.
+        NSMicrophoneUsageDescription: PranaVeda listens while you speak to Amrita, so you can tell her how you feel out loud.
+        NSSpeechRecognitionUsageDescription: Your words are turned into text so Amrita can read what you said.
         NSLocalNetworkUsageDescription: PranaVeda connects to the PranaVeda server running on your Mac while the app is in development.
   PranaVedaTests:
     type: bundle.unit-test

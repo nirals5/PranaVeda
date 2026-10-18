@@ -124,6 +124,21 @@ class ApiClient(
         }
     }
 
+    /**
+     * Amrita's ElevenLabs voice for [text] (MP3), or null when the server has
+     * no voice configured (it answers 503). Throws when it cannot be reached.
+     */
+    suspend fun speech(text: String): ByteArray? = withContext(Dispatchers.IO) {
+        val body = PvJson.encodeToString(SpeechRequest.serializer(), SpeechRequest(text))
+        val request = Request.Builder().url(baseUrl.resolve("api/tts")!!).post(body.toRequestBody(JSON)).build()
+        http.newCall(request).execute().use { response ->
+            if (response.code == 200) response.body.bytes().takeIf { it.isNotEmpty() } else null
+        }
+    }
+
+    @Serializable
+    private data class SpeechRequest(val text: String)
+
     @Serializable
     private data class InsightRequest(val profile: JsonObject, val localTime: String)
 

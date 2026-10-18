@@ -114,7 +114,7 @@ class MainActivity : ComponentActivity() {
                     ) { padding ->
                         Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
                             when (tab) {
-                                0 -> ChatScreen(chat, insight)
+                                0 -> ChatScreen(chat, insight, (application as PranaVedaApplication).voice)
                                 1 -> DoshaScreen(chat.profile, doshaGuide) { message ->
                                     // As on the website: over to the chat, with the question asked.
                                     tab = 0

@@ -18,6 +18,11 @@ final class ChatViewModel {
     /// signed-in person.
     weak var auth: AuthStore?
 
+    /// Speaks the reply to a spoken message (the app's AmritaVoice), and
+    /// stops whatever is still being said.
+    var speakReply: ((String) -> Void)?
+    var stopSpeaking: (() -> Void)?
+
     private let api: APIClient
     private let defaults: UserDefaults
     private var streamTask: Task<Void, Never>?
@@ -53,9 +58,12 @@ final class ChatViewModel {
         return formatter.string(from: date)
     }
 
-    func send(_ text: String) {
+    /// Sends a message. A `spoken` one is marked as voice for the server, and
+    /// its reply is read aloud, as on the website.
+    func send(_ text: String, spoken: Bool = false) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isStreaming else { return }
+        stopSpeaking?()
 
         items.append(ChatItem(role: .user, text: trimmed))
         let history = items.map { ChatItem.Message(role: $0.role.rawValue, content: $0.modelContent) }
@@ -71,6 +79,7 @@ final class ChatViewModel {
             profile: profile,
             localTime: now.formatted(date: .numeric, time: .standard),
             localDate: Self.localDate(now),
+            inputMode: spoken ? "voice" : "text",
             previousSession: nil
         )
 
@@ -97,6 +106,10 @@ final class ChatViewModel {
             }
             update(reply.id) { $0.streaming = false }
             isStreaming = false
+            // Speak in kind: cards stay silent, Amrita's own sentence introduces them.
+            if spoken, let said = items.first(where: { $0.id == reply.id }), !said.failed, !said.text.isEmpty {
+                speakReply?(said.text)
+            }
         }
     }
 
@@ -158,6 +171,7 @@ final class ChatViewModel {
     /// Starts a fresh conversation. The wellness profile is kept.
     func reset() {
         streamTask?.cancel()
+        stopSpeaking?()
         items = []
         isStreaming = false
     }

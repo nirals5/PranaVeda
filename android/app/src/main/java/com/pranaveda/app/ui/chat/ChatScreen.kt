@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import com.pranaveda.app.R
 import com.pranaveda.app.model.ChatItem
 import com.pranaveda.app.model.DailyInsightStore
+import com.pranaveda.app.voice.AmritaVoice
 import com.pranaveda.app.model.RecommendationResult
 import com.pranaveda.app.practice.SavedRitualsCard
 import com.pranaveda.app.practice.savedRitualStore
@@ -65,7 +66,8 @@ import java.time.LocalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null) {
+fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: AmritaVoice? = null) {
+    var talking by rememberSaveable { mutableStateOf(false) }
     var draft by rememberSaveable { mutableStateOf("") }
     val focus = LocalFocusManager.current
     val listState = rememberLazyListState()
@@ -84,6 +86,10 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null) {
         if (model.items.isNotEmpty()) listState.animateScrollToItem(model.items.size)
     }
 
+    if (talking) {
+        VoiceSheet(onDismiss = { talking = false }, onSend = { model.send(it, spoken = true) })
+    }
+
     Scaffold(
         containerColor = Color.Transparent,
         // The app's tab bar already keeps clear of the system bars.
@@ -91,6 +97,18 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null) {
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Amrita", style = Pv.heading, color = Pv.ink) },
+                // Spoken replies on or off, kept between launches (as on the website).
+                navigationIcon = {
+                    if (voice != null) {
+                        IconButton(onClick = { voice.changeMuted(!voice.isMuted) }) {
+                            Icon(
+                                painterResource(if (voice.isMuted) R.drawable.ic_volume_off else R.drawable.ic_volume_up),
+                                contentDescription = if (voice.isMuted) "Voice replies off" else "Voice replies on",
+                                tint = if (voice.isMuted) Pv.stone500 else Pv.lavenderDeep,
+                            )
+                        }
+                    }
+                },
                 actions = {
                     // Starts a fresh conversation (the wellness profile is kept),
                     // like the website's "Begin a new conversation". Only shown
@@ -110,6 +128,7 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null) {
                 onDraftChange = { draft = it },
                 canSend = draft.isNotBlank() && !model.isStreaming,
                 onSend = ::send,
+                onSpeak = if (voice != null) ({ talking = true }) else null,
                 modifier = Modifier.imePadding(),
             )
         },
@@ -185,6 +204,8 @@ private fun InputBar(
     canSend: Boolean,
     onSend: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Opens the voice consultation; no microphone button without it. */
+    onSpeak: (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(28.dp)
     Row(
@@ -213,6 +234,15 @@ private fun InputBar(
                 cursorColor = Pv.lavenderDeep,
             ),
         )
+        if (onSpeak != null) {
+            FilledIconButton(
+                onClick = onSpeak,
+                modifier = Modifier.padding(end = 6.dp).size(44.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = Pv.lavenderTint, contentColor = Pv.lavenderDeep),
+            ) {
+                Icon(painterResource(R.drawable.ic_mic), contentDescription = "Speak to Amrita")
+            }
+        }
         FilledIconButton(
             onClick = onSend,
             enabled = canSend,
