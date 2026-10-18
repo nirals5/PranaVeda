@@ -2,13 +2,13 @@ import SwiftUI
 
 /// PranaVeda's look, from figma-tokens.json and DESIGN.md.
 ///
-/// Prototype note: the web app uses Playfair Display (headings) and Plus
-/// Jakarta Sans (body). Until those font files are bundled, the system serif
-/// (New York) and the system sans stand in.
+/// Type is the website's: Playfair Display for headings and quotes, Plus
+/// Jakarta Sans for everything else (bundled in Fonts/, registered in
+/// project.yml). Labels stay monospaced, as on the website's cards.
 ///
-/// Every font is an iOS text style, never a fixed size, so all text follows
-/// the reader's text-size setting (Settings → Display & Brightness → Text
-/// Size), including the larger accessibility sizes.
+/// Every font is tied to an iOS text style, so all text follows the reader's
+/// text-size setting (Settings → Display & Brightness → Text Size), including
+/// the larger accessibility sizes.
 enum Theme {
     static let lavender = Color(hex: 0x8A79A5)
     static let lavenderDeep = Color(hex: 0x71608E)
@@ -23,13 +23,38 @@ enum Theme {
     static let stone200 = Color(hex: 0xCFD8DC)
     static let warmWhite = Color(hex: 0xF5F3EF)
 
-    static let display = Font.system(.largeTitle, design: .serif, weight: .regular)
-    static func heading(_ style: Font.TextStyle = .title3) -> Font { .system(style, design: .serif, weight: .regular) }
-    static let body = Font.system(.body)
-    static let bodySmall = Font.system(.subheadline)
+    static let serifFamily = "Playfair Display"
+    static let sansFamily = "Plus Jakarta Sans"
+
+    /// Each text style's size at the default text size, which iOS then scales.
+    static func baseSize(_ style: Font.TextStyle) -> CGFloat {
+        switch style {
+        case .largeTitle: 34
+        case .title: 28
+        case .title2: 22
+        case .title3: 20
+        case .headline, .body: 17
+        case .callout: 16
+        case .subheadline: 15
+        case .footnote: 13
+        case .caption: 12
+        case .caption2: 11
+        @unknown default: 17
+        }
+    }
+
+    static func serif(_ style: Font.TextStyle) -> Font { .custom(serifFamily, size: baseSize(style), relativeTo: style) }
+    static func sans(_ style: Font.TextStyle) -> Font { .custom(sansFamily, size: baseSize(style), relativeTo: style) }
+
+    static let display = serif(.largeTitle)
+    static func heading(_ style: Font.TextStyle = .title3) -> Font { serif(style) }
+    /// Quotes and reflective lines, set in the serif like the website's.
+    static let quote = serif(.body)
+    static let body = sans(.body)
+    static let bodySmall = sans(.subheadline)
     /// Names under pose pictures and on answer options.
-    static let itemTitle = Font.system(.subheadline, weight: .medium)
-    static let caption = Font.system(.caption)
+    static let itemTitle = sans(.subheadline).weight(.medium)
+    static let caption = sans(.caption)
     /// Small uppercase monospace labels, as on the web app's cards.
     static let label = Font.system(.caption, design: .monospaced, weight: .bold)
 

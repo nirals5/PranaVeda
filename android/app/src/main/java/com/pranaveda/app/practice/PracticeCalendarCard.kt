@@ -37,8 +37,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pranaveda.app.R
@@ -236,7 +234,7 @@ private fun SelectedDay(
         if (entries.isEmpty()) {
             Text(
                 PracticeCalendar.emptyDayLine(day, today),
-                style = Pv.body.copy(fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic),
+                style = Pv.quote,
                 color = Pv.stone700,
             )
             if (day == today) {

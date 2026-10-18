@@ -142,7 +142,7 @@ struct PracticeCalendarView: View {
             }
             if entries.isEmpty {
                 Text(PracticeCalendar.emptyDayLine(selectedKey, today: today))
-                    .font(.system(.body, design: .serif)).italic()
+                    .font(Theme.quote).italic()
                     .foregroundStyle(Theme.stone700)
                 if selectedKey == today {
                     Button(action: onBegin) {

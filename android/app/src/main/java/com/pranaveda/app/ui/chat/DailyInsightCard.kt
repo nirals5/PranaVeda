@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -77,7 +76,7 @@ private fun Reflection(insight: DailyInsight) {
 private fun Quote(text: String) {
     Text(
         "“$text”",
-        style = Pv.body.copy(fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic),
+        style = Pv.quote,
         color = Pv.stone700,
     )
 }

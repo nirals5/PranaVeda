@@ -80,5 +80,5 @@ Sign in with Apple), as Apple asks.
 
 - Plain `http` is allowed for the local network only (`NSAllowsLocalNetworking`); everything else needs https.
 - Image addresses from the API are either full addresses or site paths (`/poses/cobra.jpg`); paths are resolved against the API's address (`AppConfig.resolve`).
-- The web app's fonts (Playfair Display, Plus Jakarta Sans) are not bundled yet; the system serif and sans stand in.
+- The web app's fonts are bundled: Playfair Display for headings and quotes, Plus Jakarta Sans for text (`PranaVeda/Fonts`, registered in `project.yml`; SIL Open Font License, copies alongside). They follow the text-size setting like system fonts.
 - Spoken guidance uses the phone's built-in voice (the website uses ElevenLabs when it is configured); the speaker button on the practice screen turns it off. Practice timing follows the clock, so it stays right if the screen sleeps or the app goes to the background briefly.
