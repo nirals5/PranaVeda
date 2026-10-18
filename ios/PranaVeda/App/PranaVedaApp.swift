@@ -58,13 +58,16 @@ struct PranaVedaApp: App {
                 chat.speakReply = { [voice] in voice.speak($0) }
                 chat.stopSpeaking = { [voice] in voice.stop() }
                 practice.auth = auth
-                auth.onSignedIn = { [chat, practice] user in
+                saved.auth = auth
+                auth.onSignedIn = { [chat, practice, saved] user in
                     await chat.adoptAccountProfile(for: user)
                     await practice.adoptAccount(user)
+                    await saved.adoptAccount(user)
                 }
-                auth.onSignedOut = { [chat, practice] in
+                auth.onSignedOut = { [chat, practice, saved] in
                     chat.handBackDevice()
                     practice.handBackDevice()
+                    saved.handBackDevice()
                 }
                 await auth.restore()
             }

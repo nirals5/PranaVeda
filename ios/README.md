@@ -9,7 +9,7 @@ Prakriti Amrita assessed, with the balancing guide from `/api/dosha-guide`, as
 on the website's Dosha Profile screen), guided practice (a ritual's poses one at a time with
 a timer and spoken guidance, and a breathwork pacer) with a practice log and
 streak that sync with the account (shown on a practice calendar in the "You" tab, as on the website), saved
-rituals (bookmarked from any ritual, kept on the device as on the website), and optional Google sign-in (the "You" tab) that shares the wellness profile with the website.
+rituals (bookmarked from any ritual; kept on the device, and in the account while signed in, so they follow you to the website and your other devices), and optional Google sign-in (the "You" tab) that shares the wellness profile with the website.
 
 ## Requirements
 

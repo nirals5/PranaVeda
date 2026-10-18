@@ -68,10 +68,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         auth.onSignedIn = {
             adoptAccountProfile(it)
             practice.adoptAccount(it)
+            application.saved.adoptAccount(it)
         }
         auth.onSignedOut = {
             handBackDevice()
             practice.handBackDevice()
+            application.saved.handBackDevice()
         }
     }
 

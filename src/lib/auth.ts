@@ -143,6 +143,16 @@ export async function uploadPractices<E>(entries: E[]): Promise<boolean> {
   return response.ok;
 }
 
+export async function sendSavedChanges<R>(changes: { saves?: R[]; removes?: string[] }): Promise<boolean> {
+  const { response } = await fetchWithSession('/api/sync/saved-rituals', json('POST', changes));
+  return response.ok;
+}
+
+export async function fetchSavedRituals<R>(): Promise<R[] | null> {
+  const { response } = await fetchWithSession('/api/sync/saved-rituals', { method: 'GET' });
+  return response.ok ? ((await response.json()).rituals as R[]) : null;
+}
+
 export async function fetchPracticesAfter<E>(cursor: number): Promise<{ entries: E[]; cursor: number; hasMore: boolean } | null> {
   const { response } = await fetchWithSession(`/api/sync/practice-log?after=${cursor}`, { method: 'GET' });
   return response.ok ? response.json() : null;

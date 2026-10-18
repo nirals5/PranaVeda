@@ -16,6 +16,7 @@ import ProfileView from './components/ProfileView';
 import { useAuth } from './hooks/useAuth';
 import { useProfileSync } from './hooks/useProfileSync';
 import { usePracticeSync } from './hooks/usePracticeSync';
+import { useSavedRituals } from './hooks/useSavedRituals';
 import { usePracticeLog } from './hooks/usePracticeLog';
 import { useExternalCalendar, describeCalendar } from './hooks/useExternalCalendar';
 import FreeTimeNudge from './components/FreeTimeNudge';
@@ -88,7 +89,8 @@ export default function App() {
       setShowHome(true);
     },
   });
-  const [savedPractices, setSavedPractices] = useState<SavedPractice[]>([]);
+  // Bookmarked rituals: on this device, and in the account while signed in.
+  const { saved: savedPractices, save: saveRitual, remove: removeSavedRitual } = useSavedRituals(auth);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   
   // Track currently active saving ID to toggling
@@ -108,18 +110,6 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [notification]);
-
-  // Load saved practices from localStorage on boot
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('pranaveda_practices');
-      if (stored) {
-        setSavedPractices(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.warn("Could not read localStorage:", e);
-    }
-  }, []);
 
   // Time-of-day greeting. A signed-in person is greeted by first name: the
   // name they gave Amrita if any, else the first word of their account name.
@@ -157,14 +147,14 @@ export default function App() {
     const exists = savedPractices.find(p => p.id === activePracticeId || p.result.primaryEnergy === currentResult.primaryEnergy);
     if (exists) {
       // Remove it
-      const filtered = savedPractices.filter(p => p.id !== exists.id);
-      setSavedPractices(filtered);
-      localStorage.setItem('pranaveda_practices', JSON.stringify(filtered));
+      removeSavedRitual(exists.id);
       showToast("Practice deleted from Saved list.", "info");
     } else {
       // Add it
       const newSaved: SavedPractice = {
-        id: activePracticeId.startsWith('temp_') ? activePracticeId : `save_${Date.now()}`,
+        // Always a new id: a removed one stays removed in the account, so
+        // saving the same ritual again must not reuse it.
+        id: `save_${Date.now()}`,
         title: currentResult.yogaPractice.title,
         date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
         query: inputValue || "Voice Wellness Consultation",
@@ -172,9 +162,7 @@ export default function App() {
         result: currentResult
       };
       
-      const updated = [newSaved, ...savedPractices];
-      setSavedPractices(updated);
-      localStorage.setItem('pranaveda_practices', JSON.stringify(updated));
+      saveRitual(newSaved);
       showToast("Wellness ritual safely bookmarked.", "success");
     }
   };
@@ -187,9 +175,7 @@ export default function App() {
 
   const handleDeleteSavedPractice = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const filtered = savedPractices.filter(p => p.id !== id);
-    setSavedPractices(filtered);
-    localStorage.setItem('pranaveda_practices', JSON.stringify(filtered));
+    removeSavedRitual(id);
     if (activePracticeId === id) {
       setActivePracticeId(null);
     }

@@ -28,7 +28,14 @@ class PranaVedaApplication : Application() {
         ).also { it.auth = auth }
     }
 
-    val saved: SavedRitualStore by lazy { SavedRitualStore(File(filesDir, "saved-rituals.json"), appScope) }
+    val saved: SavedRitualStore by lazy {
+        SavedRitualStore(
+            file = File(filesDir, "saved-rituals.json"),
+            scope = appScope,
+            prefs = getSharedPreferences("pranaveda", MODE_PRIVATE),
+            api = AccountApi(),
+        ).also { it.auth = auth }
+    }
 
     /** Amrita's spoken replies, shared so a new message or screen can stop them. */
     val voice: AmritaVoice by lazy { AmritaVoice(this, appScope) }

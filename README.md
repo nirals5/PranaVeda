@@ -162,13 +162,14 @@ What signing in does:
 
 - **Wellness profile:** the profile Amrita builds is saved to the account and follows the person to other devices. While signed in, Amrita reads it from the account and saves her changes there.
 - **Practice history:** every finished practice is saved to the account, so the calendar, streak and trends show practices from all devices. A practice finished offline is uploaded later.
+- **Saved rituals:** bookmarks are saved to the account and follow the person to other devices. Removing one removes it everywhere; the server keeps a small marker in its place, so a device that was offline cannot bring it back.
 - **Greeting:** the home screen greets the person by first name.
 
 Not synced: calendar connections, location settings, wearable readings and the chat conversation stay on the device.
 
 - **First sign-in on a device:** if the account has no profile yet, this device's profile becomes the account's. Otherwise the account's replaces the device's copy.
-- **Sign-out:** by any route (signing out, a session that ended, account deletion), the device goes back to how it was before sign-in. The account's profile and practices are removed from it, and its own pre-sign-in data is put back, so the next person on a shared device does not see them. A practice that never reached the account is kept rather than lost.
-- **Account deletion:** "Delete account" in the Profile header removes the account, its sign-in methods, sessions, profile and practice history from the server, and signs out every device.
+- **Sign-out:** by any route (signing out, a session that ended, account deletion), the device goes back to how it was before sign-in. The account's profile, practices and saved rituals are removed from it, and its own pre-sign-in data is put back, so the next person on a shared device does not see them. A practice that never reached the account is kept rather than lost.
+- **Account deletion:** "Delete account" in the Profile header removes the account, its sign-in methods, sessions, profile, practice history and saved rituals from the server, and signs out every device.
 
 Sign-in methods:
 
@@ -212,6 +213,7 @@ Signed out, or with accounts switched off, everything is kept in the browser on 
 | Wellness profile Amrita has built | `pranaveda_profile` |
 | Current conversation, and the end of the previous one | `pranaveda_chat`, `pranaveda_chat_ts`, `pranaveda_last_session` |
 | Practice log | `pranaveda_practice_log` |
+| Saved (bookmarked) rituals | `pranaveda_practices` |
 | Calendar connections (including the private link) | `pranaveda_calendar_connections` |
 | Notification preference and last notification | `pranaveda_nudge_notifications`, `pranaveda_nudge_notified` |
 | Google Health daily readings (up to 90 days) | `pranaveda_health_days` |
@@ -221,7 +223,7 @@ Signed out, or with accounts switched off, everything is kept in the browser on 
 
 Disconnecting Google Health also clears its saved readings.
 
-Signed in, the browser also keeps a few markers so sync can hand the device back on sign-out: `pranaveda_signed_in`, `pranaveda_profile_owner`, `pranaveda_profile_before_signin`, and `pranaveda_practice_owner`, `pranaveda_practice_own_ids`, `pranaveda_practice_synced_ids`, `pranaveda_practice_cursor`.
+Signed in, the browser also keeps a few markers so sync can hand the device back on sign-out: `pranaveda_signed_in`, `pranaveda_profile_owner`, `pranaveda_profile_before_signin`, and `pranaveda_practice_owner`, `pranaveda_practice_own_ids`, `pranaveda_practice_synced_ids`, `pranaveda_practice_cursor`, and `pranaveda_saved_owner`, `pranaveda_saved_own_ids`, `pranaveda_saved_synced_ids`, `pranaveda_saved_removed_ids`.
 
 Signed in, the server (Neon Postgres) also stores:
 
@@ -233,6 +235,7 @@ Signed in, the server (Neon Postgres) also stores:
 | Session tokens, stored hashed | `refresh_tokens` |
 | Wellness profile | `wellness_profiles` |
 | Practice history, including heart readings and ritual snapshots | `practice_log_entries` |
+| Saved rituals, and markers for removed ones (no ritual content) | `saved_rituals` |
 
 Everything is removed when the account is deleted.
 

@@ -4,6 +4,7 @@ import { isSameOrigin, requireUser } from './_lib/http.js';
 import { parseProfile } from './_lib/profileSchema.js';
 import { loadAccountProfile, saveProfile } from './_lib/profiles.js';
 import { MAX_UPLOAD, entriesAfter, parseEntries, storeEntries } from './_lib/practiceLog.js';
+import { MAX_REMOVES, MAX_SAVES, applyChanges, listSaved, parseChanges } from './_lib/savedRituals.js';
 
 // Keeping a signed-in user's data the same on every device: /api/sync/*.
 // Signed-in only; a guest's data never leaves their device.
@@ -81,6 +82,32 @@ app.get(
     const after = Number(req.query.after ?? 0);
     if (!Number.isSafeInteger(after) || after < 0) return res.status(400).json({ error: 'invalid_cursor' });
     res.json(await entriesAfter(user.id, after));
+  })
+);
+
+// Rituals a device saved (up to MAX_SAVES) and removed (up to MAX_REMOVES).
+// Sending one already stored or removed is fine; a removed one stays removed.
+app.post(
+  '/api/sync/saved-rituals',
+  route(async (req, res) => {
+    if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const parsed = parseChanges(req.body);
+    if ('invalid' in parsed) {
+      return res.status(400).json({ error: `invalid_${parsed.invalid}`, invalidAt: parsed.at, maxSaves: MAX_SAVES, maxRemoves: MAX_REMOVES });
+    }
+    res.json(await applyChanges(user.id, parsed.saves, parsed.removes));
+  })
+);
+
+// The account's saved rituals, newest first.
+app.get(
+  '/api/sync/saved-rituals',
+  route(async (req, res) => {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    res.json({ rituals: await listSaved(user.id) });
   })
 );
 
