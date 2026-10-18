@@ -148,10 +148,20 @@ private fun WelcomeSavedRituals() {
     opening?.let { RitualSheet(it) { opening = null } }
 }
 
+/**
+ * Which greeting fits the hour, as on the website (src/lib/greeting.ts):
+ * morning starts at 5, so someone up after midnight is wished a good evening
+ * rather than a good morning.
+ */
+fun timeOfDay(hour: Int): String = when (hour) {
+    in 5..11 -> "morning"
+    in 12..16 -> "afternoon"
+    else -> "evening"
+}
+
 @Composable
 private fun Welcome(name: String?) {
-    val hour = LocalTime.now().hour
-    val time = if (hour < 12) "morning" else if (hour < 17) "afternoon" else "evening"
+    val time = timeOfDay(LocalTime.now().hour)
     val greeting = name?.split(" ")?.firstOrNull()?.let { "Good $time, $it." }
         ?: mapOf(
             "morning" to "Good morning, seeker.",

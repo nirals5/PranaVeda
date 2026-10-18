@@ -10,6 +10,7 @@ import AmritaChat from './components/AmritaChat';
 import DoshaProfileView from './components/DoshaProfileView';
 import { useAmritaChat } from './hooks/useAmritaChat';
 import { RecommendationResult, SavedPractice } from './types';
+import { timeOfDay } from './lib/greeting';
 import RecoveryTrends from './components/RecoveryTrends';
 import ProfileView from './components/ProfileView';
 import { useAuth } from './hooks/useAuth';
@@ -125,8 +126,7 @@ export default function App() {
   // While a session is still being restored the greeting stays neutral, so a
   // returning user never sees a guest phrase flash before their name.
   const getGreeting = () => {
-    const hours = new Date().getHours();
-    const time = hours < 12 ? 'morning' : hours < 17 ? 'afternoon' : 'evening';
+    const time = timeOfDay(new Date().getHours());
     if (auth.status === 'checking') return `Good ${time}.`;
     const firstName =
       auth.status === 'user' ? (profile.name || auth.user?.displayName || '').trim().split(/\s+/)[0] : '';
