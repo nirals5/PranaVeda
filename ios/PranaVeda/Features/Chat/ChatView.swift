@@ -9,6 +9,7 @@ struct ChatView: View {
     /// Set while speaking to Amrita: the input bar becomes the recording bar.
     @State private var listener: VoiceListener?
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var draft = ""
     @FocusState private var inputFocused: Bool
     /// Grows with the text size, up to 48 points (see the cap on the input bar).
@@ -86,7 +87,7 @@ struct ChatView: View {
 
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(greeting).font(Theme.display).foregroundStyle(Theme.ink)
+            Text(greeting).font(Theme.display).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
             Text("Tell me how you feel, and I'll suggest a practice that fits your body, energy, and goals.")
                 .font(Theme.body)
                 .foregroundStyle(Theme.stone700)
@@ -154,7 +155,7 @@ struct ChatView: View {
         .padding(.leading, 18)
         .padding(.trailing, 8)
         .padding(.vertical, 8)
-        .background(.white.opacity(0.85), in: Capsule())
+        .background(.white.opacity(0.96), in: Capsule()) // nearly solid: text scrolling behind never shows through
         .overlay(Capsule().stroke(Theme.stone200.opacity(0.7)))
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
@@ -187,7 +188,8 @@ struct ChatView: View {
 
     private func scrollToEnd(_ proxy: ScrollViewProxy) {
         guard let last = model.items.last else { return }
-        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(last.id, anchor: .bottom) }
+        // A gentle glide, or a jump with Reduce Motion.
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { proxy.scrollTo(last.id, anchor: .bottom) }
     }
 }
 

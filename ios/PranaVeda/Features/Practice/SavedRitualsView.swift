@@ -11,7 +11,7 @@ struct SavedRitualsView: View {
         let shown = limit.map { Array(saved.rituals.prefix($0)) } ?? saved.rituals
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Saved rituals").sectionLabel()
+                Text("Saved rituals").sectionLabel().accessibilityAddTraits(.isHeader)
                 Spacer()
                 Image(systemName: "bookmark").foregroundStyle(Theme.stone500).accessibilityHidden(true)
             }

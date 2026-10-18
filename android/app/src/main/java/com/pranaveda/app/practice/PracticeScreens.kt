@@ -1,5 +1,9 @@
 package com.pranaveda.app.practice
 
+import androidx.compose.foundation.layout.widthIn
+import com.pranaveda.app.ui.theme.rememberReduceMotion
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -242,7 +246,26 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
             BreathPacer.Phase.Inhale, BreathPacer.Phase.HoldFull -> 1f
             else -> 0.55f
         }
-        val scale by animateFloatAsState(target, tween(durationMillis = if (started) pacer.phaseSeconds * 1000 else 300), label = "breath")
+        // With Remove animations on, the circle holds still and the phase shows
+        // as a gentle change of colour: deeper breathing in or holding full,
+        // soft peach breathing out or resting empty.
+        val reduceMotion = rememberReduceMotion()
+        val scale by animateFloatAsState(
+            if (reduceMotion) 0.85f else target,
+            if (reduceMotion) snap() else tween(durationMillis = if (started) pacer.phaseSeconds * 1000 else 300),
+            label = "breath",
+        )
+        val fullBreath = pacer.phase == BreathPacer.Phase.Inhale || pacer.phase == BreathPacer.Phase.HoldFull
+        val inner by animateColorAsState(
+            if (reduceMotion && started) (if (fullBreath) Pv.lavender.copy(alpha = 0.45f) else Pv.peachTint) else Pv.lavenderTint,
+            tween(400),
+            label = "breath colour",
+        )
+        val outer by animateColorAsState(
+            if (reduceMotion && started) (if (fullBreath) Pv.blueTint else Pv.warmWhite) else Pv.blueTint.copy(alpha = 0.6f),
+            tween(400),
+            label = "breath colour",
+        )
         val phaseName = when (pacer.phase) {
             BreathPacer.Phase.Inhale -> "Inhale"
             BreathPacer.Phase.HoldFull -> "Hold full"
@@ -255,11 +278,12 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
             Box(Modifier.size(280.dp), contentAlignment = Alignment.Center) {
                 Box(
                     Modifier.fillMaxSize().scale(scale).clip(CircleShape)
-                        .background(Brush.radialGradient(listOf(Pv.lavenderTint, Pv.blueTint.copy(alpha = 0.6f))))
+                        .background(Brush.radialGradient(listOf(inner, outer)))
                         .border(2.dp, Color.White.copy(alpha = 0.9f), CircleShape),
                 )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (started) phaseName else "Ready", style = Pv.headingLarge, color = Pv.ink)
+                    // One line, inside the circle, even at the largest font sizes.
+                    Text(if (started) phaseName else "Ready", style = Pv.headingLarge, color = Pv.ink, maxLines = 1, softWrap = false, modifier = Modifier.widthIn(max = 220.dp))
                     if (started) Text("${pacer.secondsLeft}", fontSize = 28.sp, color = Pv.stone700)
                 }
             }

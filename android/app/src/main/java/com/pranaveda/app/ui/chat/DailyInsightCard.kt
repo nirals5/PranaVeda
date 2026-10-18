@@ -1,5 +1,6 @@
 package com.pranaveda.app.ui.chat
 
+import androidx.compose.ui.semantics.heading
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +39,7 @@ internal const val OFFLINE_QUOTE =
 fun DailyInsightCard(state: DailyInsightStore.State, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("DAILY INSIGHT", style = Pv.label, color = Pv.stone500, modifier = Modifier.weight(1f))
+            Text("DAILY INSIGHT", style = Pv.label, color = Pv.stone500, modifier = Modifier.weight(1f).semantics { heading() })
             Icon(painterResource(R.drawable.ic_compass), contentDescription = null, tint = Pv.stone500, modifier = Modifier.size(18.dp))
         }
         Crossfade(state, label = "insight") { current ->

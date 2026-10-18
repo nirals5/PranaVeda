@@ -29,7 +29,7 @@ struct RitualCardView: View {
                 }
                 BookmarkButton(result: result).font(.body)
             }
-            Text(result.yogaPractice.title).font(Theme.heading(.title2)).foregroundStyle(Theme.ink)
+            Text(result.yogaPractice.title).font(Theme.heading(.title2)).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
             if let energy = result.primaryEnergy {
                 Text(energy).font(Theme.bodySmall).italic().foregroundStyle(Theme.lavenderDeep)
             }
@@ -49,7 +49,7 @@ struct RitualCardView: View {
                 showingDetail = true
             } label: {
                 Text("Begin practice")
-                    .font(Theme.label)
+                    .labelFont()
                     .tracking(0.9)
                     .textCase(.uppercase)
                     .foregroundStyle(.white)
@@ -119,7 +119,7 @@ struct RitualDetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     Button { guiding = true } label: {
                         Label("Begin guided practice", systemImage: "play.fill")
-                            .font(Theme.label)
+                            .labelFont()
                             .tracking(0.9)
                             .textCase(.uppercase)
                             .foregroundStyle(.white)
@@ -186,7 +186,7 @@ struct BreathworkCardView: View {
             }
             Button { pacing = true } label: {
                 Label("Begin breathwork", systemImage: "wind")
-                    .font(Theme.label)
+                    .labelFont()
                     .tracking(0.9)
                     .textCase(.uppercase)
                     .foregroundStyle(.white)

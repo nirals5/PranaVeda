@@ -48,7 +48,7 @@ fun SavedRitualsCard(
     val shown = limit?.let { saved.rituals.take(it) } ?: saved.rituals
     Column(modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel("Saved rituals", Modifier.weight(1f))
+            SectionLabel("Saved rituals", Modifier.weight(1f), heading = true)
             Icon(painterResource(R.drawable.ic_bookmark), contentDescription = null, tint = Pv.stone500, modifier = Modifier.size(18.dp))
         }
         if (shown.isEmpty()) {

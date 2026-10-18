@@ -123,6 +123,7 @@ struct BreathworkPacerView: View {
     @State private var started = false
     @State private var guide = SpeechGuide()
     @State private var finished = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(pattern: BreathworkPattern, result: RecommendationResult? = nil) {
         self.pattern = pattern
@@ -161,14 +162,19 @@ struct BreathworkPacerView: View {
             PracticeTopBar(title: pattern.name, guide: guide, onClose: { dismiss() })
             Spacer()
             ZStack {
+                // The circle grows with the in-breath and shrinks with the
+                // out-breath. With Reduce Motion it holds still and the
+                // phase shows as a gentle change of colour instead.
                 Circle()
-                    .fill(RadialGradient(colors: [Theme.lavenderTint, Theme.blueTint.opacity(0.6)], center: .center, startRadius: 10, endRadius: 160))
+                    .fill(RadialGradient(colors: circleColors, center: .center, startRadius: 10, endRadius: 160))
                     .overlay(Circle().stroke(.white.opacity(0.9), lineWidth: 2))
-                    .scaleEffect(circleScale)
-                    .animation(.easeInOut(duration: Double(pacer.phaseSeconds)), value: pacer.step)
-                    .animation(.easeInOut(duration: Double(pacer.phaseSeconds)), value: pacer.cycle)
+                    .scaleEffect(reduceMotion ? 0.85 : circleScale)
+                    .animation(phaseAnimation, value: pacer.step)
+                    .animation(phaseAnimation, value: pacer.cycle)
                 VStack(spacing: 6) {
-                    Text(started ? phaseName : "Ready").font(Theme.heading(.title)).foregroundStyle(Theme.ink)
+                    Text(started ? phaseName : "Ready")
+                        .font(Theme.heading(.title)).foregroundStyle(Theme.ink)
+                        .lineLimit(1).minimumScaleFactor(0.5) // stays inside the circle at the largest text sizes
                     if started {
                         Text("\(pacer.secondsLeft)").font(.system(.title, design: .rounded).monospacedDigit()).foregroundStyle(Theme.stone700)
                     }
@@ -189,7 +195,7 @@ struct BreathworkPacerView: View {
                 isRunning.toggle()
             } label: {
                 Label(isRunning ? "Pause" : started ? "Resume" : "Begin", systemImage: isRunning ? "pause.fill" : "play.fill")
-                    .font(Theme.label)
+                    .labelFont()
                     .tracking(0.9)
                     .textCase(.uppercase)
                     .foregroundStyle(.white)
@@ -207,6 +213,21 @@ struct BreathworkPacerView: View {
         case .holdFull: "Hold full"
         case .exhale: "Exhale"
         case .holdEmpty: "Hold empty"
+        }
+    }
+
+    private var phaseAnimation: Animation {
+        reduceMotion ? .easeInOut(duration: 0.4) : .easeInOut(duration: Double(pacer.phaseSeconds))
+    }
+
+    /// Lavender and blue normally. With Reduce Motion the colour carries the
+    /// phase: deeper while breathing in or holding full, soft peach while
+    /// breathing out or resting empty.
+    private var circleColors: [Color] {
+        guard reduceMotion, started else { return [Theme.lavenderTint, Theme.blueTint.opacity(0.6)] }
+        return switch pacer.phase {
+        case .inhale, .holdFull: [Theme.lavender.opacity(0.45), Theme.blueTint]
+        case .exhale, .holdEmpty: [Theme.peachTint, Theme.warmWhite]
         }
     }
 
@@ -327,7 +348,7 @@ private struct PracticeComplete: View {
             if let breathwork {
                 Button { showingBreathwork = true } label: {
                     Label("Continue with \(breathwork.name)", systemImage: "wind")
-                        .font(Theme.label).tracking(0.9).textCase(.uppercase)
+                        .labelFont().tracking(0.9).textCase(.uppercase)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 22).padding(.vertical, 14)
                         .background(Theme.lavender, in: Capsule())

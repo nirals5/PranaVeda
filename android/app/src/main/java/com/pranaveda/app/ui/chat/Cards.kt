@@ -1,5 +1,7 @@
 package com.pranaveda.app.ui.chat
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -65,8 +67,9 @@ fun CardView(card: ChatCard, onOption: (String) -> Unit) {
 
 /** Small uppercase monospace label, as on the web app's cards. */
 @Composable
-fun SectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text.uppercase(), style = Pv.label, color = Pv.stone500, modifier = modifier)
+fun SectionLabel(text: String, modifier: Modifier = Modifier, heading: Boolean = false) {
+    // A card's title is a heading, so TalkBack can jump between cards; metadata labels are not.
+    Text(text.uppercase(), style = Pv.label, color = Pv.stone500, modifier = if (heading) modifier.semantics { heading() } else modifier)
 }
 
 private val italicSmall: TextStyle = Pv.bodySmall.copy(fontStyle = FontStyle.Italic)
@@ -81,7 +84,7 @@ private fun RitualCard(result: RecommendationResult) {
             result.yogaPractice.durationMinutes?.let { SectionLabel("$it min") }
             BookmarkButton(result)
         }
-        Text(result.yogaPractice.title, style = Pv.headingLarge, color = Pv.ink)
+        Text(result.yogaPractice.title, style = Pv.headingLarge, color = Pv.ink, modifier = Modifier.semantics { heading() })
         result.primaryEnergy?.let { Text(it, style = italicSmall, color = Pv.lavenderDeep) }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             items(result.yogaPractice.poses) { PoseThumbnail(it) }

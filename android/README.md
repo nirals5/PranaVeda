@@ -66,7 +66,7 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 ## Notes
 
 - The app icon is the website's lotus (`src/assets/pranaveda_icon.svg`), converted to vector drawables, on the app's soft gradient (an adaptive icon with a monochrome layer for themed icons).
-- Light only, as on iOS: the system's dark theme does not change the design. All text sizes are in `sp`, so text follows the system font size.
+- Light only, as on iOS: the system's dark theme does not change the design. All text sizes are in `sp`, so text follows the system font size. Tab labels stop at 130% so "Ask Amrita" fits. With Remove animations on, the breathing circle holds still and shows each phase by colour, the recording waves stop easing, and the chat jumps instead of gliding. Card titles and the greeting are TalkBack headings.
 - Plain `http` is allowed only for `10.0.2.2`, `localhost` and `*.local` (`res/xml/network_security_config.xml`); everything else needs https.
 - Image addresses from the API are either full addresses or site paths (`/poses/cobra.jpg`); paths are resolved against the API's address (`AppConfig.resolve`).
 - The web app's fonts are bundled: Playfair Display for headings and quotes, Plus Jakarta Sans for text (`res/font`; SIL Open Font License, shipped in `assets/licenses`).

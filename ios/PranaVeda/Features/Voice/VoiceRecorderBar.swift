@@ -57,7 +57,7 @@ struct VoiceRecorderBar: View {
             .padding(.leading, 8)
             .padding(.trailing, 8)
             .padding(.vertical, 8)
-            .background(.white.opacity(0.85), in: Capsule())
+            .background(.white.opacity(0.96), in: Capsule()) // nearly solid: text scrolling behind never shows through
             .overlay(Capsule().stroke(Theme.lavender.opacity(0.5)))
             .padding(.horizontal, 16)
         }
