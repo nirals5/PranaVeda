@@ -11,6 +11,7 @@ struct PranaVedaApp: App {
     @State private var practice = PracticeStore()
     @State private var insight = DailyInsightStore()
     @State private var saved = SavedRitualStore()
+    @State private var voice = AmritaVoice()
     @State private var tab = AppTab.amrita
 
     enum AppTab: Hashable { case amrita, dosha, library, you }
@@ -29,7 +30,7 @@ struct PranaVedaApp: App {
     var body: some Scene {
         WindowGroup {
             TabView(selection: $tab) {
-                ChatView(model: chat, auth: auth, insight: insight, saved: saved)
+                ChatView(model: chat, auth: auth, insight: insight, saved: saved, voice: voice)
                     .tabItem { Label("Ask Amrita", systemImage: "sparkles") }
                     .tag(AppTab.amrita)
                 DoshaProfileView(profile: chat.profile, guide: doshaGuide) { message in
@@ -54,6 +55,8 @@ struct PranaVedaApp: App {
             .onOpenURL { url in GIDSignIn.sharedInstance.handle(url) }
             .task {
                 chat.auth = auth
+                chat.speakReply = { [voice] in voice.speak($0) }
+                chat.stopSpeaking = { [voice] in voice.stop() }
                 practice.auth = auth
                 auth.onSignedIn = { [chat, practice] user in
                     await chat.adoptAccountProfile(for: user)

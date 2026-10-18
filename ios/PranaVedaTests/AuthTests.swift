@@ -200,4 +200,38 @@ struct AuthTests {
         #expect(chat.profileName == "Phone Guest")
         withExtendedLifetime(auth) {}
     }
+
+    // MARK: Speaking to Amrita
+
+    @Test func aSpokenMessageIsMarkedAsVoiceAndItsReplyIsReadAloud() async {
+        StubURLProtocol.reset { request in
+            request.path == "/api/chat"
+                ? (200, "data: {\"type\":\"text\",\"delta\":\"Let us **slow** the breath.\"}\n\ndata: {\"type\":\"done\"}\n\n")
+                : (404, "{}")
+        }
+        let chat = ChatViewModel(api: stubAPI(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        var spoken: [String] = []
+        var stops = 0
+        chat.speakReply = { spoken.append($0) }
+        chat.stopSpeaking = { stops += 1 }
+
+        chat.send("I feel scattered", spoken: true)
+        await waitForReply(chat)
+        #expect(StubURLProtocol.requests(to: "/api/chat").last?.body?["inputMode"] as? String == "voice")
+        #expect(spoken == ["Let us **slow** the breath."])
+
+        chat.send("Thank you")
+        await waitForReply(chat)
+        #expect(StubURLProtocol.requests(to: "/api/chat").last?.body?["inputMode"] as? String == "text")
+        #expect(spoken.count == 1) // a typed message's reply stays silent
+        #expect(stops == 2) // each new message stops what was still being said
+    }
+
+    @Test func usesTheServersVoiceOnlyWhenItHasOne() async throws {
+        StubURLProtocol.reset { request in
+            request.body?["text"] as? String == "configured" ? (200, "ID3-mp3-bytes") : (503, #"{"unavailable":true}"#)
+        }
+        #expect(try await stubAPI().speech("configured") == Data("ID3-mp3-bytes".utf8))
+        #expect(try await stubAPI().speech("not configured") == nil) // the phone's own voice speaks instead
+    }
 }

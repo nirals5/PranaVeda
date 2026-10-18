@@ -8,6 +8,7 @@ import com.pranaveda.app.auth.KeystoreSessionStorage
 import com.pranaveda.app.model.DailyInsightStore
 import com.pranaveda.app.model.PracticeStore
 import com.pranaveda.app.model.SavedRitualStore
+import com.pranaveda.app.voice.AmritaVoice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,6 +29,9 @@ class PranaVedaApplication : Application() {
     }
 
     val saved: SavedRitualStore by lazy { SavedRitualStore(File(filesDir, "saved-rituals.json"), appScope) }
+
+    /** Amrita's spoken replies, shared so a new message or screen can stop them. */
+    val voice: AmritaVoice by lazy { AmritaVoice(this, appScope) }
 
     /** Kept for as long as the app runs, so the reflection is asked for once per launch. */
     val insight: DailyInsightStore by lazy { DailyInsightStore() }

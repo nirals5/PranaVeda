@@ -30,7 +30,9 @@ struct APIClient: Sendable {
         /// The device's calendar day ("YYYY-MM-DD"), so the server dates
         /// profile writes by the user's day rather than UTC's.
         let localDate: String
-        let inputMode = "text"
+        /// "voice" when the message was spoken: the server keeps the reply
+        /// short and written for the ear.
+        var inputMode = "text"
         let previousSession: [Message]?
     }
 

@@ -5,6 +5,8 @@ struct ChatView: View {
     var auth: AuthStore? = nil
     var insight: DailyInsightStore? = nil
     var saved: SavedRitualStore? = nil
+    var voice: AmritaVoice? = nil
+    @State private var talking = false
     @State private var draft = ""
     @FocusState private var inputFocused: Bool
     /// Grows with the text size, up to 48 points (see the cap on the input bar).
@@ -32,9 +34,23 @@ struct ChatView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) { inputBar }
+            .sheet(isPresented: $talking) {
+                VoiceSheet { spoken in model.send(spoken, spoken: true) }
+            }
             .navigationTitle("Amrita")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // Spoken replies on or off, kept between launches (as on the website).
+                if let voice {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { voice.setMuted(!voice.isMuted) } label: {
+                            Image(systemName: voice.isMuted ? "speaker.slash" : "speaker.wave.2")
+                        }
+                        .tint(voice.isMuted ? Theme.stone500 : Theme.lavenderDeep)
+                        .accessibilityLabel(voice.isMuted ? "Voice replies off" : "Voice replies on")
+                        .accessibilityHint(voice.isMuted ? "Amrita will read replies to spoken messages aloud" : "Amrita will stop reading replies aloud")
+                    }
+                }
                 // Starts a fresh conversation (the wellness profile is kept),
                 // like the website's "Begin a new conversation". Only shown
                 // when there is a conversation to clear.
@@ -96,6 +112,17 @@ struct ChatView: View {
                 .focused($inputFocused)
                 .submitLabel(.send)
                 .onSubmit(send)
+            if voice != nil {
+                Button { talking = true } label: {
+                    Image(systemName: "mic")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Theme.lavenderDeep)
+                        .frame(width: min(sendButtonSize, 48), height: min(sendButtonSize, 48))
+                        .background(Theme.lavenderTint, in: Circle())
+                }
+                .disabled(model.isStreaming)
+                .accessibilityLabel("Speak to Amrita")
+            }
             Button(action: send) {
                 Image(systemName: "arrow.up")
                     .font(.body.weight(.semibold))
