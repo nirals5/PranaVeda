@@ -73,7 +73,7 @@ class AuthStoreTest {
             }
         }
         server.start()
-        api = ApiClient(baseUrl = server.url("/"))
+        api = ApiClient(baseUrl = server.baseUrl())
         routes["GET /api/auth/nonce"] = { json(200, """{"nonce":"n-123"}""") }
     }
 

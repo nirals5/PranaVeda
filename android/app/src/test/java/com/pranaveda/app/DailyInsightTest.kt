@@ -33,7 +33,7 @@ class DailyInsightTest {
             server.enqueue(MockResponse.Builder().body("""{"headline":"A","quote":"B","focus":"C","tip":"D","_isFallback":true}""").build())
             server.start()
             val profile = JsonObject(mapOf("prakriti" to JsonPrimitive("Vata-Pitta")))
-            val insight = ApiClient(baseUrl = server.url("/")).dailyInsight(profile, "10/16/2026, 9:05:09 PM")
+            val insight = ApiClient(baseUrl = server.baseUrl()).dailyInsight(profile, "10/16/2026, 9:05:09 PM")
             assertEquals(DailyInsight("A", "B", "C", "D", isFallback = true), insight)
             val request = server.takeRequest()
             assertEquals("POST", request.method)
