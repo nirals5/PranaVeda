@@ -246,7 +246,7 @@ class PracticeStoreTest {
             }
         }
         server.start()
-        api = ApiClient(baseUrl = server.url("/"))
+        api = ApiClient(baseUrl = server.baseUrl())
         routes["POST /api/auth/refresh"] = { session }
     }
 

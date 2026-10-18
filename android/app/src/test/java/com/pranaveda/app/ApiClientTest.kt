@@ -30,7 +30,7 @@ class ApiClientTest {
 
     @Before fun start() {
         server.start()
-        api = ApiClient(baseUrl = server.url("/"))
+        api = ApiClient(baseUrl = server.baseUrl())
     }
 
     @After fun stop() = server.close()

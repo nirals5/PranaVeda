@@ -54,7 +54,7 @@ class DoshaProfileTest {
                 ).build(),
             )
             server.start()
-            val guide = ApiClient(baseUrl = server.url("/")).doshaGuide()
+            val guide = ApiClient(baseUrl = server.baseUrl()).doshaGuide()
             assertEquals(listOf("Soups"), guide.doshas.getValue("Vata").diet)
             assertEquals("Not a medical diagnosis.", guide.note)
             assertEquals("/api/dosha-guide", server.takeRequest().url.encodedPath)
