@@ -23,7 +23,7 @@ Accounts and sync are optional and off by default; see [Accounts and sync](#acco
 
 Checks: `npm run lint` (type check) and `npm test` (Vitest). The tests that need a database run when `DATABASE_URL` is set and are skipped otherwise; they create throwaway accounts and delete them afterwards, so point `DATABASE_URL` at a development database, never production.
 
-GitHub Actions runs these checks on every pull request (`.github/workflows/`): the website's type check and tests, and, when a pull request touches `ios/` or `android/`, the iOS tests on a simulator and the Android unit tests. The database tests are skipped there, since CI has no database.
+GitHub Actions runs these checks on every pull request (`.github/workflows/`): the website's type check and tests, and, when a pull request touches `ios/` or `android/`, the iOS tests on a simulator and the Android unit tests. The database tests are skipped there, since CI has no database. `tests/apiImports.test.ts` also fails if a file the Vercel functions load has a relative import without a `.js` extension: it would pass every other check and only crash on Vercel.
 
 ## Features: practice calendar, connectors, wearables, and location
 

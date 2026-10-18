@@ -29,4 +29,11 @@ struct ChatRequestTests {
         #expect(json["localDate"] as? String == "2026-10-14")
         #expect(json["localTime"] as? String == "10/14/2026, 7:11:00 PM")
     }
+
+    @Test func greetsByTheHourAsTheWebsiteDoes() {
+        #expect([0, 1, 4].map { ChatView.timeOfDay(hour: $0) } == ["evening", "evening", "evening"])
+        #expect([5, 11].map { ChatView.timeOfDay(hour: $0) } == ["morning", "morning"])
+        #expect([12, 16].map { ChatView.timeOfDay(hour: $0) } == ["afternoon", "afternoon"])
+        #expect([17, 23].map { ChatView.timeOfDay(hour: $0) } == ["evening", "evening"])
+    }
 }

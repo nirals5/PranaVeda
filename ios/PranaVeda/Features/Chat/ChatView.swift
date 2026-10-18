@@ -69,13 +69,23 @@ struct ChatView: View {
     }
 
     private var greeting: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        let time = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening"
+        let time = Self.timeOfDay(hour: Calendar.current.component(.hour, from: Date()))
         // Signed in, the name they gave Amrita, else their account name (as on
         // the website). Guests are greeted by name only if they told Amrita.
         let name = model.profileName ?? auth?.user?.displayName
         if let first = name?.split(separator: " ").first { return "Good \(time), \(first)." }
         return ["morning": "Good morning, seeker.", "afternoon": "Good afternoon, reflective heart.", "evening": "Good evening, peaceful traveler."][time]!
+    }
+
+    /// Which greeting fits the hour, as on the website (src/lib/greeting.ts):
+    /// morning starts at 5, so someone up after midnight is wished a good
+    /// evening rather than a good morning.
+    nonisolated static func timeOfDay(hour: Int) -> String {
+        switch hour {
+        case 5..<12: "morning"
+        case 12..<17: "afternoon"
+        default: "evening"
+        }
     }
 
     private var inputBar: some View {
