@@ -1,5 +1,14 @@
 package com.pranaveda.app.ui.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.compose.ui.platform.LocalContext
+import com.pranaveda.app.voice.VoiceListener
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -67,10 +76,31 @@ import java.time.LocalTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: AmritaVoice? = null) {
-    var talking by rememberSaveable { mutableStateOf(false) }
     var draft by rememberSaveable { mutableStateOf("") }
     val focus = LocalFocusManager.current
     val listState = rememberLazyListState()
+
+    // Set while speaking to Amrita: the input bar becomes the recording bar.
+    val context = LocalContext.current
+    var listener by remember { mutableStateOf<VoiceListener?>(null) }
+    fun stopRecording() {
+        listener?.release()
+        listener = null
+    }
+    val askForMicrophone = rememberLauncherForActivityResult(RequestPermission()) { granted ->
+        listener?.let { if (granted) it.start() else it.notAllowed() }
+    }
+    fun startRecording() {
+        focus.clearFocus()
+        voice?.stop()
+        val started = VoiceListener(context)
+        listener = started
+        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) started.start()
+        else askForMicrophone.launch(Manifest.permission.RECORD_AUDIO)
+    }
+    // The microphone is never left on: leaving the tab or the app stops it.
+    DisposableEffect(Unit) { onDispose { stopRecording() } }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { stopRecording() }
 
     fun send() {
         val text = draft
@@ -84,10 +114,6 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: 
     val last = model.items.lastOrNull()
     LaunchedEffect(model.items.size, last?.text?.length, last?.cards?.size) {
         if (model.items.isNotEmpty()) listState.animateScrollToItem(model.items.size)
-    }
-
-    if (talking) {
-        VoiceSheet(onDismiss = { talking = false }, onSend = { model.send(it, spoken = true) })
     }
 
     Scaffold(
@@ -123,12 +149,23 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: 
             )
         },
         bottomBar = {
-            InputBar(
+            val recording = listener
+            if (recording != null) {
+                VoiceRecorderBar(
+                    recording,
+                    onCancel = ::stopRecording,
+                    onSend = { words ->
+                        stopRecording()
+                        model.send(words, spoken = true)
+                    },
+                    modifier = Modifier.imePadding(),
+                )
+            } else InputBar(
                 draft = draft,
                 onDraftChange = { draft = it },
                 canSend = draft.isNotBlank() && !model.isStreaming,
                 onSend = ::send,
-                onSpeak = if (voice != null) ({ talking = true }) else null,
+                onSpeak = if (voice != null) ({ startRecording() }) else null,
                 modifier = Modifier.imePadding(),
             )
         },

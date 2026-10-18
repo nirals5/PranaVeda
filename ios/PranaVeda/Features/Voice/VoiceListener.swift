@@ -3,8 +3,8 @@ import Observation
 import Speech
 
 /// Listens for one spoken message with the phone's own speech recognition,
-/// showing the words as they are heard (the website's voice consultation).
-/// Recognition stays on the phone when it supports that.
+/// keeping the words heard so far and how loud the voice is, for the chat's
+/// recording bar. Recognition stays on the phone when it supports that.
 @MainActor
 @Observable
 final class VoiceListener {
@@ -19,6 +19,11 @@ final class VoiceListener {
 
     private(set) var state: State = .idle
     private(set) var transcript = ""
+    /// Recent loudness, 0 (silence) to 1, oldest first: the recording bar's waves.
+    private(set) var levels = [Float](repeating: 0, count: VoiceListener.waveCount)
+    /// When listening began, for the recording bar's clock.
+    private(set) var startedAt: Date?
+    static let waveCount = 28
 
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     private let engine = AVAudioEngine()
@@ -28,6 +33,7 @@ final class VoiceListener {
     func start() async {
         stop()
         transcript = ""
+        levels = [Float](repeating: 0, count: Self.waveCount)
         guard await Self.speechAllowed(), await AVAudioApplication.requestRecordPermission() else {
             state = .notAllowed
             return
@@ -47,10 +53,13 @@ final class VoiceListener {
             request.addsPunctuation = true
             self.request = request
 
-            Self.feed(engine.inputNode, into: request)
+            Self.feed(engine.inputNode, into: request) { [weak self] level in
+                Task { @MainActor in self?.hear(level) }
+            }
             engine.prepare()
             try engine.start()
             state = .listening
+            startedAt = Date()
 
             task = Self.recognize(request, with: recognizer) { [weak self] text, finished, failed in
                 Task { @MainActor in
@@ -74,6 +83,12 @@ final class VoiceListener {
         task = nil
         stopAudio()
         if state == .listening { state = .idle }
+    }
+
+    private func hear(_ level: Float) {
+        guard state == .listening else { return }
+        levels.removeFirst()
+        levels.append(level)
     }
 
     private func stopAudio() {
@@ -100,11 +115,28 @@ final class VoiceListener {
         }
     }
 
-    /// Hands the microphone's audio to the recognizer, from the audio thread.
-    nonisolated private static func feed(_ input: AVAudioInputNode, into request: SFSpeechAudioBufferRecognitionRequest) {
-        input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { buffer, _ in
+    /// Hands the microphone's audio to the recognizer, and reports its
+    /// loudness, from the audio thread.
+    nonisolated private static func feed(
+        _ input: AVAudioInputNode,
+        into request: SFSpeechAudioBufferRecognitionRequest,
+        level: @escaping @Sendable (Float) -> Void
+    ) {
+        input.installTap(onBus: 0, bufferSize: 2048, format: input.outputFormat(forBus: 0)) { buffer, _ in
             request.append(buffer)
+            guard let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
+            var sum: Float = 0
+            for i in 0..<Int(buffer.frameLength) { sum += samples[i] * samples[i] }
+            level(normalizedLevel(rms: (sum / Float(buffer.frameLength)).squareRoot()))
         }
+    }
+
+    /// Loudness for the waves: quiet room (about -50 dB) is 0, a raised voice
+    /// (about -10 dB) is 1.
+    nonisolated static func normalizedLevel(rms: Float) -> Float {
+        guard rms > 0 else { return 0 }
+        let decibels = 20 * log10(rms)
+        return min(1, max(0, (decibels + 50) / 40))
     }
 
     /// Reports the words so far, whether recognition has finished, and whether it failed.
