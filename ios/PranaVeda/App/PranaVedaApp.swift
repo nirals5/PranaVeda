@@ -1,5 +1,6 @@
 import GoogleSignIn
 import SwiftUI
+import UIKit
 
 @main
 struct PranaVedaApp: App {
@@ -13,6 +14,17 @@ struct PranaVedaApp: App {
     @State private var tab = AppTab.amrita
 
     enum AppTab: Hashable { case amrita, dosha, library, you }
+
+    init() {
+        // Screen titles in the serif, like headings everywhere else. Scaled
+        // with the reader's text size, as the system's own titles are.
+        func playfair(_ size: CGFloat, _ style: UIFont.TextStyle) -> UIFont? {
+            UIFont(name: "PlayfairDisplay-Regular", size: size).map { UIFontMetrics(forTextStyle: style).scaledFont(for: $0) }
+        }
+        let bar = UINavigationBar.appearance()
+        if let large = playfair(34, .largeTitle) { bar.largeTitleTextAttributes = [.font: large] }
+        if let inline = playfair(19, .headline) { bar.titleTextAttributes = [.font: inline] }
+    }
 
     var body: some Scene {
         WindowGroup {

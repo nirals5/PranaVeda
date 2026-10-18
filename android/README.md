@@ -69,5 +69,5 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 - Light only, as on iOS: the system's dark theme does not change the design. All text sizes are in `sp`, so text follows the system font size.
 - Plain `http` is allowed only for `10.0.2.2`, `localhost` and `*.local` (`res/xml/network_security_config.xml`); everything else needs https.
 - Image addresses from the API are either full addresses or site paths (`/poses/cobra.jpg`); paths are resolved against the API's address (`AppConfig.resolve`).
-- The web app's fonts (Playfair Display, Plus Jakarta Sans) are not bundled yet; the system serif and sans stand in.
+- The web app's fonts are bundled: Playfair Display for headings and quotes, Plus Jakarta Sans for text (`res/font`; SIL Open Font License, shipped in `assets/licenses`).
 - Spoken guidance uses the phone's built-in voice (the website uses ElevenLabs when it is configured); the speaker button on the practice screen turns it off. Practice timing follows the clock, so it stays right if the screen sleeps or the app goes to the background briefly.

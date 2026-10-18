@@ -52,6 +52,13 @@ targets:
         # YES when the build has the Sign in with Apple capability
         # (PV_APPLE_SIGN_IN in Configuration/App.xcconfig).
         PVAppleSignInEnabled: $(PV_APPLE_SIGN_IN)
+        # The website's typefaces, bundled (PranaVeda/Fonts, SIL Open Font
+        # License): Playfair Display for headings, Plus Jakarta Sans for text.
+        UIAppFonts:
+          - PlayfairDisplay.ttf
+          - PlayfairDisplay-Italic.ttf
+          - PlusJakartaSans.ttf
+          - PlusJakartaSans-Italic.ttf
         # Plain http is allowed for the local network only (the dev server);
         # everything on the internet still needs https.
         NSAppTransportSecurity:

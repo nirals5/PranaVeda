@@ -51,14 +51,14 @@ struct DailyInsightCard: View {
 
     private func quote(_ text: String) -> some View {
         Text("“\(text)”")
-            .font(.system(.body, design: .serif)).italic()
+            .font(Theme.quote).italic()
             .foregroundStyle(Theme.stone700)
     }
 
     private var placeholder: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("A short reflection for today").font(Theme.heading())
-            Text("A line or two of quiet wisdom for this moment of your day.").font(.system(.body, design: .serif))
+            Text("A line or two of quiet wisdom for this moment of your day.").font(Theme.quote)
         }
         .redacted(reason: .placeholder)
         .accessibilityElement()
