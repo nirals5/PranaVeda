@@ -5,6 +5,7 @@ import com.pranaveda.app.net.ApiClient
 import com.pranaveda.app.net.ChatMessage
 import com.pranaveda.app.net.ChatRequest
 import com.pranaveda.app.voice.AmritaVoice
+import com.pranaveda.app.voice.VoiceListener
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -43,5 +44,18 @@ class VoiceTest {
             assertEquals("configured", PvJson.parseToJsonElement(sent.body!!.utf8()).jsonObject["text"]?.jsonPrimitive?.content)
             assertNull(api.speech("not configured")) // the phone's own voice speaks instead
         }
+    }
+
+    @Test fun turnsLoudnessIntoWaveHeights() {
+        assertEquals(0f, VoiceListener.normalizedLevel(-2f), 0.001f) // silence
+        assertEquals(0.5f, VoiceListener.normalizedLevel(4f), 0.001f)
+        assertEquals(1f, VoiceListener.normalizedLevel(15f), 0.001f) // loud: capped
+        assertEquals(0f, VoiceListener.normalizedLevel(-10f), 0.001f)
+    }
+
+    @Test fun keepsTheWordsAcrossPauses() {
+        assertEquals("I feel tense after work", VoiceListener.join("I feel tense", " after work "))
+        assertEquals("after work", VoiceListener.join("", "after work"))
+        assertEquals("I feel tense", VoiceListener.join("I feel tense", ""))
     }
 }

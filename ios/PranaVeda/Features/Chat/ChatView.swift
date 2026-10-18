@@ -6,7 +6,9 @@ struct ChatView: View {
     var insight: DailyInsightStore? = nil
     var saved: SavedRitualStore? = nil
     var voice: AmritaVoice? = nil
-    @State private var talking = false
+    /// Set while speaking to Amrita: the input bar becomes the recording bar.
+    @State private var listener: VoiceListener?
+    @Environment(\.scenePhase) private var scenePhase
     @State private var draft = ""
     @FocusState private var inputFocused: Bool
     /// Grows with the text size, up to 48 points (see the cap on the input bar).
@@ -33,10 +35,26 @@ struct ChatView: View {
                     .onChange(of: model.items.count) { _, _ in scrollToEnd(proxy) }
                 }
             }
-            .safeAreaInset(edge: .bottom) { inputBar }
-            .sheet(isPresented: $talking) {
-                VoiceSheet { spoken in model.send(spoken, spoken: true) }
+            .safeAreaInset(edge: .bottom) {
+                if let listener {
+                    VoiceRecorderBar(
+                        listener: listener,
+                        onCancel: stopRecording,
+                        onSend: { words in
+                            stopRecording()
+                            model.send(words, spoken: true)
+                        },
+                        buttonSize: min(sendButtonSize, 48)
+                    )
+                    .transition(.opacity)
+                } else {
+                    inputBar
+                }
             }
+            .animation(.easeOut(duration: 0.2), value: listener == nil)
+            // The microphone is never left on: leaving the tab or the app stops it.
+            .onDisappear(perform: stopRecording)
+            .onChange(of: scenePhase) { _, phase in if phase != .active { stopRecording() } }
             .navigationTitle("Amrita")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -113,7 +131,7 @@ struct ChatView: View {
                 .submitLabel(.send)
                 .onSubmit(send)
             if voice != nil {
-                Button { talking = true } label: {
+                Button(action: startRecording) {
                     Image(systemName: "mic")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(Theme.lavenderDeep)
@@ -144,6 +162,19 @@ struct ChatView: View {
         // the field and send button still fit side by side; the conversation
         // above keeps scaling.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+    }
+
+    private func startRecording() {
+        inputFocused = false
+        voice?.stop()
+        let listener = VoiceListener()
+        self.listener = listener
+        Task { await listener.start() }
+    }
+
+    private func stopRecording() {
+        listener?.stop()
+        listener = nil
     }
 
     private func send() {
