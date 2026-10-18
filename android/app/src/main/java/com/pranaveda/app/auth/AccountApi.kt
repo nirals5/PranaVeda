@@ -1,5 +1,8 @@
 package com.pranaveda.app.auth
 
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
+import com.pranaveda.app.model.SavedRitual
 import com.pranaveda.app.model.PracticeLogEntry
 import com.pranaveda.app.model.PracticePage
 import com.pranaveda.app.model.PvJson
@@ -145,6 +148,27 @@ class AccountApi(private val api: ApiClient = ApiClient()) {
         val reply = send("GET", "api/sync/practice-log?after=$cursor", bearer = accessToken)
         if (reply.status != 200) throw HttpStatusException(reply.status)
         return PvJson.decodeFromString(PracticePage.serializer(), reply.body)
+    }
+
+    @Serializable private data class SavedChanges(val saves: List<SavedRitual>, val removes: List<String>)
+
+    /**
+     * Rituals saved (at most 25) and removed (at most 100) on this phone. Sending
+     * one the account already has, or already removed, is fine. Throws
+     * [HttpStatusException] 401 for an expired sign-in.
+     */
+    suspend fun sendSavedChanges(saves: List<SavedRitual>, removes: List<String>, accessToken: String) {
+        val body = PvJson.encodeToString(SavedChanges.serializer(), SavedChanges(saves, removes))
+        val reply = send("POST", "api/sync/saved-rituals", bearer = accessToken, body = body)
+        if (reply.status != 200) throw HttpStatusException(reply.status)
+    }
+
+    /** The account's saved rituals, newest first. One this phone cannot read is skipped. */
+    suspend fun savedRituals(accessToken: String): List<SavedRitual> {
+        val reply = send("GET", "api/sync/saved-rituals", bearer = accessToken)
+        if (reply.status != 200) throw HttpStatusException(reply.status)
+        val list = PvJson.parseToJsonElement(reply.body).jsonObject["rituals"]?.jsonArray.orEmpty()
+        return list.mapNotNull { runCatching { PvJson.decodeFromJsonElement(SavedRitual.serializer(), it) }.getOrNull() }
     }
 
     private companion object {

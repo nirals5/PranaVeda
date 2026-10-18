@@ -148,3 +148,21 @@ export const practiceLogEntries = pgTable(
     index('practice_log_entries_user_seq_idx').on(t.userId, t.seq),
   ]
 );
+
+// Rituals a signed-in user bookmarked, from any device. Unlike the practice
+// log they can be removed: a removal keeps the row as a marker (removed_at
+// set, data cleared), so a device that uploads the same ritual late cannot
+// bring it back.
+export const savedRituals = pgTable(
+  'saved_rituals',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    ritualId: text('ritual_id').notNull(),
+    data: jsonb('data'), // the saved ritual, as the device keeps it; null once removed
+    savedAt: timestamptz('saved_at').notNull().defaultNow(),
+    removedAt: timestamptz('removed_at'),
+  },
+  (t) => [uniqueIndex('saved_rituals_user_ritual_key').on(t.userId, t.ritualId)]
+);
