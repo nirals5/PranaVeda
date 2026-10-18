@@ -1,5 +1,8 @@
 package com.pranaveda.app.ui.chat
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
+import com.pranaveda.app.ui.theme.rememberReduceMotion
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -79,6 +82,7 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: 
     var draft by rememberSaveable { mutableStateOf("") }
     val focus = LocalFocusManager.current
     val listState = rememberLazyListState()
+    val reduceMotion = rememberReduceMotion()
 
     // Set while speaking to Amrita: the input bar becomes the recording bar.
     val context = LocalContext.current
@@ -113,7 +117,10 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: 
     // Follow the reply as it streams in.
     val last = model.items.lastOrNull()
     LaunchedEffect(model.items.size, last?.text?.length, last?.cards?.size) {
-        if (model.items.isNotEmpty()) listState.animateScrollToItem(model.items.size)
+        // A gentle glide, or a jump with Remove animations on.
+        if (model.items.isNotEmpty()) {
+            if (reduceMotion) listState.scrollToItem(model.items.size) else listState.animateScrollToItem(model.items.size)
+        }
     }
 
     Scaffold(
@@ -225,7 +232,7 @@ private fun Welcome(name: String?) {
             "evening" to "Good evening, peaceful traveler.",
         ).getValue(time)
     Column(Modifier.padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(greeting, style = Pv.display, color = Pv.ink)
+        Text(greeting, style = Pv.display, color = Pv.ink, modifier = Modifier.semantics { heading() })
         Text(
             "Tell me how you feel, and I'll suggest a practice that fits your body, energy, and goals.",
             style = Pv.body,

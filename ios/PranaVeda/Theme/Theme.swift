@@ -91,6 +91,14 @@ extension View {
     func cardSurface() -> some View { modifier(CardSurface()) }
 
     func sectionLabel() -> some View {
-        self.font(Theme.label).tracking(0.9).textCase(.uppercase).foregroundStyle(Theme.stone500)
+        self.labelFont().tracking(0.9).textCase(.uppercase).foregroundStyle(Theme.stone500)
+    }
+
+    /// The small uppercase label type. Labels are short markers, so they grow
+    /// with the reader's text size up to the first accessibility size and no
+    /// further; past that they would break mid-word. Body text and headings
+    /// keep growing.
+    func labelFont() -> some View {
+        self.font(Theme.label).dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 }

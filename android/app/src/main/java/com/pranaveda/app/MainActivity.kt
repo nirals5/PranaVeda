@@ -1,5 +1,7 @@
 package com.pranaveda.app
 
+import androidx.compose.ui.unit.sp
+import com.pranaveda.app.ui.theme.cappedSp
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
@@ -105,7 +107,8 @@ class MainActivity : ComponentActivity() {
                                         selected = tab == index,
                                         onClick = { tab = index },
                                         icon = { Icon(painterResource(icon), contentDescription = null) },
-                                        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        // Tab labels grow with the font size only so far, so "Ask Amrita" still fits.
+                                        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = cappedSp(12.sp)) },
                                         colors = itemColors,
                                     )
                                 }

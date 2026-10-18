@@ -35,7 +35,7 @@ struct AccountView: View {
 
     private var signedOut: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Guest").font(Theme.heading(.title)).foregroundStyle(Theme.ink)
+            Text("Guest").font(Theme.heading(.title)).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
             Text("Signing in is optional. It saves the wellness profile Amrita builds to your account, so it follows you to the website and your other devices.")
                 .font(Theme.body)
                 .foregroundStyle(Theme.stone700)
@@ -50,18 +50,21 @@ struct AccountView: View {
                 .disabled(auth.isBusy)
                 .accessibilityLabel("Sign in with Apple")
             }
+            // Google's button has a fixed design that cuts its text off at the
+            // largest sizes, so it grows only to the first accessibility size.
             GoogleSignInButton(viewModel: GoogleSignInButtonViewModel(scheme: .light, style: .wide, state: auth.isBusy ? .disabled : .normal)) {
                 notice = nil
                 Task { await auth.signInWithGoogle() }
             }
             .frame(maxWidth: 320)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         }
         .cardSurface()
     }
 
     private func signedIn(_ user: AccountUser) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Signed in").sectionLabel()
+            Text("Signed in").sectionLabel().accessibilityAddTraits(.isHeader)
             Text(user.displayName ?? user.email ?? "Your account").font(Theme.heading(.title)).foregroundStyle(Theme.ink)
             if user.displayName != nil, let email = user.email {
                 Text(email).font(Theme.bodySmall).foregroundStyle(Theme.stone500)

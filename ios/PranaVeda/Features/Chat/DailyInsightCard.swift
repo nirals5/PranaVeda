@@ -12,7 +12,7 @@ struct DailyInsightCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Daily insight").sectionLabel()
+                Text("Daily insight").sectionLabel().accessibilityAddTraits(.isHeader)
                 Spacer()
                 Image(systemName: "safari").foregroundStyle(Theme.stone500).accessibilityHidden(true)
             }
@@ -38,7 +38,7 @@ struct DailyInsightCard: View {
             Divider().overlay(Theme.stone200.opacity(0.5))
             VStack(alignment: .leading, spacing: 6) {
                 Text(insight.focus)
-                    .font(Theme.label).tracking(1.2).textCase(.uppercase)
+                    .labelFont().tracking(1.2).textCase(.uppercase)
                     .foregroundStyle(Theme.lavender)
                 Text(insight.tip)
                     .font(Theme.bodySmall).italic()

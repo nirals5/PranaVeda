@@ -79,7 +79,7 @@ fun PracticeCalendarCard(
 
     Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel("Practice calendar", Modifier.weight(1f))
+            SectionLabel("Practice calendar", Modifier.weight(1f), heading = true)
             TextButton(onClick = {
                 month = YearMonth.now().toString()
                 selected = LocalDate.now().toString()

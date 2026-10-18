@@ -1,5 +1,7 @@
 package com.pranaveda.app.ui.chat
 
+import com.pranaveda.app.ui.theme.rememberReduceMotion
+import androidx.compose.animation.core.snap
 import android.content.Intent
 import android.net.Uri
 import android.os.SystemClock
@@ -121,9 +123,10 @@ fun VoiceRecorderBar(listener: VoiceListener, onCancel: () -> Unit, onSend: (Str
 /** Bars that rise with the voice, newest on the right. */
 @Composable
 private fun SoundWaves(levels: List<Float>, modifier: Modifier = Modifier) {
+    val reduceMotion = rememberReduceMotion()
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         levels.forEach { level ->
-            val height by animateFloatAsState(level, tween(120), label = "wave")
+            val height by animateFloatAsState(level, if (reduceMotion) snap() else tween(120), label = "wave")
             Box(Modifier.weight(1f).fillMaxHeight(0.15f + 0.85f * height).background(Pv.lavender, CircleShape))
         }
     }

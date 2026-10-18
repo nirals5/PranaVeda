@@ -1,5 +1,10 @@
 package com.pranaveda.app.ui.theme
 
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.remember
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
@@ -145,3 +150,26 @@ fun Modifier.cardSurface(): Modifier = this
     .background(Color.White.copy(alpha = 0.75f), cardShape)
     .border(1.dp, Color.White.copy(alpha = 0.8f), cardShape)
     .padding(16.dp)
+
+/**
+ * True when "Remove animations" is on in the phone's accessibility settings.
+ * Breathing and ambient motion then holds still and changes by a short
+ * crossfade instead (DESIGN.md: every breathing animation has a reduced-motion
+ * fallback).
+ */
+@Composable
+fun rememberReduceMotion(): Boolean {
+    val resolver = LocalContext.current.contentResolver
+    return remember { Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }
+}
+
+/**
+ * [base] that follows the reader's font size up to [maxScale] and no further.
+ * Only for short labels with a fixed space, like the tab bar's, which would
+ * otherwise be cut off; body text keeps growing.
+ */
+@Composable
+fun cappedSp(base: TextUnit, maxScale: Float = 1.3f): TextUnit {
+    val scale = LocalDensity.current.fontScale
+    return if (scale <= maxScale) base else (base.value * maxScale / scale).sp
+}

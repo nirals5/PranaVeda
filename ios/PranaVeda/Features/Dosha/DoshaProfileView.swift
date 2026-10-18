@@ -64,7 +64,7 @@ struct DoshaProfileView: View {
             Button { askAmrita(discoveryMessage) } label: {
                 Label("Begin discovery with Amrita", systemImage: "arrow.right")
                     .labelStyle(TrailingIconLabelStyle())
-                    .font(Theme.label)
+                    .labelFont()
                     .tracking(0.9)
                     .textCase(.uppercase)
                     .foregroundStyle(.white)
@@ -123,7 +123,7 @@ struct DoshaProfileView: View {
                 }
                 Button { askAmrita(discoveryMessage) } label: {
                     Label("Revisit with Amrita", systemImage: "arrow.clockwise")
-                        .font(Theme.label)
+                        .labelFont()
                         .tracking(0.9)
                         .textCase(.uppercase)
                         .foregroundStyle(Theme.stone700)
@@ -140,7 +140,7 @@ struct DoshaProfileView: View {
     private func header(_ dosha: SavedDoshaProfile, tagline: String?) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Your Prakriti", systemImage: "sparkles")
-                .font(Theme.label)
+                .labelFont()
                 .tracking(0.9)
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.stone700)
@@ -183,7 +183,7 @@ struct DoshaProfileView: View {
     private func section<Content: View>(_ title: String, symbol: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(title, systemImage: symbol)
-                .font(Theme.label)
+                .labelFont()
                 .tracking(0.9)
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.stone500)
@@ -236,7 +236,7 @@ private struct BalanceBar: View {
     var body: some View {
         HStack(spacing: 10) {
             Label(style.name, systemImage: style.symbol)
-                .font(Theme.label)
+                .labelFont()
                 .textCase(.uppercase)
                 .foregroundStyle(style.ink)
                 .padding(.horizontal, 8)

@@ -23,6 +23,7 @@ struct PracticeCalendarView: View {
         VStack(alignment: .leading, spacing: 16) {
             header(count: keys.reduce(0) { $0 + (byDay[$1]?.count ?? 0) })
             monthGrid(keys: keys, byDay: byDay)
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             legend
             Divider().overlay(Theme.stone200.opacity(0.5))
             selectedDay(byDay[selectedKey] ?? [])
@@ -41,7 +42,7 @@ struct PracticeCalendarView: View {
                     month = Date()
                     selected = nil
                 }
-                .font(Theme.label)
+                .labelFont()
                 .textCase(.uppercase)
                 .tint(Theme.lavenderDeep)
             }
@@ -75,10 +76,13 @@ struct PracticeCalendarView: View {
 
     private func monthGrid(keys: [String], byDay: [String: [PracticeLogEntry]]) -> some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+        // The grid is a map of the month: it grows to the first accessibility
+        // size, and the chosen day's panel below shows everything at full size
+        // (VoiceOver reads each day in full).
         return LazyVGrid(columns: columns, spacing: 4) {
             ForEach(Array(grid.weekdays.enumerated()), id: \.offset) { _, day in
                 Text(day.short)
-                    .font(Theme.label)
+                    .labelFont()
                     .foregroundStyle(Theme.stone500)
                     .accessibilityLabel(day.long)
             }
@@ -96,6 +100,7 @@ struct PracticeCalendarView: View {
             VStack(spacing: 4) {
                 Text("\(number)")
                     .font(isToday ? Theme.body.weight(.semibold) : Theme.body)
+                    .lineLimit(1).minimumScaleFactor(0.5) // a date never wraps in its cell
                     .foregroundStyle(isSelected ? .white : key > today ? Theme.stone500 : Theme.ink)
                 HStack(spacing: 2) {
                     ForEach(entries.prefix(3)) { PracticeMarker(kind: $0.kind, inverted: isSelected) }
@@ -126,7 +131,7 @@ struct PracticeCalendarView: View {
             Label { Text("Breathwork") } icon: { PracticeMarker(kind: .breathwork) }
         }
         .labelStyle(MarkerLabelStyle())
-        .font(Theme.label)
+        .labelFont()
         .textCase(.uppercase)
         .foregroundStyle(Theme.stone500)
         .accessibilityHidden(true)
@@ -148,7 +153,7 @@ struct PracticeCalendarView: View {
                     Button(action: onBegin) {
                         Label("Begin with Amrita", systemImage: "arrow.right")
                             .labelStyle(TrailingIconLabelStyle())
-                            .font(Theme.label)
+                            .labelFont()
                             .tracking(0.9)
                             .textCase(.uppercase)
                             .foregroundStyle(.white)
@@ -173,7 +178,7 @@ struct PracticeCalendarView: View {
                 PracticeMarker(kind: entry.kind)
                 Text(entryDetail(entry))
             }
-            .font(Theme.label)
+            .labelFont()
             .textCase(.uppercase)
             .foregroundStyle(Theme.stone500)
             Text(entry.title).font(Theme.heading(.headline)).foregroundStyle(Theme.ink)
@@ -181,7 +186,7 @@ struct PracticeCalendarView: View {
                 Button { reopening = result } label: {
                     Label("Open ritual", systemImage: "arrow.right")
                         .labelStyle(TrailingIconLabelStyle())
-                        .font(Theme.label)
+                        .labelFont()
                         .textCase(.uppercase)
                 }
                 .tint(Theme.lavenderDeep)
