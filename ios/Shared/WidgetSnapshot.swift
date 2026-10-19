@@ -102,5 +102,7 @@ enum WidgetLink {
     /// The chat, already listening.
     static let talk = URL(string: "pranaveda://talk")!
     static let you = URL(string: "pranaveda://you")!
+    /// The newest saved ritual's guided practice (Siri, app shortcuts).
+    static let practice = URL(string: "pranaveda://practice")!
     static func savedRitual(_ id: String) -> URL { URL(string: "pranaveda://ritual/\(id)")! }
 }

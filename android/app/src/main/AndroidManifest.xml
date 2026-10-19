@@ -53,6 +53,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="pranaveda" />
             </intent-filter>
+            <!-- Long-press the app icon: Talk to Amrita, Start my practice. -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
 
         <!-- How PranaVeda uses health data: Health Connect links here from its

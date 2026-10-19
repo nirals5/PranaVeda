@@ -58,6 +58,11 @@ targets:
         # A practice shows on the lock screen and in the Dynamic Island while
         # it runs (Shared/PracticeActivity.swift).
         NSSupportsLiveActivities: true
+        # Siri also knows the app as "Amrita": "Hey Siri, talk to Amrita"
+        # (App/PranaVedaShortcuts.swift).
+        INAlternativeAppNames:
+          - INAlternativeAppName: Amrita
+            INAlternativeAppNamePronunciationHint: ahm-REE-tah
         # The website's typefaces, bundled (PranaVeda/Fonts, SIL Open Font
         # License): Playfair Display for headings, Plus Jakarta Sans for text.
         UIAppFonts:
