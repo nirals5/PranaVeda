@@ -1,5 +1,6 @@
 package com.pranaveda.app.ui.chat
 
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.heading
 import com.pranaveda.app.ui.theme.rememberReduceMotion
@@ -78,7 +79,7 @@ import java.time.LocalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: AmritaVoice? = null) {
+fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: AmritaVoice? = null, voiceRequest: Int = 0) {
     var draft by rememberSaveable { mutableStateOf("") }
     val focus = LocalFocusManager.current
     val listState = rememberLazyListState()
@@ -105,6 +106,14 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: 
     // The microphone is never left on: leaving the tab or the app stops it.
     DisposableEffect(Unit) { onDispose { stopRecording() } }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { stopRecording() }
+    // A widget's "Talk to Amrita": start listening, once per request.
+    var handledVoiceRequest by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(voiceRequest) {
+        if (voiceRequest > handledVoiceRequest && voice != null) {
+            handledVoiceRequest = voiceRequest
+            if (listener == null && !model.isStreaming) startRecording()
+        }
+    }
 
     fun send() {
         val text = draft

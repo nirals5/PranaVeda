@@ -9,6 +9,7 @@ import com.pranaveda.app.model.DailyInsightStore
 import com.pranaveda.app.model.PracticeStore
 import com.pranaveda.app.model.SavedRitualStore
 import com.pranaveda.app.voice.AmritaVoice
+import com.pranaveda.app.widget.WidgetBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,6 +43,12 @@ class PranaVedaApplication : Application() {
 
     /** Kept for as long as the app runs, so the reflection is asked for once per launch. */
     val insight: DailyInsightStore by lazy { DailyInsightStore() }
+
+    override fun onCreate() {
+        super.onCreate()
+        // The home-screen widgets show what the app knows; keep them in step.
+        WidgetBridge.start(this)
+    }
 
     val auth: AuthStore by lazy {
         AuthStore(

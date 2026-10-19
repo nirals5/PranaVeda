@@ -20,8 +20,9 @@ targets:
   PranaVeda:
     type: application
     platform: iOS
-    sources: [PranaVeda]
+    sources: [PranaVeda, Shared]
     dependencies:
+      - target: PranaVedaWidgets
       - package: GoogleSignIn
         product: GoogleSignIn
       - package: GoogleSignIn
@@ -52,6 +53,8 @@ targets:
         # YES when the build has the Sign in with Apple capability
         # (PV_APPLE_SIGN_IN in Configuration/App.xcconfig).
         PVAppleSignInEnabled: $(PV_APPLE_SIGN_IN)
+        # The App Group shared with the widgets (Shared/WidgetSnapshot.swift).
+        PVAppGroup: group.$(PV_BUNDLE_ID)
         # The website's typefaces, bundled (PranaVeda/Fonts, SIL Open Font
         # License): Playfair Display for headings, Plus Jakarta Sans for text.
         UIAppFonts:
@@ -68,12 +71,50 @@ targets:
         GIDClientID: $(PV_GOOGLE_CLIENT_ID)
         CFBundleURLTypes:
           - CFBundleURLSchemes: [$(PV_GOOGLE_URL_SCHEME)]
+          # The widgets' links: pranaveda://talk, pranaveda://ritual/<id>, …
+          - CFBundleURLSchemes: [pranaveda]
         # Shown by iOS the first time a phone build reaches the Mac.
         # Speaking to Amrita: the words are recognised on the phone where it
         # can, and only the text is sent.
         NSMicrophoneUsageDescription: PranaVeda listens while you speak to Amrita, so you can tell her how you feel out loud.
         NSSpeechRecognitionUsageDescription: Your words are turned into text so Amrita can read what you said.
         NSLocalNetworkUsageDescription: PranaVeda connects to the PranaVeda server running on your Mac while the app is in development.
+  # Home-screen and lock-screen widgets. They read the snapshot the app
+  # writes into the shared App Group, and never call the server.
+  PranaVedaWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - PranaVedaWidgets
+      - Shared
+      - path: PranaVeda/Fonts
+        buildPhase: resources
+        includes: ["*.ttf"]
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    configFiles:
+      Debug: Configuration/App.xcconfig
+      Release: Configuration/App.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(PV_BUNDLE_ID).widgets
+        CODE_SIGN_ENTITLEMENTS: PranaVedaWidgets/PranaVedaWidgets.entitlements
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: PranaVeda
+        SKIP_INSTALL: YES
+    info:
+      path: PranaVedaWidgets/Info.plist
+      properties:
+        PVAppGroup: group.$(PV_BUNDLE_ID)
+        UIAppFonts:
+          - PlayfairDisplay.ttf
+          - PlayfairDisplay-Italic.ttf
+          - PlusJakartaSans.ttf
+          - PlusJakartaSans-Italic.ttf
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
   PranaVedaTests:
     type: bundle.unit-test
     platform: iOS

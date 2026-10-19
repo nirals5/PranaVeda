@@ -23,8 +23,9 @@ PV_GOOGLE_URL_SCHEME = com.googleusercontent.apps.163737232285-bcks8qr3n3d3a6q01
 // Local.xcconfig to add the capability and show the Apple button; the server
 // also needs the Apple settings in .env (see .env.example).
 PV_APPLE_SIGN_IN = NO
+// Both include the App Group the widgets read from (group.<bundle id>).
 PV_ENTITLEMENTS_YES = PranaVeda/PranaVeda.entitlements
-PV_ENTITLEMENTS_NO =
+PV_ENTITLEMENTS_NO = PranaVeda/PranaVedaBase.entitlements
 CODE_SIGN_ENTITLEMENTS = $(PV_ENTITLEMENTS_$(PV_APPLE_SIGN_IN))
 
 #include? "Local.xcconfig"
