@@ -6,6 +6,10 @@ struct PranaVedaWidgets: WidgetBundle {
     var body: some Widget {
         TodayWidget()
         WeekWidget()
+        PracticeLiveActivityWidget()
+        if #available(iOS 18.0, *) {
+            TalkToAmritaControl()
+        }
     }
 }
 

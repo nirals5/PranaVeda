@@ -55,6 +55,9 @@ targets:
         PVAppleSignInEnabled: $(PV_APPLE_SIGN_IN)
         # The App Group shared with the widgets (Shared/WidgetSnapshot.swift).
         PVAppGroup: group.$(PV_BUNDLE_ID)
+        # A practice shows on the lock screen and in the Dynamic Island while
+        # it runs (Shared/PracticeActivity.swift).
+        NSSupportsLiveActivities: true
         # The website's typefaces, bundled (PranaVeda/Fonts, SIL Open Font
         # License): Playfair Display for headings, Plus Jakarta Sans for text.
         UIAppFonts:
