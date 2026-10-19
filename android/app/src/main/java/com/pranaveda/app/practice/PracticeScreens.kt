@@ -138,12 +138,23 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
     var version by remember { mutableIntStateOf(0) }
     var running by remember { mutableStateOf(true) }
     var finished by remember { mutableStateOf(false) }
+    val notice = rememberPracticeNotice()
+
+    fun showNotice() {
+        if (finished || sequence.index >= poses.size) return
+        notice.show(result.yogaPractice.title, poses[sequence.index].nameEnglish, "Posture ${sequence.index + 1} of ${poses.size}", sequence.secondsLeft, running)
+    }
+    AskForPracticeNotifications(onAllowed = ::showNotice)
 
     fun handle(events: List<PoseSequence.Event>, back: Boolean = false) {
         for (event in events) when (event) {
-            is PoseSequence.Event.EnteredPose -> guide.speak(if (back) Guidance.returnToPose(poses[event.index]) else Guidance.enterPose(poses[event.index]))
+            is PoseSequence.Event.EnteredPose -> {
+                guide.speak(if (back) Guidance.returnToPose(poses[event.index]) else Guidance.enterPose(poses[event.index]))
+                showNotice()
+            }
             PoseSequence.Event.Finished -> {
                 running = false
+                notice.cancel()
                 practice.log(
                     PracticeLogEntry.Kind.Ritual,
                     result.yogaPractice.title,
@@ -157,7 +168,10 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
         version++
     }
 
-    LaunchedEffect(Unit) { poses.firstOrNull()?.let { guide.speak(Guidance.startPose(it)) } }
+    LaunchedEffect(Unit) {
+        poses.firstOrNull()?.let { guide.speak(Guidance.startPose(it)) }
+        showNotice()
+    }
     PracticeClock(running && !finished) { handle(sequence.advance(it)) }
 
     PracticeDialog(onClose) {
@@ -196,7 +210,7 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
                         running = running,
                         canGoBack = sequence.index > 0,
                         onBack = { handle(sequence.previous(), back = true) },
-                        onToggle = { running = !running },
+                        onToggle = { running = !running; showNotice() },
                         onNext = { handle(sequence.next()) },
                     )
                 }
@@ -218,13 +232,24 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
     var started by remember { mutableStateOf(false) }
     var running by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
+    val notice = rememberPracticeNotice()
+
+    fun showNotice() {
+        if (!started || finished) return
+        notice.show(pattern.name, breathPhaseName(pacer.phase), "Cycle ${pacer.cycle} of ${pacer.cycles}", pacer.secondsLeft, running)
+    }
+    AskForPracticeNotifications(onAllowed = ::showNotice)
 
     fun handle(events: List<BreathPacer.Event>, speak: Boolean = true) {
         for (event in events) when (event) {
-            // The opening line already covers the very first inhale.
-            is BreathPacer.Event.PhaseStarted -> if (speak) guide.speak(Guidance.cue(event.phase, event.seconds))
+            is BreathPacer.Event.PhaseStarted -> {
+                // The opening line already covers the very first inhale.
+                if (speak) guide.speak(Guidance.cue(event.phase, event.seconds))
+                showNotice()
+            }
             BreathPacer.Event.Finished -> {
                 running = false
+                notice.cancel()
                 practice.log(PracticeLogEntry.Kind.Breathwork, pattern.name, pacer.totalMinutes, result)
                 guide.speak(Guidance.breathworkComplete(pattern.name))
                 finished = true
@@ -266,12 +291,7 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
             tween(400),
             label = "breath colour",
         )
-        val phaseName = when (pacer.phase) {
-            BreathPacer.Phase.Inhale -> "Inhale"
-            BreathPacer.Phase.HoldFull -> "Hold full"
-            BreathPacer.Phase.Exhale -> "Exhale"
-            BreathPacer.Phase.HoldEmpty -> "Hold empty"
-        }
+        val phaseName = breathPhaseName(pacer.phase)
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             PracticeTopBar(pattern.name, guide, onClose)
             Spacer(Modifier.weight(1f))
@@ -297,6 +317,7 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
                         handle(listOf(pacer.startEvent), speak = false)
                     }
                     running = !running
+                    showNotice()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Pv.lavender, contentColor = Color.White),
                 modifier = Modifier.padding(top = 12.dp, bottom = 32.dp),
@@ -377,4 +398,11 @@ private fun PracticeComplete(detail: String, breathwork: BreathworkPattern?, res
             onDone()
         }
     }
+}
+
+private fun breathPhaseName(phase: BreathPacer.Phase) = when (phase) {
+    BreathPacer.Phase.Inhale -> "Inhale"
+    BreathPacer.Phase.HoldFull -> "Hold full"
+    BreathPacer.Phase.Exhale -> "Exhale"
+    BreathPacer.Phase.HoldEmpty -> "Hold empty"
 }

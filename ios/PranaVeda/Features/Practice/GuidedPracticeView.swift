@@ -11,6 +11,8 @@ struct GuidedPracticeView: View {
     @State private var isRunning = true
     @State private var guide = SpeechGuide()
     @State private var finished = false
+    /// The practice on the lock screen and in the Dynamic Island.
+    @State private var liveActivity = PracticeLiveActivity()
 
     init(result: RecommendationResult) {
         self.result = result
@@ -39,11 +41,14 @@ struct GuidedPracticeView: View {
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
             if let first = poses.first { guide.speak(Guidance.startPose(first)) }
+            showLiveActivity()
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
             guide.stop()
+            liveActivity.end()
         }
+        .onChange(of: isRunning) { showLiveActivity() }
         .task(id: isRunning) {
             guard isRunning else { return }
             await runClock { handle(sequence.advance(by: $0)) }
@@ -91,6 +96,12 @@ struct GuidedPracticeView: View {
         }
     }
 
+    private func showLiveActivity() {
+        guard !finished, sequence.index < poses.count else { return }
+        liveActivity.show(title: result.yogaPractice.title, kind: "ritual", step: poses[sequence.index].nameEnglish,
+                          detail: "Posture \(sequence.index + 1) of \(poses.count)", secondsLeft: sequence.secondsLeft, running: isRunning)
+    }
+
     private enum Direction { case forward, back }
 
     private func handle(_ events: [PoseSequence.Event], going direction: Direction = .forward) {
@@ -98,12 +109,14 @@ struct GuidedPracticeView: View {
             switch event {
             case .enteredPose(let index):
                 guide.speak(direction == .back ? Guidance.returnToPose(poses[index]) : Guidance.enterPose(poses[index]))
+                showLiveActivity()
             case .finished:
                 isRunning = false
                 practice.log(kind: .ritual, title: result.yogaPractice.title,
                              durationMinutes: result.yogaPractice.durationMinutes ?? sequence.durations.reduce(0, +) / 60,
                              result: result)
                 guide.speak(Guidance.ritualComplete)
+                liveActivity.end()
                 withAnimation { finished = true }
             }
         }
@@ -121,6 +134,7 @@ struct BreathworkPacerView: View {
     @State private var pacer: BreathPacer
     @State private var isRunning = false
     @State private var started = false
+    @State private var liveActivity = PracticeLiveActivity()
     @State private var guide = SpeechGuide()
     @State private var finished = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -147,7 +161,9 @@ struct BreathworkPacerView: View {
             }
         }
         .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
+        .onChange(of: isRunning) { showLiveActivity() }
         .onDisappear {
+            liveActivity.end()
             UIApplication.shared.isIdleTimerDisabled = false
             guide.stop()
         }
@@ -241,16 +257,25 @@ struct BreathworkPacerView: View {
         }
     }
 
+    /// Each breath phase on the lock screen once the pacer has begun.
+    private func showLiveActivity() {
+        guard started, !finished else { return }
+        liveActivity.show(title: pattern.name, kind: "breathwork", step: phaseName,
+                          detail: "Cycle \(pacer.cycle) of \(pacer.cycles)", secondsLeft: pacer.secondsLeft, running: isRunning)
+    }
+
     private func handle(_ events: [BreathPacer.Event], speakFirst: Bool = true) {
         for event in events {
             switch event {
             case .phase(let phase, let seconds, _):
                 // The opening line already covers the very first inhale.
                 if speakFirst { guide.speak(Guidance.cue(for: phase, seconds: seconds)) }
+                showLiveActivity()
             case .finished:
                 isRunning = false
                 practice.log(kind: .breathwork, title: pattern.name, durationMinutes: pacer.totalMinutes, result: result)
                 guide.speak(Guidance.breathworkComplete(pattern.name))
+                liveActivity.end()
                 withAnimation { finished = true }
             }
         }
