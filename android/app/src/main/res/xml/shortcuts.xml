@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app icon: Talk to Amrita, Start my practice. Each follows a
+     pranaveda:// link, as the widgets and the Quick Settings tile do. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="talk"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_talk"
+        android:shortcutShortLabel="@string/shortcut_talk"
+        android:shortcutLongLabel="@string/shortcut_talk">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="pranaveda://talk"
+            android:targetPackage="com.pranaveda.app"
+            android:targetClass="com.pranaveda.app.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="practice"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_practice"
+        android:shortcutShortLabel="@string/shortcut_practice"
+        android:shortcutLongLabel="@string/shortcut_practice_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="pranaveda://practice"
+            android:targetPackage="com.pranaveda.app"
+            android:targetClass="com.pranaveda.app.MainActivity" />
+    </shortcut>
+</shortcuts>

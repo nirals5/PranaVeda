@@ -18,6 +18,8 @@ struct PranaVedaApp: App {
     @State private var voiceRequest = 0
     /// A saved ritual opened from a widget.
     @State private var openedRitual: SavedRitual?
+    /// A saved ritual begun straight away ("Start my practice").
+    @State private var practicingRitual: SavedRitual?
     /// Links from intents (the Talk to Amrita control).
     @State private var router = AppLinkRouter.shared
 
@@ -68,6 +70,9 @@ struct PranaVedaApp: App {
                 open(url)
             }
             .sheet(item: $openedRitual) { RitualDetailView(result: $0.result) }
+            .fullScreenCover(item: $practicingRitual) {
+                GuidedPracticeView(result: $0.result).environment(practice).environment(saved)
+            }
             // The widgets show what the app knows; keep them in step.
             .onChange(of: practice.entries, initial: true) { publishToWidgets() }
             .onChange(of: saved.rituals) { publishToWidgets() }
@@ -98,7 +103,7 @@ struct PranaVedaApp: App {
         WidgetBridge.publish(entries: practice.entries, saved: saved.rituals, insight: insight.state)
     }
 
-    /// pranaveda://talk, pranaveda://you, pranaveda://ritual/<id>
+    /// pranaveda://talk, pranaveda://you, pranaveda://ritual/<id>, pranaveda://practice
     private func open(_ url: URL) {
         switch url.host() {
         case "talk":
@@ -106,6 +111,9 @@ struct PranaVedaApp: App {
             voiceRequest += 1
         case "you":
             tab = .you
+        case "practice":
+            openedRitual = nil
+            if let newest = saved.rituals.first { practicingRitual = newest } else { tab = .library }
         case "ritual":
             let id = url.lastPathComponent
             if let ritual = saved.rituals.first(where: { $0.id == id }) { openedRitual = ritual } else { tab = .you }

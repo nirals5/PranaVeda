@@ -1,6 +1,7 @@
 package com.pranaveda.app
 
 import com.pranaveda.app.ui.chat.RitualSheet
+import com.pranaveda.app.practice.GuidedPracticeScreen
 import com.pranaveda.app.model.RecommendationResult
 import androidx.compose.runtime.mutableStateOf
 import android.net.Uri
@@ -54,7 +55,7 @@ import com.pranaveda.app.ui.theme.PranaVedaTheme
 private const val LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
 
 class MainActivity : ComponentActivity() {
-    /** A widget's link waiting to be followed (pranaveda://talk, …/you, …/ritual/<id>). */
+    /** A link waiting to be followed (pranaveda://talk, …/you, …/ritual/<id>, …/practice). */
     private var link by mutableStateOf<Uri?>(null)
 
     override fun onNewIntent(intent: Intent) {
@@ -82,6 +83,8 @@ class MainActivity : ComponentActivity() {
                 // Raised by the widgets' "Talk to Amrita": the chat starts listening.
                 var voiceRequest by remember { mutableIntStateOf(0) }
                 var openedRitual by remember { mutableStateOf<RecommendationResult?>(null) }
+                // A saved ritual begun straight away ("Start my practice").
+                var practicing by remember { mutableStateOf<RecommendationResult?>(null) }
                 LaunchedEffect(link) {
                     val uri = link ?: return@LaunchedEffect
                     when (uri.host) {
@@ -90,6 +93,11 @@ class MainActivity : ComponentActivity() {
                             voiceRequest++
                         }
                         "you" -> tab = 3
+                        "practice" -> {
+                            openedRitual = null
+                            val newest = (application as PranaVedaApplication).saved.rituals.firstOrNull()
+                            if (newest != null) practicing = newest.result else tab = 2
+                        }
                         "ritual" -> {
                             val saved = (application as PranaVedaApplication).saved.rituals.firstOrNull { it.id == uri.lastPathSegment }
                             if (saved != null) openedRitual = saved.result else tab = 3
@@ -98,6 +106,7 @@ class MainActivity : ComponentActivity() {
                     link = null
                 }
                 openedRitual?.let { RitualSheet(it) { openedRitual = null } }
+                practicing?.let { GuidedPracticeScreen(it) { practicing = null } }
 
                 // Talking to the dev server on the Mac: from Android 17 the
                 // user must allow local-network access first (debug builds).
