@@ -84,6 +84,8 @@ dependencies {
     // Home-screen widgets.
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
+    // Recovery & Trends: sleep and heart readings from Health Connect, on the phone.
+    implementation(libs.androidx.health.connect)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

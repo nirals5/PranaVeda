@@ -1,5 +1,7 @@
 package com.pranaveda.app.practice
 
+import com.pranaveda.app.health.HealthTrendsSection
+import com.pranaveda.app.health.HealthStore
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,7 +36,7 @@ import kotlin.math.roundToInt
 
 /** Recovery & Trends, part one: what the practice log shows, real data only. (Heart and sleep from Health Connect come next.) */
 @Composable
-fun PracticeTrendsCard(practice: PracticeStore) {
+fun PracticeTrendsCard(practice: PracticeStore, health: HealthStore? = null) {
     val trends = PracticeTrends(practice.entries)
     Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionLabel("Recovery & Trends", heading = true)
@@ -44,8 +46,19 @@ fun PracticeTrendsCard(practice: PracticeStore) {
                 style = Pv.bodySmall,
                 color = Pv.stone700,
             )
-            return@Column
+        } else {
+            PracticeSummary(trends)
         }
+        health?.let {
+            HorizontalDivider(color = Pv.stone200.copy(alpha = 0.5f))
+            HealthTrendsSection(it, practice.entries.map { entry -> entry.localDate }.toSet())
+        }
+    }
+}
+
+@Composable
+private fun PracticeSummary(trends: PracticeTrends) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Column(Modifier.semantics(mergeDescendants = true) { }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("This week", style = Pv.caption, color = Pv.stone500)
             Text(PracticeTrends.weekLine(trends.thisWeek), style = Pv.headingLarge, color = Pv.ink)

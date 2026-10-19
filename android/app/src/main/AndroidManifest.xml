@@ -4,6 +4,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Speaking to Amrita. Asked for the first time the microphone is tapped. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Recovery & Trends: read only, on the phone (health/HealthStore.kt). -->
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />
 
     <!-- Spoken guidance and replies use the phone's text-to-speech engine, and
          speaking to Amrita its speech recognition; from Android 11 an app must
@@ -15,6 +19,8 @@
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <!-- Health Connect, for Android 13 and earlier, where it is a separate app. -->
+        <package android:name="com.google.android.apps.healthdata" />
     </queries>
 
     <application
@@ -44,6 +50,27 @@
                 <data android:scheme="pranaveda" />
             </intent-filter>
         </activity>
+
+        <!-- How PranaVeda uses health data: Health Connect links here from its
+             permission screen (Android 13 and earlier, and 14 and later). -->
+        <activity
+            android:name=".health.HealthPrivacyActivity"
+            android:exported="true"
+            android:label="Your health data in PranaVeda">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".health.HealthPrivacyActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- Home-screen widgets (widget/Widgets.kt). -->
         <receiver android:name=".widget.TodayWidgetReceiver" android:exported="true" android:label="Today">

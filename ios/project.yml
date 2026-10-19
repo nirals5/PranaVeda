@@ -78,6 +78,9 @@ targets:
         # can, and only the text is sent.
         NSMicrophoneUsageDescription: PranaVeda listens while you speak to Amrita, so you can tell her how you feel out loud.
         NSSpeechRecognitionUsageDescription: Your words are turned into text so Amrita can read what you said.
+        # Recovery & Trends reads sleep, resting heart rate and HRV from Apple
+        # Health, on the phone only (Models/HealthStore.swift).
+        NSHealthShareUsageDescription: PranaVeda shows your sleep, resting heart rate and heart-rate variability beside your practice. They are read on this phone and never sent anywhere.
         NSLocalNetworkUsageDescription: PranaVeda connects to the PranaVeda server running on your Mac while the app is in development.
   # Home-screen and lock-screen widgets. They read the snapshot the app
   # writes into the shared App Group, and never call the server.

@@ -78,7 +78,7 @@ fun AccountScreen(auth: AuthStore, onBegin: () -> Unit = {}) {
             val app = LocalContext.current.applicationContext as PranaVedaApplication
             var reopening by remember { mutableStateOf<RecommendationResult?>(null) }
             PracticeCalendarCard(app.practice, onOpenRitual = { reopening = it }, onBegin = onBegin)
-            PracticeTrendsCard(app.practice)
+            PracticeTrendsCard(app.practice, app.health)
             SavedRitualsCard(app.saved, onOpen = { reopening = it })
             reopening?.let { RitualSheet(it) { reopening = null } }
         }
