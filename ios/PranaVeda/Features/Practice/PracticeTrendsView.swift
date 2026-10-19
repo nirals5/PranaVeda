@@ -5,6 +5,8 @@ import SwiftUI
 /// (Heart and sleep from Apple Health come next.)
 struct PracticeTrendsView: View {
     let practice: PracticeStore
+    /// Apple Health readings, part two of the card.
+    var health: HealthStore? = nil
 
     var body: some View {
         let trends = PracticeTrends(entries: practice.entries)
@@ -20,6 +22,10 @@ struct PracticeTrendsView: View {
                 Divider().overlay(Theme.stone200.opacity(0.5))
                 streaks(trends)
                 if let share = trends.ritualShare { balance(share) }
+            }
+            if let health {
+                Divider().overlay(Theme.stone200.opacity(0.5))
+                HealthTrendsSection(health: health, practiceDays: Set(practice.entries.map(\.localDate)))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

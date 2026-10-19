@@ -7,6 +7,7 @@ struct AccountView: View {
     let auth: AuthStore
     let practice: PracticeStore
     let saved: SavedRitualStore
+    var health: HealthStore? = nil
     /// Over to the chat ("Begin with Amrita" on the calendar).
     var onBegin: () -> Void = {}
     @State private var confirmingDelete = false
@@ -21,7 +22,7 @@ struct AccountView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         if let user = auth.user { signedIn(user) } else { signedOut }
                         PracticeCalendarView(practice: practice, onBegin: onBegin)
-                        PracticeTrendsView(practice: practice)
+                        PracticeTrendsView(practice: practice, health: health)
                         SavedRitualsView(saved: saved)
                         if let message = auth.problem ?? notice {
                             Text(message).font(Theme.bodySmall).foregroundStyle(Theme.terracotta)

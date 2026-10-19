@@ -12,6 +12,7 @@ struct PranaVedaApp: App {
     @State private var insight = DailyInsightStore()
     @State private var saved = SavedRitualStore()
     @State private var voice = AmritaVoice()
+    @State private var health = HealthStore()
     @State private var tab = AppTab.amrita
     /// Raised by the widgets' "Talk to Amrita": the chat starts listening.
     @State private var voiceRequest = 0
@@ -47,7 +48,7 @@ struct PranaVedaApp: App {
                 LibraryView(catalog: catalog)
                     .tabItem { Label("Library", systemImage: "figure.mind.and.body") }
                     .tag(AppTab.library)
-                AccountView(auth: auth, practice: practice, saved: saved) { tab = .amrita }
+                AccountView(auth: auth, practice: practice, saved: saved, health: health) { tab = .amrita }
                     .tabItem { Label("You", systemImage: "person.crop.circle") }
                     .tag(AppTab.you)
             }
