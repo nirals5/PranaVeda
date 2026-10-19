@@ -37,6 +37,7 @@ import com.pranaveda.app.PranaVedaApplication
 import com.pranaveda.app.R
 import com.pranaveda.app.model.RecommendationResult
 import com.pranaveda.app.practice.PracticeCalendarCard
+import com.pranaveda.app.practice.PracticeTrendsCard
 import com.pranaveda.app.practice.SavedRitualsCard
 import com.pranaveda.app.ui.chat.RitualSheet
 import com.pranaveda.app.auth.AccountUser
@@ -77,6 +78,7 @@ fun AccountScreen(auth: AuthStore, onBegin: () -> Unit = {}) {
             val app = LocalContext.current.applicationContext as PranaVedaApplication
             var reopening by remember { mutableStateOf<RecommendationResult?>(null) }
             PracticeCalendarCard(app.practice, onOpenRitual = { reopening = it }, onBegin = onBegin)
+            PracticeTrendsCard(app.practice)
             SavedRitualsCard(app.saved, onOpen = { reopening = it })
             reopening?.let { RitualSheet(it) { reopening = null } }
         }
