@@ -21,6 +21,7 @@ struct AccountView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         if let user = auth.user { signedIn(user) } else { signedOut }
                         PracticeCalendarView(practice: practice, onBegin: onBegin)
+                        PracticeTrendsView(practice: practice)
                         SavedRitualsView(saved: saved)
                         if let message = auth.problem ?? notice {
                             Text(message).font(Theme.bodySmall).foregroundStyle(Theme.terracotta)
