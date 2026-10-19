@@ -18,6 +18,8 @@ struct PranaVedaApp: App {
     @State private var voiceRequest = 0
     /// A saved ritual opened from a widget.
     @State private var openedRitual: SavedRitual?
+    /// Links from intents (the Talk to Amrita control).
+    @State private var router = AppLinkRouter.shared
 
     enum AppTab: Hashable { case amrita, dosha, library, you }
 
@@ -59,6 +61,11 @@ struct PranaVedaApp: App {
             .environment(saved)
             .onOpenURL { url in
                 if url.scheme == WidgetLink.scheme { open(url) } else { GIDSignIn.sharedInstance.handle(url) }
+            }
+            .onChange(of: router.pending, initial: true) {
+                guard let url = router.pending else { return }
+                router.pending = nil
+                open(url)
             }
             .sheet(item: $openedRitual) { RitualDetailView(result: $0.result) }
             // The widgets show what the app knows; keep them in step.
