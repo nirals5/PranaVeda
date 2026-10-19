@@ -106,7 +106,7 @@ struct PracticeGlyph: View {
 struct TalkToAmritaControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "talk") {
-            ControlWidgetButton(action: OpenURLIntent(WidgetLink.talk)) {
+            ControlWidgetButton(action: TalkToAmritaIntent()) {
                 Label("Talk to Amrita", systemImage: "mic.fill")
             }
         }
