@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the This week widget looks like, for the widget picker. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="14dp">
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="THIS WEEK" android:textColor="#78909C" android:textSize="11sp"
+        android:textStyle="bold" android:fontFamily="monospace" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="4 days of practice" android:textColor="#2D3436" android:textSize="16sp" android:fontFamily="serif" />
+    <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+        <ImageView android:layout_width="0dp" android:layout_weight="1" android:layout_height="10dp" android:src="@drawable/widget_dot_ritual" android:contentDescription="@null" />
+        <ImageView android:layout_width="0dp" android:layout_weight="1" android:layout_height="10dp" android:src="@drawable/widget_dot_breathwork" android:contentDescription="@null" />
+        <ImageView android:layout_width="0dp" android:layout_weight="1" android:layout_height="10dp" android:src="@drawable/widget_dot_ritual" android:contentDescription="@null" />
+        <ImageView android:layout_width="0dp" android:layout_weight="1" android:layout_height="10dp" android:src="@drawable/widget_dot_empty" android:contentDescription="@null" />
+        <ImageView android:layout_width="0dp" android:layout_weight="1" android:layout_height="10dp" android:src="@drawable/widget_dot_ritual" android:contentDescription="@null" />
+        <ImageView android:layout_width="0dp" android:layout_weight="1" android:layout_height="10dp" android:src="@drawable/widget_dot_empty" android:contentDescription="@null" />
+        <ImageView android:layout_width="0dp" android:layout_weight="1" android:layout_height="10dp" android:src="@drawable/widget_dot_empty" android:contentDescription="@null" />
+    </LinearLayout>
+</LinearLayout>

@@ -13,6 +13,10 @@ struct PranaVedaApp: App {
     @State private var saved = SavedRitualStore()
     @State private var voice = AmritaVoice()
     @State private var tab = AppTab.amrita
+    /// Raised by the widgets' "Talk to Amrita": the chat starts listening.
+    @State private var voiceRequest = 0
+    /// A saved ritual opened from a widget.
+    @State private var openedRitual: SavedRitual?
 
     enum AppTab: Hashable { case amrita, dosha, library, you }
 
@@ -30,7 +34,7 @@ struct PranaVedaApp: App {
     var body: some Scene {
         WindowGroup {
             TabView(selection: $tab) {
-                ChatView(model: chat, auth: auth, insight: insight, saved: saved, voice: voice)
+                ChatView(model: chat, auth: auth, insight: insight, saved: saved, voice: voice, voiceRequest: voiceRequest)
                     .tabItem { Label("Ask Amrita", systemImage: "sparkles") }
                     .tag(AppTab.amrita)
                 DoshaProfileView(profile: chat.profile, guide: doshaGuide) { message in
@@ -52,7 +56,14 @@ struct PranaVedaApp: App {
             // ritual can be saved.
             .environment(practice)
             .environment(saved)
-            .onOpenURL { url in GIDSignIn.sharedInstance.handle(url) }
+            .onOpenURL { url in
+                if url.scheme == WidgetLink.scheme { open(url) } else { GIDSignIn.sharedInstance.handle(url) }
+            }
+            .sheet(item: $openedRitual) { RitualDetailView(result: $0.result) }
+            // The widgets show what the app knows; keep them in step.
+            .onChange(of: practice.entries, initial: true) { publishToWidgets() }
+            .onChange(of: saved.rituals) { publishToWidgets() }
+            .onChange(of: insight.state) { publishToWidgets() }
             .task {
                 chat.auth = auth
                 chat.speakReply = { [voice] in voice.speak($0) }
@@ -72,6 +83,26 @@ struct PranaVedaApp: App {
                 await auth.restore()
             }
             .task { await catalog.loadIfNeeded() }
+        }
+    }
+
+    private func publishToWidgets() {
+        WidgetBridge.publish(entries: practice.entries, saved: saved.rituals, insight: insight.state)
+    }
+
+    /// pranaveda://talk, pranaveda://you, pranaveda://ritual/<id>
+    private func open(_ url: URL) {
+        switch url.host() {
+        case "talk":
+            tab = .amrita
+            voiceRequest += 1
+        case "you":
+            tab = .you
+        case "ritual":
+            let id = url.lastPathComponent
+            if let ritual = saved.rituals.first(where: { $0.id == id }) { openedRitual = ritual } else { tab = .you }
+        default:
+            break
         }
     }
 }

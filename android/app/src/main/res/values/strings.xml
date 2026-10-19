@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">PranaVeda</string>
+    <string name="widget_today_description">Your streak, whether you have practised today, and Amrita\'s reflection for the day.</string>
+    <string name="widget_week_description">The days you practised this week: a dot for a ritual, a ring for breathwork.</string>
 </resources>

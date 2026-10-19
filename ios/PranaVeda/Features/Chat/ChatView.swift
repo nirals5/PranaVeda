@@ -6,6 +6,9 @@ struct ChatView: View {
     var insight: DailyInsightStore? = nil
     var saved: SavedRitualStore? = nil
     var voice: AmritaVoice? = nil
+    /// Goes up each time a widget asks to talk to Amrita: start listening.
+    var voiceRequest = 0
+    @State private var handledVoiceRequest = 0
     /// Set while speaking to Amrita: the input bar becomes the recording bar.
     @State private var listener: VoiceListener?
     @Environment(\.scenePhase) private var scenePhase
@@ -55,6 +58,8 @@ struct ChatView: View {
             .animation(.easeOut(duration: 0.2), value: listener == nil)
             // The microphone is never left on: leaving the tab or the app stops it.
             .onDisappear(perform: stopRecording)
+            .onAppear(perform: answerVoiceRequest)
+            .onChange(of: voiceRequest) { answerVoiceRequest() }
             .onChange(of: scenePhase) { _, phase in if phase != .active { stopRecording() } }
             .navigationTitle("Amrita")
             .navigationBarTitleDisplayMode(.inline)
@@ -171,6 +176,12 @@ struct ChatView: View {
         let listener = VoiceListener()
         self.listener = listener
         Task { await listener.start() }
+    }
+
+    private func answerVoiceRequest() {
+        guard voiceRequest > handledVoiceRequest, voice != nil else { return }
+        handledVoiceRequest = voiceRequest
+        if listener == nil, !model.isStreaming { startRecording() }
     }
 
     private func stopRecording() {

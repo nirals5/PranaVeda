@@ -1,5 +1,10 @@
 package com.pranaveda.app
 
+import com.pranaveda.app.ui.chat.RitualSheet
+import com.pranaveda.app.model.RecommendationResult
+import androidx.compose.runtime.mutableStateOf
+import android.net.Uri
+import android.content.Intent
 import androidx.compose.ui.unit.sp
 import com.pranaveda.app.ui.theme.cappedSp
 import android.content.pm.PackageManager
@@ -12,6 +17,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import com.pranaveda.app.ui.account.AccountScreen
 import com.pranaveda.app.ui.dosha.DoshaGuideViewModel
@@ -48,7 +54,16 @@ import com.pranaveda.app.ui.theme.PranaVedaTheme
 private const val LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
 
 class MainActivity : ComponentActivity() {
+    /** A widget's link waiting to be followed (pranaveda://talk, …/you, …/ritual/<id>). */
+    private var link by mutableStateOf<Uri?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        link = intent.data
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        if (savedInstanceState == null) link = intent?.data
         // Light design always: dark status and navigation bar icons.
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
@@ -64,6 +79,25 @@ class MainActivity : ComponentActivity() {
                 val insight = (application as PranaVedaApplication).insight
                 val scope = rememberCoroutineScope()
                 var tab by rememberSaveable { mutableIntStateOf(0) }
+                // Raised by the widgets' "Talk to Amrita": the chat starts listening.
+                var voiceRequest by remember { mutableIntStateOf(0) }
+                var openedRitual by remember { mutableStateOf<RecommendationResult?>(null) }
+                LaunchedEffect(link) {
+                    val uri = link ?: return@LaunchedEffect
+                    when (uri.host) {
+                        "talk" -> {
+                            tab = 0
+                            voiceRequest++
+                        }
+                        "you" -> tab = 3
+                        "ritual" -> {
+                            val saved = (application as PranaVedaApplication).saved.rituals.firstOrNull { it.id == uri.lastPathSegment }
+                            if (saved != null) openedRitual = saved.result else tab = 3
+                        }
+                    }
+                    link = null
+                }
+                openedRitual?.let { RitualSheet(it) { openedRitual = null } }
 
                 // Talking to the dev server on the Mac: from Android 17 the
                 // user must allow local-network access first (debug builds).
@@ -117,7 +151,7 @@ class MainActivity : ComponentActivity() {
                     ) { padding ->
                         Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
                             when (tab) {
-                                0 -> ChatScreen(chat, insight, (application as PranaVedaApplication).voice)
+                                0 -> ChatScreen(chat, insight, (application as PranaVedaApplication).voice, voiceRequest)
                                 1 -> DoshaScreen(chat.profile, doshaGuide) { message ->
                                     // As on the website: over to the chat, with the question asked.
                                     tab = 0
