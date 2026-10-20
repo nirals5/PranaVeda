@@ -107,7 +107,7 @@ struct TalkToAmritaControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "talk") {
             ControlWidgetButton(action: TalkToAmritaIntent()) {
-                Label("Talk to Amrita", systemImage: "mic.fill")
+                Label("Talk to Amrita", image: "lotus")
             }
         }
         .displayName("Talk to Amrita")
