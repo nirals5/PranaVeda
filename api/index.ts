@@ -9,8 +9,8 @@ import { applyProfileChanges, loadAccountProfile } from './_lib/profiles.js';
 import type { VersionedProfile } from './_lib/profiles.js';
 import { getUser } from './_lib/users.js';
 import { DOSHA_GUIDE, DOSHA_GUIDE_NOTE } from './_lib/doshaGuide.js';
-import { catalogOf, getCatalog } from './_lib/catalog.js';
-import type { Catalog } from './_lib/catalog.js';
+import { catalogOf, conditionConflicts, getCatalog } from './_lib/catalog.js';
+import type { Catalog, CatalogCondition } from './_lib/catalog.js';
 
 // IMPORTANT: relative imports here (and anywhere under api/) must end in
 // ".js". Vercel runs these files as native ES modules, where an
@@ -735,7 +735,27 @@ export const breathworkById = new Map(BREATHWORK.map((b) => [b.id, b]));
 
 // The catalog above is the fallback. What is served comes from the practices
 // tables when a database is configured (api/_lib/catalog.ts).
-export const BUILT_IN_CATALOG: Catalog = catalogOf(POSES, BREATHWORK, 'built-in');
+// The conditions the built-in catalog's contraindications use, with the words
+// a profile may say them in (the Practice Library's Conditions tab replaces
+// this when the catalog comes from the database).
+export const BUILT_IN_CONDITIONS: CatalogCondition[] = [
+  { code: 'knee_injury', label: 'Knee injury', userWords: ['bad knee', 'sore knees'] },
+  { code: 'wrist_injury', label: 'Wrist injury', userWords: ['sore wrists', 'carpal tunnel'] },
+  { code: 'shoulder_injury', label: 'Shoulder injury', userWords: ['frozen shoulder'] },
+  { code: 'neck_injury', label: 'Neck injury', userWords: ['stiff neck'] },
+  { code: 'lower_back_injury', label: 'Lower back injury', userWords: ['bad back', 'back pain'] },
+  { code: 'hamstring_injury', label: 'Hamstring injury', userWords: ['pulled hamstring'] },
+  { code: 'pregnancy', label: 'Pregnancy', userWords: ['pregnant', 'expecting'] },
+  { code: 'hypertension', label: 'High blood pressure', userWords: ['high BP'] },
+  { code: 'low_blood_pressure', label: 'Low blood pressure', userWords: ['low BP', 'dizzy when standing'] },
+  { code: 'glaucoma', label: 'Glaucoma', userWords: ['eye pressure'] },
+  { code: 'heart_condition', label: 'Heart condition', userWords: ['heart problems'] },
+  { code: 'recent_surgery', label: 'Recent surgery', userWords: ['had an operation'] },
+  { code: 'vertigo', label: 'Vertigo', userWords: ['balance issues', 'unsteady'] },
+  { code: 'asthma', label: 'Asthma', userWords: ['wheezing', 'short of breath'] },
+];
+
+export const BUILT_IN_CATALOG: Catalog = catalogOf(POSES, BREATHWORK, BUILT_IN_CONDITIONS, 'built-in');
 const servedCatalog = () => getCatalog(BUILT_IN_CATALOG);
 
 // ============================== Catalog artwork ==============================
@@ -1265,12 +1285,6 @@ export function userToday(localDate: unknown, timeZone?: string | null, now = ne
   return now.toISOString().slice(0, 10);
 }
 
-function conditionConflicts(contraindications: string[], conditions: string[] | undefined): string[] {
-  if (!conditions?.length) return [];
-  const normalized = conditions.map((c) => c.toLowerCase().replace(/\s+/g, '_'));
-  return contraindications.filter((tag) => normalized.some((c) => c.includes(tag) || tag.includes(c)));
-}
-
 // Strip JSON punctuation the model sometimes leaves on a value, e.g.
 // `foo"]` or `["foo` when it half-serialises an array into a string.
 // Quotes are only dropped when they wrap the value or are left unpaired, so
@@ -1333,6 +1347,21 @@ export function applyProfileUpdate(profile: WellnessProfile, input: any, today =
   return next;
 }
 
+// The tools for one reply, with the served catalog's conditions listed where
+// Amrita records a user's conditions, so she uses the codes the safety check knows.
+export function toolsFor(catalog: Catalog): Anthropic.Tool[] {
+  const codes = catalog.conditions.map((c) => `${c.code} (${c.label})`).join(', ');
+  return tools.map((tool) => {
+    if (tool.name !== 'update_wellness_profile') return tool;
+    const schema = tool.input_schema as { properties: Record<string, any> };
+    const addConditions = {
+      ...schema.properties.addConditions,
+      description: `Injuries/conditions. When one of these applies, record its code: ${codes}. Free text is fine for anything else.`,
+    };
+    return { ...tool, input_schema: { ...tool.input_schema, properties: { ...schema.properties, addConditions } } };
+  });
+}
+
 function buildRitual(
   input: any,
   profile: WellnessProfile,
@@ -1344,7 +1373,7 @@ function buildRitual(
   for (const p of input.poses ?? []) {
     const pose = catalog.poseById.get(p.poseId);
     if (!pose) return { error: `Unknown poseId "${p.poseId}". Choose ids from the catalog.` };
-    const bad = conditionConflicts(pose.contraindications, profile.conditions);
+    const bad = conditionConflicts(pose.contraindications, profile.conditions, catalog.conditions);
     if (bad.length) conflicts.push(`${pose.id} (contraindicated for ${bad.join(', ')})`);
     const mins = Math.max(1, Math.round(p.durationMinutes));
     poses.push({
@@ -1361,7 +1390,7 @@ function buildRitual(
   }
   const breath = catalog.breathworkById.get(input.breathworkId);
   if (!breath) return { error: `Unknown breathworkId "${input.breathworkId}". Choose ids from the catalog.` };
-  const badBreath = conditionConflicts(breath.contraindications, profile.conditions);
+  const badBreath = conditionConflicts(breath.contraindications, profile.conditions, catalog.conditions);
   if (badBreath.length) conflicts.push(`${breath.id} (contraindicated for ${badBreath.join(', ')})`);
   if (conflicts.length) {
     return { error: `Rejected for safety — the user's conditions conflict with: ${conflicts.join('; ')}. Pick alternatives from the catalog.` };
@@ -1396,7 +1425,7 @@ function buildRitual(
 function buildBreathworkCard(input: any, profile: WellnessProfile, catalog: Catalog): { error?: string; card?: any } {
   const breath = catalog.breathworkById.get(input.breathworkId);
   if (!breath) return { error: `Unknown breathworkId "${input.breathworkId}". Choose ids from the catalog.` };
-  const bad = conditionConflicts(breath.contraindications, profile.conditions);
+  const bad = conditionConflicts(breath.contraindications, profile.conditions, catalog.conditions);
   if (bad.length) {
     return { error: `Rejected for safety — ${breath.id} is contraindicated for ${bad.join(', ')}. Pick an alternative.` };
   }
@@ -1527,7 +1556,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
           max_tokens: 3000,
           system,
           messages: history,
-          tools,
+          tools: toolsFor(catalog),
         });
 
         // A text block starts with the first text of each model call, or

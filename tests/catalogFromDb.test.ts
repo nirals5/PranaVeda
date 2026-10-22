@@ -19,7 +19,7 @@ vi.mock('../api/_lib/db.js', async (importOriginal) => {
 });
 
 const { catalogFromRows, describeTimes, getCatalog, resetCatalogCache } = await import('../api/_lib/catalog.js');
-const { BUILT_IN_CATALOG, POSES, BREATHWORK } = await import('../api/index.js');
+const { BUILT_IN_CATALOG, BUILT_IN_CONDITIONS, POSES, BREATHWORK } = await import('../api/index.js');
 
 const configured = { url: process.env.DATABASE_URL, pooled: process.env.DATABASE_URL_POOLED };
 const hasDb = !!(configured.url || configured.pooled);
@@ -100,7 +100,7 @@ const breathRow = (overrides: Partial<Row> = {}) =>
     bestTimes: ['any'],
     ...overrides,
   });
-const builtIn = { poses: POSES, breathwork: BREATHWORK };
+const builtIn = { poses: POSES, breathwork: BREATHWORK, conditions: BUILT_IN_CONDITIONS };
 
 describe('catalog from the practices tables', () => {
   it('builds poses and breath practices in the shape clients know', () => {
@@ -241,5 +241,17 @@ describe.skipIf(!hasDb)('catalog from the configured database', () => {
       }
     }
     expect(becameCautions.sort()).toEqual(NOW_CAUTIONS);
+  });
+
+  it('carries the Conditions tab, so everyday words reach the right code', async () => {
+    resetCatalogCache();
+    dbMock.fail = false;
+    const catalog = await getCatalog(builtIn);
+    const codes = catalog.conditions.map((c) => c.code);
+    expect(codes).toContain('balance_issues');
+    expect(codes).toContain('asthma');
+    // Every code a served practice uses is one the profile tool can name.
+    const used = new Set([...catalog.poses, ...catalog.breathwork].flatMap((x) => [...x.contraindications, ...(x.cautions ?? [])]));
+    expect([...used].filter((code) => !codes.includes(code))).toEqual([]);
   });
 });

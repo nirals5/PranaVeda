@@ -7,9 +7,19 @@ import type { CatalogBreathwork, CatalogPose } from '../index.js';
 // built-in catalog in api/index.ts. That built-in catalog is the fallback: with
 // no database, or when the database fails, the app serves it unchanged.
 
+// A health condition practices can be avoided or adapted for: its code (what
+// contraindications and cautions list), and the label and everyday words it is
+// recognised by in a user's profile.
+export interface CatalogCondition {
+  code: string;
+  label: string;
+  userWords: string[];
+}
+
 export interface Catalog {
   poses: CatalogPose[];
   breathwork: CatalogBreathwork[];
+  conditions: CatalogCondition[];
   poseById: Map<string, CatalogPose>;
   breathworkById: Map<string, CatalogBreathwork>;
   source: 'database' | 'built-in';
@@ -17,7 +27,7 @@ export interface Catalog {
 
 type PracticeRow = typeof schema.practices.$inferSelect;
 type ConditionRow = Pick<typeof schema.practiceConditions.$inferSelect, 'practiceId' | 'conditionCode' | 'level'>;
-export type BuiltIn = { poses: CatalogPose[]; breathwork: CatalogBreathwork[] };
+export type BuiltIn = { poses: CatalogPose[]; breathwork: CatalogBreathwork[]; conditions: CatalogCondition[] };
 
 // Rows are read at most this often per server instance. After a failed read
 // the built-in catalog is served, and the database is tried again sooner.
@@ -37,14 +47,53 @@ const DOSHA_WORDS: Record<string, string> = {
   aggravates: 'Can aggravate — use with care',
 };
 
-export function catalogOf(poses: CatalogPose[], breathwork: CatalogBreathwork[], source: Catalog['source']): Catalog {
+export function catalogOf(
+  poses: CatalogPose[],
+  breathwork: CatalogBreathwork[],
+  conditions: CatalogCondition[],
+  source: Catalog['source']
+): Catalog {
   return {
     poses,
     breathwork,
+    conditions,
     poseById: new Map(poses.map((p) => [p.id, p])),
     breathworkById: new Map(breathwork.map((b) => [b.id, b])),
     source,
   };
+}
+
+// "Bad Knee!" → " bad knee " (spaces at both ends, so a phrase matches only as
+// whole words: "knee" is found in "bad knee", "knee" is not found in "kneel").
+const words = (s: string) => ` ${s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
+
+// The condition codes a user's profile conditions refer to, by code, label or
+// any of the condition's everyday words: "bad knee" → knee_injury, "high BP" →
+// hypertension, "vertigo" → balance_issues.
+export function profileConditionCodes(profileConditions: string[] | undefined, conditions: CatalogCondition[]): Set<string> {
+  const codes = new Set<string>();
+  for (const said of profileConditions ?? []) {
+    const text = words(said);
+    for (const c of conditions) {
+      const terms = [c.code, c.label, ...c.userWords].map(words).filter((t) => t.trim());
+      if (terms.some((t) => text.includes(t))) codes.add(c.code);
+    }
+  }
+  return codes;
+}
+
+// The contraindications a user's conditions rule out. Matching by code, label
+// and everyday words only ever adds to the older text match it keeps, so it is
+// never stricter than before.
+export function conditionConflicts(
+  contraindications: string[],
+  profileConditions: string[] | undefined,
+  conditions: CatalogCondition[]
+): string[] {
+  if (!profileConditions?.length) return [];
+  const codes = profileConditionCodes(profileConditions, conditions);
+  const older = profileConditions.map((c) => c.toLowerCase().replace(/\s+/g, '_'));
+  return contraindications.filter((tag) => codes.has(tag) || older.some((c) => c.includes(tag) || tag.includes(c)));
 }
 
 // ["evening", "any"] + "On an empty stomach." → "Evening (also any time). On an empty stomach."
@@ -62,7 +111,12 @@ function servable(p: PracticeRow): boolean {
   return p.inhaleSec !== null && p.exhaleSec !== null && p.cycles !== null;
 }
 
-export function catalogFromRows(rows: PracticeRow[], conditions: ConditionRow[], builtIn: BuiltIn): Catalog {
+export function catalogFromRows(
+  rows: PracticeRow[],
+  conditions: ConditionRow[],
+  builtIn: BuiltIn,
+  conditionList: CatalogCondition[] = builtIn.conditions
+): Catalog {
   const avoid = new Map<string, string[]>();
   const caution = new Map<string, string[]>();
   for (const c of conditions) {
@@ -133,12 +187,12 @@ export function catalogFromRows(rows: PracticeRow[], conditions: ConditionRow[],
       bestTime: describeTimes(r.bestTimes, r.timingNote),
     }));
 
-  return catalogOf(poses, breathwork, 'database');
+  return catalogOf(poses, breathwork, conditionList, 'database');
 }
 
 async function readCatalog(builtIn: BuiltIn): Promise<Catalog> {
   const db = getDb();
-  const [rows, conditions] = await Promise.all([
+  const [rows, conditions, conditionList] = await Promise.all([
     db.select().from(schema.practices).where(isNull(schema.practices.retiredAt)),
     db
       .select({
@@ -148,8 +202,12 @@ async function readCatalog(builtIn: BuiltIn): Promise<Catalog> {
       })
       .from(schema.practiceConditions)
       .orderBy(asc(schema.practiceConditions.conditionCode)),
+    db
+      .select({ code: schema.conditions.code, label: schema.conditions.label, userWords: schema.conditions.userWords })
+      .from(schema.conditions)
+      .orderBy(asc(schema.conditions.code)),
   ]);
-  const catalog = catalogFromRows(rows, conditions, builtIn);
+  const catalog = catalogFromRows(rows, conditions, builtIn, conditionList);
   // An empty result means the tables are not loaded yet, not that the app has no practices.
   if (!catalog.poses.length || !catalog.breathwork.length) throw new Error('the practices tables are empty');
   return catalog;
@@ -163,7 +221,7 @@ let inflight: Promise<Catalog> | undefined;
 export async function getCatalog(builtIn: BuiltIn, now = Date.now()): Promise<Catalog> {
   if (cached && now < cached.until) return cached.catalog;
   if (!(process.env.DATABASE_URL_POOLED || process.env.DATABASE_URL)) {
-    return catalogOf(builtIn.poses, builtIn.breathwork, 'built-in');
+    return catalogOf(builtIn.poses, builtIn.breathwork, builtIn.conditions, 'built-in');
   }
   inflight ??= readCatalog(builtIn)
     .then((catalog) => {
@@ -172,7 +230,7 @@ export async function getCatalog(builtIn: BuiltIn, now = Date.now()): Promise<Ca
     })
     .catch((err) => {
       console.error('[catalog] serving the built-in catalog; the database read failed:', err?.message || err);
-      const catalog = catalogOf(builtIn.poses, builtIn.breathwork, 'built-in');
+      const catalog = catalogOf(builtIn.poses, builtIn.breathwork, builtIn.conditions, 'built-in');
       cached = { catalog, until: now + RETRY_MS };
       return catalog;
     })
