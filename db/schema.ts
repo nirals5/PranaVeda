@@ -316,6 +316,9 @@ export const exclusions = pgTable('exclusions', {
   status: text('status', { enum: EXCLUSION_STATUSES }).notNull(),
   notes: text('notes'), // a combination rule's whole wording lives here
   appliesTo: text('applies_to'),
+  // Phrases where a term means something else and is not food, e.g. "lift your
+  // spirits" for Alcohol; the food check ignores a term inside one of these.
+  notWhen: text('not_when').array().notNull().default(sql`'{}'::text[]`),
 });
 
 // The words that trigger an exclusion, in English, Hindi or Sanskrit.

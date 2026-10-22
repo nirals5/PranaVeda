@@ -6,6 +6,7 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '../schema.js';
 import { parseFoodLibrary } from './parse.js';
+import { foodRowsOf, writeFoodRulesSnapshot } from './snapshot.js';
 import { readWorkbook } from './workbook.js';
 import { writeFoodLibrary } from './write.js';
 
@@ -54,6 +55,9 @@ async function main() {
   const fileSha256 = createHash('sha256').update(await readFile(file)).digest('hex');
   const { importId } = await writeFoodLibrary(db, lib, { fileName: basename(file), fileSha256, warnings });
   console.log(`\nImported (food_imports #${importId}).`);
+  if (await writeFoodRulesSnapshot(foodRowsOf(lib))) {
+    console.log("The app's copy of the exclusions changed: commit api/_lib/foodRules.builtIn.ts.");
+  }
 }
 
 main().catch((err) => {

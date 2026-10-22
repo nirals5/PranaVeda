@@ -55,7 +55,14 @@ export interface FoodLibrary {
   ingredients: Ingredient[];
   ingredientNames: { ingredient: string; name: string }[];
   recipeIngredients: { recipeCode: string; position: number; ingredient: string; honeySwapped: boolean }[];
-  exclusions: { id: string; item: string; status: (typeof EXCLUSION_STATUSES)[number]; notes: string | null; appliesTo: string | null }[];
+  exclusions: {
+    id: string;
+    item: string;
+    status: (typeof EXCLUSION_STATUSES)[number];
+    notes: string | null;
+    appliesTo: string | null;
+    notWhen: string[];
+  }[];
   exclusionTerms: { exclusionId: string; term: string }[];
   substitutions: {
     position: number;
@@ -93,7 +100,7 @@ export const HEADERS = {
     'english_name', 'sanskrit_names (as spelled in source)', 'botanical / source name', 'group', 'kitchen', 'sattvik',
     'note', 'used_in_recipes',
   ],
-  Exclusions: ['item', 'status', 'match terms', 'applies to', 'notes'],
+  Exclusions: ['item', 'status', 'match terms', 'applies to', 'notes', 'not when'],
   Sources: ['id', 'title', 'publisher / author', 'edition / location', 'rights', 'role'],
 } as const;
 
@@ -440,7 +447,9 @@ export function parseFoodLibrary(tabs: Tabs): ParseResult {
         continue;
       }
     }
-    library.exclusions.push({ id, item: r.item, status, notes, appliesTo: blank(r['applies to']) });
+    // "not when": phrases where a term is not food ("lift your spirits"), separated by ";".
+    const notWhen = [...new Set(r['not when'].split(';').map((t) => t.trim()).filter(Boolean))];
+    library.exclusions.push({ id, item: r.item, status, notes, appliesTo: blank(r['applies to']), notWhen });
     library.exclusionTerms.push(...terms.map((term) => ({ exclusionId: id, term })));
   }
 
