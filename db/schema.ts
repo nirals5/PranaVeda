@@ -433,6 +433,10 @@ export const practices = pgTable(
     vata: text('vata', { enum: DOSHA_EFFECTS }),
     pitta: text('pitta', { enum: DOSHA_EFFECTS }),
     kapha: text('kapha', { enum: DOSHA_EFFECTS }),
+    // How the practice suits each dosha, in words (Amrita quotes these).
+    doshaVata: text('dosha_vata'),
+    doshaPitta: text('dosha_pitta'),
+    doshaKapha: text('dosha_kapha'),
     bestTimes: textArray('best_times'), // in order: the first is preferred
     timingNote: text('timing_note'),
     bestWeather: textArray('best_weather'),

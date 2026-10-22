@@ -44,6 +44,9 @@ export interface Practice extends Review {
   vata: Of<typeof DOSHA_EFFECTS> | null;
   pitta: Of<typeof DOSHA_EFFECTS> | null;
   kapha: Of<typeof DOSHA_EFFECTS> | null;
+  doshaVata: string | null;
+  doshaPitta: string | null;
+  doshaKapha: string | null;
   bestTimes: string[];
   timingNote: string | null;
   bestWeather: string[];
@@ -135,7 +138,8 @@ export const HEADERS = {
   Practices: [
     'id', 'app_id', 'type', 'name_sanskrit', 'name_english', 'source_level', 'source_body_area', 'where_shown',
     'merged_into', 'min_experience', 'intensity', 'setting', 'setting_note', 'duration_min', 'effect', 'vata', 'pitta',
-    'kapha', 'best_time', 'timing_note', 'best_weather', 'needs_served', 'counter_pose_id', 'avoid_conditions',
+    'kapha', 'dosha_vata', 'dosha_pitta', 'dosha_kapha', 'best_time', 'timing_note', 'best_weather', 'needs_served',
+    'counter_pose_id', 'avoid_conditions',
     'caution_conditions', 'avoid_notes', 'avoid_weather', 'avoid_after_meal', 'plain_benefit', 'image', 'cues',
     'common_mistakes', 'modifications', 'breath_description', 'inhale_sec', 'hold_in_sec', 'exhale_sec', 'hold_out_sec',
     'cycles', 'ayurvedic_note', 'source_caution', 'data_flag', 'basis', 'status', 'reviewed_by', 'reviewed_on',
@@ -500,6 +504,9 @@ export function parsePracticeLibrary(tabs: Tabs): ParseResult {
       vata: tags.vata ?? null,
       pitta: tags.pitta ?? null,
       kapha: tags.kapha ?? null,
+      doshaVata: blank(r.dosha_vata),
+      doshaPitta: blank(r.dosha_pitta),
+      doshaKapha: blank(r.dosha_kapha),
       bestTimes,
       timingNote: blank(r.timing_note),
       bestWeather,

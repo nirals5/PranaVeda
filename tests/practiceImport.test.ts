@@ -32,6 +32,8 @@ const pose = (overrides: Cells = {}): Cells => ({
   caution_conditions: 'pregnancy',
   avoid_notes: 'Late pregnancy: widen knees.',
   cues: 'Sink hips toward heels; Let the forehead rest down',
+  dosha_vata: 'Deeply grounding and calming — ideal for vata',
+  dosha_kapha: 'Can increase heaviness if held too long',
   ...tagged,
   ...overrides,
 });
@@ -99,6 +101,9 @@ describe('practice library import', () => {
       effects: ['calming', 'grounding'],
       bestTimes: ['evening', 'any'],
       cues: ['Sink hips toward heels', 'Let the forehead rest down'],
+      doshaVata: 'Deeply grounding and calming — ideal for vata',
+      doshaPitta: null,
+      doshaKapha: 'Can increase heaviness if held too long',
       status: 'draft',
     });
     expect(b01).toMatchObject({ inhaleSec: 4, holdInSec: 4, exhaleSec: 6, holdOutSec: 0, cycles: 10, classicalSourceId: 'S4' });
