@@ -11,6 +11,9 @@ struct ChatView: View {
     @State private var handledVoiceRequest = 0
     /// Set while speaking to Amrita: the input bar becomes the recording bar.
     @State private var listener: VoiceListener?
+    @State private var heyAmrita = HeyAmrita.shared
+    @State private var confirmingHeyAmrita = false
+    @State private var heyAmritaProblem: String?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var draft = ""
@@ -61,6 +64,30 @@ struct ChatView: View {
             .onAppear(perform: answerVoiceRequest)
             .onChange(of: voiceRequest) { answerVoiceRequest() }
             .onChange(of: scenePhase) { _, phase in if phase != .active { stopRecording() } }
+            // The recording bar has the microphone while it's open.
+            .onChange(of: listener == nil) { _, closed in heyAmrita.hold(.recording, !closed) }
+            .onChange(of: heyAmrita.state) { _, state in
+                switch state {
+                case .notAllowed:
+                    heyAmritaProblem = "To listen for “Hey Amrita”, allow PranaVeda to use the microphone and speech recognition in Settings."
+                case .unavailable:
+                    heyAmritaProblem = "This iPhone can't recognise speech on the device, so it can't listen for “Hey Amrita” privately."
+                default:
+                    return
+                }
+                heyAmrita.setEnabled(false)
+            }
+            .alert("Listen for “Hey Amrita”?", isPresented: $confirmingHeyAmrita) {
+                Button("Turn on") { heyAmrita.setEnabled(true) }
+                Button("Not now", role: .cancel) {}
+            } message: {
+                Text("While this screen or a practice is open, PranaVeda listens for “Hey Amrita”, then opens the microphone for you. In a practice, say “Hey Amrita, pause” (or resume, next, back, end). Listening happens on this iPhone; nothing is sent anywhere.")
+            }
+            .alert("“Hey Amrita” is off", isPresented: Binding(get: { heyAmritaProblem != nil }, set: { if !$0 { heyAmritaProblem = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(heyAmritaProblem ?? "")
+            }
             .navigationTitle("Amrita")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -73,6 +100,16 @@ struct ChatView: View {
                         .tint(voice.isMuted ? Theme.stone500 : Theme.lavenderDeep)
                         .accessibilityLabel(voice.isMuted ? "Voice replies off" : "Voice replies on")
                         .accessibilityHint(voice.isMuted ? "Amrita will read replies to spoken messages aloud" : "Amrita will stop reading replies aloud")
+                    }
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            if heyAmrita.isEnabled { heyAmrita.setEnabled(false) } else { confirmingHeyAmrita = true }
+                        } label: {
+                            Image(systemName: heyAmrita.isEnabled ? "ear.fill" : "ear")
+                        }
+                        .tint(heyAmrita.isEnabled ? Theme.lavenderDeep : Theme.stone500)
+                        .accessibilityLabel(heyAmrita.isEnabled ? "Listening for Hey Amrita" : "Not listening for Hey Amrita")
+                        .accessibilityHint(heyAmrita.isEnabled ? "Stops listening for Hey Amrita" : "Listens for Hey Amrita while the app is open")
                     }
                 }
                 // Starts a fresh conversation (the wellness profile is kept),
@@ -130,7 +167,7 @@ struct ChatView: View {
 
     private var inputBar: some View {
         HStack(spacing: 10) {
-            TextField("Tell Amrita how you're feeling…", text: $draft, axis: .vertical)
+            TextField(heyAmrita.isListening ? "Say “Hey Amrita”, or type…" : "Tell Amrita how you're feeling…", text: $draft, axis: .vertical)
                 .lineLimit(1...4)
                 .font(Theme.body)
                 .focused($inputFocused)

@@ -13,6 +13,7 @@ struct GuidedPracticeView: View {
     @State private var finished = false
     /// The practice on the lock screen and in the Dynamic Island.
     @State private var liveActivity = PracticeLiveActivity()
+    @State private var heyAmrita = HeyAmrita.shared
 
     init(result: RecommendationResult) {
         self.result = result
@@ -42,9 +43,11 @@ struct GuidedPracticeView: View {
             UIApplication.shared.isIdleTimerDisabled = true
             if let first = poses.first { guide.speak(Guidance.startPose(first)) }
             showLiveActivity()
+            heyAmrita.practiceCommands = { obey($0) }
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
+            heyAmrita.practiceCommands = nil
             guide.stop()
             liveActivity.end()
         }
@@ -96,6 +99,23 @@ struct GuidedPracticeView: View {
         }
     }
 
+    /// "Hey Amrita, pause" and the rest: the same as the buttons. A bare
+    /// "Hey Amrita" quiets the guidance so the command can be heard.
+    private func obey(_ command: WakePhrase.Command?) {
+        guard let command else { return guide.stop() }
+        if finished || poses.isEmpty {
+            if command == .end { dismiss() }
+            return
+        }
+        switch command {
+        case .pause: isRunning = false
+        case .resume: isRunning = true
+        case .next: handle(sequence.next())
+        case .back: if sequence.index > 0 { handle(sequence.previous(), going: .back) }
+        case .end: dismiss()
+        }
+    }
+
     private func showLiveActivity() {
         guard !finished, sequence.index < poses.count else { return }
         liveActivity.show(title: result.yogaPractice.title, kind: "ritual", step: poses[sequence.index].nameEnglish,
@@ -137,6 +157,7 @@ struct BreathworkPacerView: View {
     @State private var liveActivity = PracticeLiveActivity()
     @State private var guide = SpeechGuide()
     @State private var finished = false
+    @State private var heyAmrita = HeyAmrita.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(pattern: BreathworkPattern, result: RecommendationResult? = nil) {
@@ -160,9 +181,13 @@ struct BreathworkPacerView: View {
                 pacerScreen
             }
         }
-        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
+        .onAppear {
+            UIApplication.shared.isIdleTimerDisabled = true
+            heyAmrita.practiceCommands = { obey($0) }
+        }
         .onChange(of: isRunning) { showLiveActivity() }
         .onDisappear {
+            heyAmrita.practiceCommands = nil
             liveActivity.end()
             UIApplication.shared.isIdleTimerDisabled = false
             guide.stop()
@@ -202,14 +227,7 @@ struct BreathworkPacerView: View {
             Text(started ? "Cycle \(pacer.cycle) of \(pacer.cycles)" : "\(pattern.rhythm) · \(pattern.cycles) cycles")
                 .sectionLabel()
                 .padding(.bottom, 12)
-            Button {
-                if !started {
-                    started = true
-                    guide.speak(Guidance.beginBreathwork(pattern.name))
-                    handle([pacer.startEvent], speakFirst: false)
-                }
-                isRunning.toggle()
-            } label: {
+            Button(action: toggle) {
                 Label(isRunning ? "Pause" : started ? "Resume" : "Begin", systemImage: isRunning ? "pause.fill" : "play.fill")
                     .labelFont()
                     .tracking(0.9)
@@ -220,6 +238,27 @@ struct BreathworkPacerView: View {
                     .background(Theme.lavender, in: Capsule())
             }
             .padding(.bottom, 32)
+        }
+    }
+
+    private func toggle() {
+        if !started {
+            started = true
+            guide.speak(Guidance.beginBreathwork(pattern.name))
+            handle([pacer.startEvent], speakFirst: false)
+        }
+        isRunning.toggle()
+    }
+
+    /// "Hey Amrita, pause" and the rest. A pattern has no next or previous
+    /// step. A bare "Hey Amrita" quiets the cues so the command can be heard.
+    private func obey(_ command: WakePhrase.Command?) {
+        guard let command else { return guide.stop() }
+        switch command {
+        case .pause: if isRunning, !finished { toggle() }
+        case .resume: if !isRunning, !finished { toggle() }
+        case .end: dismiss()
+        case .next, .back: break
         }
     }
 
@@ -302,6 +341,7 @@ private struct PracticeTopBar: View {
     let title: String
     let guide: SpeechGuide
     let onClose: () -> Void
+    @State private var heyAmrita = HeyAmrita.shared
 
     var body: some View {
         HStack {
@@ -311,8 +351,23 @@ private struct PracticeTopBar: View {
             }
             .accessibilityLabel("End practice")
             Spacer()
-            Text(title).sectionLabel()
+            VStack(spacing: 2) {
+                Text(title).sectionLabel()
+                // While "Hey Amrita" listens, a reminder of what to say.
+                if heyAmrita.isListening {
+                    Text(heyAmrita.state == .awake ? "Listening…" : "Say “Hey Amrita, pause”")
+                        .font(Theme.bodySmall)
+                        .foregroundStyle(heyAmrita.state == .awake ? Theme.lavenderDeep : Theme.stone500)
+                        .accessibilityHint("You can also say resume, next, back or end")
+                }
+            }
             Spacer()
+            Button { heyAmrita.setEnabled(!heyAmrita.isEnabled) } label: {
+                Image(systemName: heyAmrita.isEnabled ? "ear.fill" : "ear").font(.body)
+                    .foregroundStyle(heyAmrita.isEnabled ? Theme.lavenderDeep : Theme.stone700)
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel(heyAmrita.isEnabled ? "Stop listening for Hey Amrita" : "Listen for Hey Amrita")
             Button { guide.setMuted(!guide.isMuted) } label: {
                 Image(systemName: guide.isMuted ? "speaker.slash" : "speaker.wave.2").font(.body).foregroundStyle(Theme.stone700)
                     .frame(width: 44, height: 44)

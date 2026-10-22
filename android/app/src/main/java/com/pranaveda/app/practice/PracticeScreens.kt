@@ -68,6 +68,11 @@ import com.pranaveda.app.ui.chat.PoseImage
 import com.pranaveda.app.ui.chat.SectionLabel
 import com.pranaveda.app.ui.theme.Pv
 import com.pranaveda.app.ui.theme.cardSurface
+import com.pranaveda.app.voice.HeyAmrita
+import com.pranaveda.app.voice.WakePhrase
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import com.pranaveda.app.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -114,6 +119,19 @@ private fun PracticeClock(running: Boolean, tick: (Double) -> Unit) {
             tick((now - last) / 1e9)
             last = now
         }
+    }
+}
+
+@Composable
+private fun heyAmrita(): HeyAmrita = (LocalContext.current.applicationContext as PranaVedaApplication).heyAmrita
+
+/** While the practice is open, "Hey Amrita, pause" and the rest go to [obey]. */
+@Composable
+private fun ListenForCommands(obey: (WakePhrase.Command?) -> Unit) {
+    val heyAmrita = heyAmrita()
+    DisposableEffect(heyAmrita) {
+        heyAmrita.practiceCommands = { obey(it) }
+        onDispose { heyAmrita.practiceCommands = null }
     }
 }
 
@@ -167,6 +185,24 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
         }
         version++
     }
+
+    // "Hey Amrita, pause" and the rest: the same as the buttons. A bare
+    // "Hey Amrita" quiets the guidance so the command can be heard.
+    fun obey(command: WakePhrase.Command?) {
+        if (command == null) return guide.stop()
+        if (finished || poses.isEmpty()) {
+            if (command == WakePhrase.Command.End) onClose()
+            return
+        }
+        when (command) {
+            WakePhrase.Command.Pause -> { running = false; showNotice() }
+            WakePhrase.Command.Resume -> { running = true; showNotice() }
+            WakePhrase.Command.Next -> handle(sequence.next())
+            WakePhrase.Command.Back -> if (sequence.index > 0) handle(sequence.previous(), back = true)
+            WakePhrase.Command.End -> onClose()
+        }
+    }
+    ListenForCommands(::obey)
 
     LaunchedEffect(Unit) {
         poses.firstOrNull()?.let { guide.speak(Guidance.startPose(it)) }
@@ -258,6 +294,29 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
         version++
     }
 
+    fun toggle() {
+        if (!started) {
+            started = true
+            guide.speak(Guidance.beginBreathwork(pattern.name))
+            handle(listOf(pacer.startEvent), speak = false)
+        }
+        running = !running
+        showNotice()
+    }
+
+    // "Hey Amrita, pause" and the rest. A pattern has no next or previous
+    // step. A bare "Hey Amrita" quiets the cues so the command can be heard.
+    fun obey(command: WakePhrase.Command?) {
+        when (command) {
+            null -> guide.stop()
+            WakePhrase.Command.Pause -> if (running && !finished) toggle()
+            WakePhrase.Command.Resume -> if (!running && !finished) toggle()
+            WakePhrase.Command.End -> onClose()
+            WakePhrase.Command.Next, WakePhrase.Command.Back -> Unit
+        }
+    }
+    ListenForCommands(::obey)
+
     PracticeClock(running && !finished) { handle(pacer.advance(it)) }
 
     PracticeDialog(onClose) {
@@ -310,15 +369,7 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
             Spacer(Modifier.weight(1f))
             SectionLabel(if (started) "Cycle ${pacer.cycle} of ${pacer.cycles}" else "${pattern.rhythm} · ${pattern.cycles} cycles")
             Button(
-                onClick = {
-                    if (!started) {
-                        started = true
-                        guide.speak(Guidance.beginBreathwork(pattern.name))
-                        handle(listOf(pacer.startEvent), speak = false)
-                    }
-                    running = !running
-                    showNotice()
-                },
+                onClick = ::toggle,
                 colors = ButtonDefaults.buttonColors(containerColor = Pv.lavender, contentColor = Color.White),
                 modifier = Modifier.padding(top = 12.dp, bottom = 32.dp),
             ) {
@@ -330,11 +381,31 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
 
 @Composable
 private fun PracticeTopBar(title: String, guide: SpeechGuide, onClose: () -> Unit) {
+    val heyAmrita = heyAmrita()
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = onClose, modifier = Modifier.semantics { contentDescription = "End practice" }) {
             Text("✕", fontSize = 20.sp, color = Pv.stone700)
         }
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { SectionLabel(title) }
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+            SectionLabel(title)
+            // While "Hey Amrita" listens, a reminder of what to say.
+            if (heyAmrita.isListening) {
+                val awake = heyAmrita.state == HeyAmrita.State.Awake
+                Text(
+                    if (awake) "Listening…" else "Say “Hey Amrita, pause”",
+                    style = Pv.bodySmall,
+                    color = if (awake) Pv.lavenderDeep else Pv.stone500,
+                    modifier = Modifier.semantics { contentDescription = if (awake) "Listening" else "Say Hey Amrita, then pause, resume, next, back or end" },
+                )
+            }
+        }
+        IconButton(onClick = { heyAmrita.changeEnabled(!heyAmrita.isEnabled) }) {
+            Icon(
+                painterResource(R.drawable.ic_hearing),
+                contentDescription = if (heyAmrita.isEnabled) "Stop listening for Hey Amrita" else "Listen for Hey Amrita",
+                tint = if (heyAmrita.isEnabled) Pv.lavenderDeep else Pv.stone500,
+            )
+        }
         TextButton(
             onClick = { guide.changeMuted(!guide.isMuted) },
             modifier = Modifier.semantics { contentDescription = if (guide.isMuted) "Turn spoken guidance on" else "Turn spoken guidance off" },

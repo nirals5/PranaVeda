@@ -22,6 +22,9 @@ struct PranaVedaApp: App {
     @State private var practicingRitual: SavedRitual?
     /// Links from intents (the Talk to Amrita control).
     @State private var router = AppLinkRouter.shared
+    /// "Hey Amrita" while the app is open (opt-in).
+    @State private var heyAmrita = HeyAmrita.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     enum AppTab: Hashable { case amrita, dosha, library, you }
 
@@ -64,6 +67,11 @@ struct PranaVedaApp: App {
             .onOpenURL { url in
                 if url.scheme == WidgetLink.scheme { open(url) } else { GIDSignIn.sharedInstance.handle(url) }
             }
+            // Listens on the Amrita tab (practice screens hand it their own
+            // commands), never in the background or over Amrita's own voice.
+            .onChange(of: tab == .amrita && openedRitual == nil, initial: true) { _, showing in heyAmrita.chatShowing = showing }
+            .onChange(of: scenePhase, initial: true) { _, phase in heyAmrita.hold(.background, phase != .active) }
+            .onChange(of: voice.isSpeaking) { _, speaking in heyAmrita.hold(.replying, speaking) }
             .onChange(of: router.pending, initial: true) {
                 guard let url = router.pending else { return }
                 router.pending = nil
@@ -81,6 +89,7 @@ struct PranaVedaApp: App {
                 chat.auth = auth
                 chat.speakReply = { [voice] in voice.speak($0) }
                 chat.stopSpeaking = { [voice] in voice.stop() }
+                heyAmrita.onWake = { open(WidgetLink.talk) }
                 practice.auth = auth
                 saved.auth = auth
                 auth.onSignedIn = { [chat, practice, saved] user in

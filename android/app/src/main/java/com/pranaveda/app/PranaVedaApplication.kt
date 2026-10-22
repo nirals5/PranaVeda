@@ -10,6 +10,7 @@ import com.pranaveda.app.model.DailyInsightStore
 import com.pranaveda.app.model.PracticeStore
 import com.pranaveda.app.model.SavedRitualStore
 import com.pranaveda.app.voice.AmritaVoice
+import com.pranaveda.app.voice.HeyAmrita
 import com.pranaveda.app.widget.WidgetBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,9 @@ class PranaVedaApplication : Application() {
 
     /** Amrita's spoken replies, shared so a new message or screen can stop them. */
     val voice: AmritaVoice by lazy { AmritaVoice(this, appScope) }
+
+    /** "Hey Amrita" while the app is open (opt-in), shared by the chat and the practice screens. */
+    val heyAmrita: HeyAmrita by lazy { HeyAmrita(this) }
 
     /** Kept for as long as the app runs, so the reflection is asked for once per launch. */
     val insight: DailyInsightStore by lazy { DailyInsightStore() }

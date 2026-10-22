@@ -26,6 +26,9 @@ import com.pranaveda.app.ui.dosha.DoshaScreen
 import kotlinx.coroutines.launch
 import com.pranaveda.app.config.AppConfig
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import com.pranaveda.app.voice.HeyAmrita
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -105,6 +108,22 @@ class MainActivity : ComponentActivity() {
                     }
                     link = null
                 }
+                // "Hey Amrita": listens on the Amrita tab (practice screens hand
+                // it their own commands), never in the background or over
+                // Amrita's own voice. Outside a practice it opens the chat listening.
+                val app = application as PranaVedaApplication
+                val heyAmrita = app.heyAmrita
+                LaunchedEffect(Unit) {
+                    heyAmrita.onWake = {
+                        tab = 0
+                        voiceRequest++
+                    }
+                }
+                LaunchedEffect(tab == 0 && openedRitual == null) { heyAmrita.chatShowing = tab == 0 && openedRitual == null }
+                LaunchedEffect(app.voice.isSpeaking) { heyAmrita.hold(HeyAmrita.Hold.Replying, app.voice.isSpeaking) }
+                LifecycleEventEffect(Lifecycle.Event.ON_START) { heyAmrita.hold(HeyAmrita.Hold.Background, false) }
+                LifecycleEventEffect(Lifecycle.Event.ON_STOP) { heyAmrita.hold(HeyAmrita.Hold.Background, true) }
+
                 openedRitual?.let { RitualSheet(it) { openedRitual = null } }
                 practicing?.let { GuidedPracticeScreen(it) { practicing = null } }
 

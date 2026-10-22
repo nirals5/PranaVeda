@@ -3,6 +3,8 @@ package com.pranaveda.app.practice
 import android.content.Context
 import android.media.AudioAttributes
 import android.speech.tts.TextToSpeech
+import com.pranaveda.app.PranaVedaApplication
+import com.pranaveda.app.voice.HeyAmrita
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -15,6 +17,7 @@ import java.util.Locale
  */
 class SpeechGuide(context: Context) {
     private val prefs = context.getSharedPreferences("pranaveda", Context.MODE_PRIVATE)
+    private val heyAmrita = (context.applicationContext as? PranaVedaApplication)?.heyAmrita
     var isMuted by mutableStateOf(prefs.getBoolean(MUTED_KEY, false))
         private set
 
@@ -45,7 +48,8 @@ class SpeechGuide(context: Context) {
     }
 
     fun speak(text: String) {
-        if (isMuted) {
+        // Quiet while "Hey Amrita" waits for a command.
+        if (isMuted || heyAmrita?.state == HeyAmrita.State.Awake) {
             tts.stop()
             return
         }
