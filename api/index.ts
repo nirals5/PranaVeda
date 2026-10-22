@@ -9,6 +9,8 @@ import { applyProfileChanges, loadAccountProfile } from './_lib/profiles.js';
 import type { VersionedProfile } from './_lib/profiles.js';
 import { getUser } from './_lib/users.js';
 import { DOSHA_GUIDE, DOSHA_GUIDE_NOTE } from './_lib/doshaGuide.js';
+import { catalogOf, getCatalog } from './_lib/catalog.js';
+import type { Catalog } from './_lib/catalog.js';
 
 // IMPORTANT: relative imports here (and anywhere under api/) must end in
 // ".js". Vercel runs these files as native ES modules, where an
@@ -59,7 +61,12 @@ export interface CatalogPose {
   commonMistakes: string[];
   benefits: string;
   modifications: string;
-  contraindications: ConditionTag[];
+  // Condition codes (the Practice Library's Conditions tab; ConditionTag in the
+  // built-in catalog) for which the pose is never offered.
+  contraindications: string[];
+  // Conditions for which it is offered with an adaptation, and that adaptation.
+  cautions?: string[];
+  safetyNote?: string;
   dosha: { vata: string; pitta: string; kapha: string };
   bestTime: string;
   counterPoseId?: string;
@@ -80,7 +87,9 @@ export interface CatalogBreathwork {
   cycles: number;
   benefits: string;
   doshaSuitability: string;
-  contraindications: ConditionTag[];
+  contraindications: string[];
+  cautions?: string[];
+  safetyNote?: string;
   bestTime: string;
 }
 
@@ -724,6 +733,11 @@ export const BREATHWORK: CatalogBreathwork[] = [
 export const poseById = new Map(POSES.map((p) => [p.id, p]));
 export const breathworkById = new Map(BREATHWORK.map((b) => [b.id, b]));
 
+// The catalog above is the fallback. What is served comes from the practices
+// tables when a database is configured (api/_lib/catalog.ts).
+export const BUILT_IN_CATALOG: Catalog = catalogOf(POSES, BREATHWORK, 'built-in');
+const servedCatalog = () => getCatalog(BUILT_IN_CATALOG);
+
 // ============================== Catalog artwork ==============================
 
 // Niral's composited room scenes (public/poses_with_background/web/), shown on
@@ -766,27 +780,34 @@ function requestOrigin(req: Request): string {
 }
 
 // The catalog as clients see it: every image as a full address.
-export function publicCatalog(base: string) {
+export function publicCatalog(base: string, catalog: Catalog = BUILT_IN_CATALOG) {
   return {
-    poses: POSES.map((pose) => ({
+    poses: catalog.poses.map((pose) => ({
       ...pose,
       poseImageUrl: assetUrl(pose.poseImageUrl, base),
       sceneImageUrl: assetUrl(sceneImagePath(pose.id), base),
     })),
-    breathwork: BREATHWORK,
+    breathwork: catalog.breathwork,
   };
+}
+
+// " Avoid with: …. Adapt for: … (note)." for one practice's prompt line.
+function safetyLine(x: { contraindications: string[]; cautions?: string[]; safetyNote?: string }): string {
+  const avoid = x.contraindications.length ? ` Avoid with: ${x.contraindications.join(', ')}.` : '';
+  const adapt = x.cautions?.length ? ` Adapt for: ${x.cautions.join(', ')}${x.safetyNote ? ` (${x.safetyNote})` : ''}.` : '';
+  return avoid + adapt;
 }
 
 // Compact catalog summaries injected into Amrita's system prompt so she can
 // select by id without seeing every field.
-export function catalogPromptSummary(): string {
-  const poses = POSES.map(
+export function catalogPromptSummary(catalog: Catalog = BUILT_IN_CATALOG): string {
+  const poses = catalog.poses.map(
     (p) =>
-      `- ${p.id} (${p.nameEnglish} / ${p.nameSanskrit}) — ${p.bodyFocus}. Vata: ${p.dosha.vata}. Pitta: ${p.dosha.pitta}. Kapha: ${p.dosha.kapha}. Best: ${p.bestTime}.${p.contraindications.length ? ' Avoid with: ' + p.contraindications.join(', ') + '.' : ''}`
+      `- ${p.id} (${p.nameEnglish} / ${p.nameSanskrit}) — ${p.bodyFocus}. Vata: ${p.dosha.vata}. Pitta: ${p.dosha.pitta}. Kapha: ${p.dosha.kapha}. Best: ${p.bestTime}.${safetyLine(p)}`
   ).join('\n');
-  const breaths = BREATHWORK.map(
+  const breaths = catalog.breathwork.map(
     (b) =>
-      `- ${b.id} (${b.name} / ${b.sanskritName}) — ${b.doshaSuitability}. ${b.inhale}-${b.holdActive}-${b.exhale}-${b.holdEmpty} × ${b.cycles}. Best: ${b.bestTime}.${b.contraindications.length ? ' Avoid with: ' + b.contraindications.join(', ') + '.' : ''}`
+      `- ${b.id} (${b.name} / ${b.sanskritName}) — ${b.doshaSuitability}. ${b.inhale}-${b.holdActive}-${b.exhale}-${b.holdEmpty} × ${b.cycles}. Best: ${b.bestTime}.${safetyLine(b)}`
   ).join('\n');
   return `## Pose catalog (recommend ONLY these, by id)\n${poses}\n\n## Breathwork catalog (recommend ONLY these, by id)\n${breaths}`;
 }
@@ -918,7 +939,8 @@ export function buildSystemPrompt(
   previousSession?: { role: string; content: string }[],
   calendar?: CalendarContext,
   health?: HealthContext,
-  place?: string
+  place?: string,
+  catalog: Catalog = BUILT_IN_CATALOG
 ): string {
   const profileBlock = profile && Object.keys(profile).length
     ? JSON.stringify(profile, null, 1)
@@ -1022,7 +1044,7 @@ Local time for the user: ${localTime}
 Wellness profile (accumulated across conversations, stored on the user's device):
 ${profileBlock}
 
-${catalogPromptSummary()}`;
+${catalogPromptSummary(catalog)}`;
 }
 
 // ========================= Conversational chat (SSE) ==========================
@@ -1311,11 +1333,16 @@ export function applyProfileUpdate(profile: WellnessProfile, input: any, today =
   return next;
 }
 
-function buildRitual(input: any, profile: WellnessProfile, assetBase = configuredAssetBase()): { error?: string; card?: any } {
+function buildRitual(
+  input: any,
+  profile: WellnessProfile,
+  catalog: Catalog,
+  assetBase = configuredAssetBase()
+): { error?: string; card?: any } {
   const conflicts: string[] = [];
   const poses: any[] = [];
   for (const p of input.poses ?? []) {
-    const pose = poseById.get(p.poseId);
+    const pose = catalog.poseById.get(p.poseId);
     if (!pose) return { error: `Unknown poseId "${p.poseId}". Choose ids from the catalog.` };
     const bad = conditionConflicts(pose.contraindications, profile.conditions);
     if (bad.length) conflicts.push(`${pose.id} (contraindicated for ${bad.join(', ')})`);
@@ -1332,7 +1359,7 @@ function buildRitual(input: any, profile: WellnessProfile, assetBase = configure
       videoUrl: pose.videoUrl,
     });
   }
-  const breath = breathworkById.get(input.breathworkId);
+  const breath = catalog.breathworkById.get(input.breathworkId);
   if (!breath) return { error: `Unknown breathworkId "${input.breathworkId}". Choose ids from the catalog.` };
   const badBreath = conditionConflicts(breath.contraindications, profile.conditions);
   if (badBreath.length) conflicts.push(`${breath.id} (contraindicated for ${badBreath.join(', ')})`);
@@ -1366,8 +1393,8 @@ function buildRitual(input: any, profile: WellnessProfile, assetBase = configure
   };
 }
 
-function buildBreathworkCard(input: any, profile: WellnessProfile): { error?: string; card?: any } {
-  const breath = breathworkById.get(input.breathworkId);
+function buildBreathworkCard(input: any, profile: WellnessProfile, catalog: Catalog): { error?: string; card?: any } {
+  const breath = catalog.breathworkById.get(input.breathworkId);
   if (!breath) return { error: `Unknown breathworkId "${input.breathworkId}". Choose ids from the catalog.` };
   const bad = conditionConflicts(breath.contraindications, profile.conditions);
   if (bad.length) {
@@ -1474,6 +1501,8 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       .slice(-30)
       .map((m: any) => ({ role: m.role, content: m.content }));
 
+    // One catalog for the whole reply: the prompt and the safety checks must agree.
+    const catalog = await servedCatalog();
     const system = buildSystemPrompt(
       profile,
       localTime || new Date().toLocaleString(),
@@ -1483,7 +1512,8 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
         : undefined,
       sanitizeCalendarContext(calendar),
       sanitizeHealthContext(health),
-      sanitizeLocationContext(location)
+      sanitizeLocationContext(location),
+      catalog
     );
 
     // The last text sent, so that when a reply resumes after a tool call it
@@ -1583,7 +1613,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
                 'Dosha profile card shown and recorded. The full result now lives in their "Dosha Profile" tab, with balancing guidance — you may mention that. Close with one or two warm sentences; do not restate the card.';
             }
           } else if (block.name === 'create_ritual') {
-            const { error, card } = buildRitual(block.input, profile);
+            const { error, card } = buildRitual(block.input, profile, catalog);
             if (error) {
               resultText = error;
               isError = true;
@@ -1594,7 +1624,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
               resultText = 'Ritual card shown to the user. Continue with one or two warm sentences; do not restate its contents.';
             }
           } else if (block.name === 'suggest_breathwork') {
-            const { error, card } = buildBreathworkCard(block.input, profile);
+            const { error, card } = buildBreathworkCard(block.input, profile, catalog);
             if (error) {
               resultText = error;
               isError = true;
@@ -1897,9 +1927,9 @@ app.get('/api/insight', handleInsight);
 // The practice catalog (poses and breathwork) for clients that do not carry
 // their own copy — the iOS and Android apps. The same data Amrita composes
 // rituals from, with every image as a full address.
-app.get('/api/catalog', (req, res) => {
+app.get('/api/catalog', async (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.json(publicCatalog(configuredAssetBase() || requestOrigin(req)));
+  res.json(publicCatalog(configuredAssetBase() || requestOrigin(req), await servedCatalog()));
 });
 // The balancing reference behind the Dosha Profile screen, for the native
 // apps (the website imports the same file). Public: it is general guidance,
