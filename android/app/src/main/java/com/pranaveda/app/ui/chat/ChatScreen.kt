@@ -13,6 +13,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.platform.LocalContext
 import com.pranaveda.app.voice.VoiceListener
+import com.pranaveda.app.PranaVedaApplication
+import com.pranaveda.app.voice.HeyAmrita
+import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -103,6 +106,52 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: 
         if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) started.start()
         else askForMicrophone.launch(Manifest.permission.RECORD_AUDIO)
     }
+    // "Hey Amrita": switched on here, and paused while the recording bar has the microphone.
+    val heyAmrita = (context.applicationContext as PranaVedaApplication).heyAmrita
+    var confirmingHeyAmrita by remember { mutableStateOf(false) }
+    var heyAmritaProblem by remember { mutableStateOf<String?>(null) }
+    val askForHeyAmritaMicrophone = rememberLauncherForActivityResult(RequestPermission()) { granted ->
+        if (granted) heyAmrita.changeEnabled(true)
+        else heyAmritaProblem = "To listen for “Hey Amrita”, allow PranaVeda to use the microphone in Settings."
+    }
+    LaunchedEffect(listener == null) { heyAmrita.hold(HeyAmrita.Hold.Recording, listener != null) }
+    LaunchedEffect(heyAmrita.state) {
+        heyAmritaProblem = when (heyAmrita.state) {
+            HeyAmrita.State.NotAllowed -> "To listen for “Hey Amrita”, allow PranaVeda to use the microphone in Settings."
+            HeyAmrita.State.Unavailable -> "This phone can't recognise speech on the device (it needs Android 13 or later), so it can't listen for “Hey Amrita” privately."
+            else -> return@LaunchedEffect
+        }
+        heyAmrita.changeEnabled(false)
+    }
+    if (confirmingHeyAmrita) {
+        AlertDialog(
+            onDismissRequest = { confirmingHeyAmrita = false },
+            title = { Text("Listen for “Hey Amrita”?") },
+            text = {
+                Text(
+                    "While this screen or a practice is open, PranaVeda listens for “Hey Amrita”, then opens the microphone for you. " +
+                        "In a practice, say “Hey Amrita, pause” (or resume, next, back, end). Listening happens on this phone; nothing is sent anywhere.",
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    confirmingHeyAmrita = false
+                    if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) heyAmrita.changeEnabled(true)
+                    else askForHeyAmritaMicrophone.launch(Manifest.permission.RECORD_AUDIO)
+                }) { Text("Turn on") }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmingHeyAmrita = false }) { Text("Not now") } },
+        )
+    }
+    heyAmritaProblem?.let { problem ->
+        AlertDialog(
+            onDismissRequest = { heyAmritaProblem = null },
+            title = { Text("“Hey Amrita” is off") },
+            text = { Text(problem) },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { heyAmritaProblem = null }) { Text("OK") } },
+        )
+    }
+
     // The microphone is never left on: leaving the tab or the app stops it.
     DisposableEffect(Unit) { onDispose { stopRecording() } }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { stopRecording() }
@@ -142,12 +191,21 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: 
                 // Spoken replies on or off, kept between launches (as on the website).
                 navigationIcon = {
                     if (voice != null) {
-                        IconButton(onClick = { voice.changeMuted(!voice.isMuted) }) {
-                            Icon(
-                                painterResource(if (voice.isMuted) R.drawable.ic_volume_off else R.drawable.ic_volume_up),
-                                contentDescription = if (voice.isMuted) "Voice replies off" else "Voice replies on",
-                                tint = if (voice.isMuted) Pv.stone500 else Pv.lavenderDeep,
-                            )
+                        Row {
+                            IconButton(onClick = { voice.changeMuted(!voice.isMuted) }) {
+                                Icon(
+                                    painterResource(if (voice.isMuted) R.drawable.ic_volume_off else R.drawable.ic_volume_up),
+                                    contentDescription = if (voice.isMuted) "Voice replies off" else "Voice replies on",
+                                    tint = if (voice.isMuted) Pv.stone500 else Pv.lavenderDeep,
+                                )
+                            }
+                            IconButton(onClick = { if (heyAmrita.isEnabled) heyAmrita.changeEnabled(false) else confirmingHeyAmrita = true }) {
+                                Icon(
+                                    painterResource(R.drawable.ic_hearing),
+                                    contentDescription = if (heyAmrita.isEnabled) "Listening for Hey Amrita" else "Not listening for Hey Amrita",
+                                    tint = if (heyAmrita.isEnabled) Pv.lavenderDeep else Pv.stone500,
+                                )
+                            }
                         }
                     }
                 },
@@ -183,6 +241,7 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: 
                 onSend = ::send,
                 onSpeak = if (voice != null) ({ startRecording() }) else null,
                 modifier = Modifier.imePadding(),
+                placeholder = if (heyAmrita.isListening) "Say “Hey Amrita”, or type…" else "Tell Amrita how you're feeling…",
             )
         },
     ) { padding ->
@@ -259,6 +318,7 @@ private fun InputBar(
     modifier: Modifier = Modifier,
     /** Opens the voice consultation; no microphone button without it. */
     onSpeak: (() -> Unit)? = null,
+    placeholder: String = "Tell Amrita how you're feeling…",
 ) {
     val shape = RoundedCornerShape(28.dp)
     Row(
@@ -274,7 +334,7 @@ private fun InputBar(
             value = draft,
             onValueChange = onDraftChange,
             modifier = Modifier.weight(1f),
-            placeholder = { Text("Tell Amrita how you're feeling…", style = Pv.body, color = Pv.stone500) },
+            placeholder = { Text(placeholder, style = Pv.body, color = Pv.stone500) },
             textStyle = Pv.body.copy(color = Pv.ink),
             maxLines = 4,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),

@@ -17,7 +17,8 @@ final class SpeechGuide {
 
     func speak(_ text: String) {
         synthesizer.stopSpeaking(at: .immediate)
-        guard !isMuted else { return }
+        // Quiet while "Hey Amrita" waits for a command.
+        guard !isMuted, HeyAmrita.shared.state != .awake else { return }
         activateAudio()
         for part in Guidance.script(text) {
             let utterance = AVSpeechUtterance(string: part.words)
@@ -36,14 +37,24 @@ final class SpeechGuide {
 
     func stop() {
         synthesizer.stopSpeaking(at: .immediate)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        // While "Hey Amrita" listens, the session is its too.
+        if !Self.sharingWithListener {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 
     /// Spoken guidance should be heard with the ringer switch on silent, and
-    /// lower other audio (music) while it speaks rather than stop it.
+    /// lower other audio (music) while it speaks rather than stop it. While
+    /// "Hey Amrita" listens, its play-and-record session already plays it.
     private func activateAudio() {
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        if !Self.sharingWithListener {
+            try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        }
         try? session.setActive(true)
+    }
+
+    private static var sharingWithListener: Bool {
+        AVAudioSession.sharedInstance().category == .playAndRecord
     }
 }

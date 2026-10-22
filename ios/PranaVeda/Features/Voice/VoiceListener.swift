@@ -104,7 +104,7 @@ final class VoiceListener {
     // The system calls these back on its own threads, so they are kept off
     // the main actor: a callback that inherited it would stop the app.
 
-    nonisolated private static func speechAllowed() async -> Bool {
+    nonisolated static func speechAllowed() async -> Bool {
         switch SFSpeechRecognizer.authorizationStatus() {
         case .authorized: return true
         case .notDetermined:
