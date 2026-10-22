@@ -12,7 +12,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "food:import": "tsx db/food/import.ts"
+    "food:import": "tsx db/food/import.ts",
+    "practice:import": "tsx db/practice/import.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.2",

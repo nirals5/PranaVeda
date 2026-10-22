@@ -21,10 +21,10 @@ type Db = NeonHttpDatabase<typeof schema>;
 // Postgres allows 65,535 parameters per statement; rows are inserted in
 // chunks well under that.
 const CHUNK = 500;
-const chunks = <T>(rows: T[]) => Array.from({ length: Math.ceil(rows.length / CHUNK) }, (_, i) => rows.slice(i * CHUNK, (i + 1) * CHUNK));
+export const chunks = <T>(rows: T[]) => Array.from({ length: Math.ceil(rows.length / CHUNK) }, (_, i) => rows.slice(i * CHUNK, (i + 1) * CHUNK));
 
 // "on conflict do update" that takes every non-key column from the new row.
-function replaceAll(table: PgTable, keys: string[]) {
+export function replaceAll(table: PgTable, keys: string[]) {
   return Object.fromEntries(
     Object.entries(getTableColumns(table))
       .filter(([key]) => !keys.includes(key))
