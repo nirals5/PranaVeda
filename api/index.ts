@@ -11,6 +11,20 @@ import { getUser } from './_lib/users.js';
 import { DOSHA_GUIDE, DOSHA_GUIDE_NOTE } from './_lib/doshaGuide.js';
 import { catalogOf, conditionConflicts, getCatalog } from './_lib/catalog.js';
 import type { Catalog, CatalogCondition } from './_lib/catalog.js';
+import {
+  BUILT_IN_FOOD_RULES,
+  FOOD_LEFT_OUT,
+  JUDGE_SYSTEM,
+  SentenceGate,
+  confirmedHits,
+  foodHitsIn,
+  foodRejection,
+  foodRewriteNote,
+  foodRulesPrompt,
+  getFoodRules,
+  judgePrompt,
+} from './_lib/exclusions.js';
+import type { FoodJudge, FoodRules } from './_lib/exclusions.js';
 
 // IMPORTANT: relative imports here (and anywhere under api/) must end in
 // ".js". Vercel runs these files as native ES modules, where an
@@ -758,6 +772,14 @@ export const BUILT_IN_CONDITIONS: CatalogCondition[] = [
 export const BUILT_IN_CATALOG: Catalog = catalogOf(POSES, BREATHWORK, BUILT_IN_CONDITIONS, 'built-in');
 const servedCatalog = () => getCatalog(BUILT_IN_CATALOG);
 
+// Practice names are never food: "Fish Pose" does not suggest fish.
+export function practiceNames(catalog: Catalog): string[] {
+  return [
+    ...catalog.poses.flatMap((p) => [p.nameEnglish, p.nameSanskrit]),
+    ...catalog.breathwork.flatMap((b) => [b.name, b.sanskritName]),
+  ].filter(Boolean);
+}
+
 // ============================== Catalog artwork ==============================
 
 // Niral's composited room scenes (public/poses_with_background/web/), shown on
@@ -960,7 +982,8 @@ export function buildSystemPrompt(
   calendar?: CalendarContext,
   health?: HealthContext,
   place?: string,
-  catalog: Catalog = BUILT_IN_CATALOG
+  catalog: Catalog = BUILT_IN_CATALOG,
+  food: FoodRules = BUILT_IN_FOOD_RULES
 ): string {
   const profileBlock = profile && Object.keys(profile).length
     ? JSON.stringify(profile, null, 1)
@@ -1050,6 +1073,8 @@ Your purpose is not to generate wellness plans. Your purpose is to build a long-
 
 - NEVER include a pose or breath whose contraindications match the user's known conditions; choose alternatives and, if relevant, briefly say why you steered away.
 - If the profile mentions pregnancy or a heart condition, keep everything gentle and explicitly invite professional guidance.
+
+${foodRulesPrompt(food)}
 
 # What you can and cannot do
 
@@ -1248,6 +1273,45 @@ type SseEvent =
   | { type: 'profile'; profile: WellnessProfile }
   | { type: 'done' }
   | { type: 'error'; message: string };
+
+const JUDGE_MODEL = 'claude-haiku-4-5-20251001';
+const JUDGE_TIMEOUT_MS = 4000;
+
+// The second opinion on a chat sentence the word check flagged: does it
+// suggest the food, or only mention it? A failure or timeout counts as yes.
+function haikuFoodJudge(client: Anthropic): FoodJudge {
+  return async (sentence, context, hits) => {
+    const response = await client.messages.create(
+      {
+        model: JUDGE_MODEL,
+        max_tokens: 5,
+        system: JUDGE_SYSTEM,
+        messages: [{ role: 'user', content: judgePrompt(sentence, context, hits) }],
+      },
+      { timeout: JUDGE_TIMEOUT_MS, maxRetries: 0 }
+    );
+    const block = response.content.find((b) => b.type === 'text');
+    const answer = block && block.type === 'text' ? block.text.trim().toUpperCase() : '';
+    if (answer.startsWith('NO')) return false;
+    if (answer.startsWith('YES')) return true;
+    throw new Error(`unexpected answer "${answer}"`);
+  };
+}
+
+// Tools whose cards carry advice the user reads (diet tips, herbs, guidance),
+// checked against the exclusions before they are shown.
+const FOOD_CHECKED_TOOLS = new Set(['create_ritual', 'suggest_breathwork', 'present_dosha_profile']);
+
+// Adds a note to the last user message, so the conversation still alternates.
+function appendToLastUserMessage(history: Anthropic.MessageParam[], note: string) {
+  const last = history[history.length - 1];
+  if (!last || last.role !== 'user') {
+    history.push({ role: 'user', content: note });
+    return;
+  }
+  const blocks = typeof last.content === 'string' ? [{ type: 'text' as const, text: last.content }] : last.content;
+  last.content = [...blocks, { type: 'text', text: note }];
+}
 
 function send(res: Response, event: SseEvent) {
   res.write(`data: ${JSON.stringify(event)}\n\n`);
@@ -1530,8 +1594,10 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       .slice(-30)
       .map((m: any) => ({ role: m.role, content: m.content }));
 
-    // One catalog for the whole reply: the prompt and the safety checks must agree.
-    const catalog = await servedCatalog();
+    // One catalog and one set of food rules for the whole reply: the prompt
+    // and the safety checks must agree.
+    const [catalog, food] = await Promise.all([servedCatalog(), getFoodRules()]);
+    const notFood = practiceNames(catalog);
     const system = buildSystemPrompt(
       profile,
       localTime || new Date().toLocaleString(),
@@ -1542,16 +1608,34 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       sanitizeCalendarContext(calendar),
       sanitizeHealthContext(health),
       sanitizeLocationContext(location),
-      catalog
+      catalog,
+      food
     );
 
     // The last text sent, so that when a reply resumes after a tool call it
     // can start a new paragraph instead of running on.
     let lastText = '';
+    let lastSent = '';
+    const sendText = (delta: string) => {
+      if (!delta) return;
+      lastSent = delta;
+      send(res, { type: 'text', delta });
+    };
+    // A reply that suggests something excluded (G9) is stopped before that
+    // sentence and Amrita continues without it, once; a second time, the
+    // reply ends with a plain note instead.
+    let rewritten = false;
+    const judge = haikuFoodJudge(client);
 
     try {
       for (let loop = 0; loop < MAX_LOOPS; loop++) {
-        const stream = client.messages.stream({
+        let stream: ReturnType<typeof client.messages.stream> | undefined;
+        const gate = new SentenceGate(
+          (sentence, before) => confirmedHits(sentence, before, food, notFood, judge),
+          sendText,
+          () => (stream as any)?.abort?.()
+        );
+        stream = client.messages.stream({
           model: MODEL,
           max_tokens: 3000,
           system,
@@ -1567,10 +1651,33 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
           firstTextOfCall = false;
           const text = (startsBlock ? textBlockSeparator(lastText, delta) : '') + delta;
           if (text) lastText = text;
-          send(res, { type: 'text', delta: text });
+          gate.push(text);
         });
 
-        const message = await stream.finalMessage();
+        const message = await stream.finalMessage().catch((err: any) => {
+          if (gate.blocked) return undefined; // stopped on purpose
+          throw err;
+        });
+        await gate.finish();
+
+        if (gate.blocked || !message) {
+          const hits = gate.blocked ?? [];
+          console.warn('[chat] reply stopped by the food check:', hits.map((h) => h.id).join(', '), '—', JSON.stringify(gate.blockedText.slice(0, 200)));
+          lastText = lastSent;
+          if (rewritten) {
+            sendText(textBlockSeparator(lastSent, FOOD_LEFT_OUT) + FOOD_LEFT_OUT);
+            break;
+          }
+          rewritten = true;
+          const said = gate.released.trim();
+          if (said) {
+            history.push({ role: 'assistant', content: said });
+            history.push({ role: 'user', content: foodRewriteNote(hits, true) });
+          } else {
+            appendToLastUserMessage(history, foodRewriteNote(hits, false));
+          }
+          continue;
+        }
 
         if (message.stop_reason !== 'tool_use') break;
 
@@ -1579,8 +1686,12 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
           if (block.type !== 'tool_use') continue;
           let resultText = 'ok';
           let isError = false;
+          const foodProblem = FOOD_CHECKED_TOOLS.has(block.name) ? foodRejection(foodHitsIn(block.input, food, notFood)) : undefined;
 
-          if (block.name === 'update_wellness_profile') {
+          if (foodProblem) {
+            resultText = foodProblem;
+            isError = true;
+          } else if (block.name === 'update_wellness_profile') {
             const input = block.input;
             changeProfile((p) => applyProfileUpdate(p, input, today));
             resultText = 'Profile updated.';
@@ -1714,7 +1825,7 @@ const client = new Anthropic({ apiKey });
 
 registerChatRoute(app, client, apiKey);
 
-const fallbacks = {
+export const fallbacks = {
   insight: {
     headline: "Prana bridges body and mind.",
     quote: "Let your breath be the anchor of this moment.",
@@ -1877,19 +1988,27 @@ function enrichRecommendation(data: any): any {
   return data;
 }
 
-async function callClaude(params: { system: string; prompt: string; schema: Record<string, unknown>; fallbackData: any; enricher?: (data: any) => any; model?: string; }) {
+// `check` returns what is wrong with an answer (the food check, G9); the
+// second attempt is told, and a second failure serves the fallback.
+async function callClaude(params: { system: string; prompt: string; schema: Record<string, unknown>; fallbackData: any; enricher?: (data: any) => any; model?: string; check?: (data: any) => string | undefined; }) {
+  let correction = '';
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const response = await client.messages.create({
         model: params.model ?? "claude-sonnet-4-6",
         max_tokens: 2048,
         system: params.system,
-        messages: [{ role: "user", content: params.prompt }],
+        messages: [{ role: "user", content: correction ? `${params.prompt}\n\n${correction}` : params.prompt }],
         output_config: { format: { type: "json_schema", schema: params.schema } }
       } as any);
       const textBlock = response.content.find((b: any) => b.type === "text");
       if (!textBlock || textBlock.type !== "text") throw new Error("No text block in Claude response");
       const parsed = JSON.parse(textBlock.text.trim());
+      const problem = params.check?.(parsed);
+      if (problem) {
+        correction = problem;
+        throw new Error(`failed the food check: ${problem}`);
+      }
       return params.enricher ? params.enricher(parsed) : parsed;
     } catch (err: any) {
       console.warn(`[Claude] attempt ${attempt} failed:`, err?.message || err);
@@ -1914,7 +2033,15 @@ app.post('/api/coaching', async (req, res) => {
     - Recommend a breathwork exercise with specific timing ratios (inhale, hold, exhale, empty) that matches their state perfectly.
     - Suggest customized warm dietary advice and herbal recipes.
     - Keep the tone grounded, encouraging, and deeply wise. Use humble and sophisticated language.`;
-  const result = await callClaude({ system: "You are Amrita, an ancient wise Ayurvedic mentor. Speak with extreme warmth, grace, and human empathy.", prompt, schema: coachResponseSchema, fallbackData: fallbacks.recommendation, enricher: enrichRecommendation });
+  const [catalog, food] = await Promise.all([servedCatalog(), getFoodRules()]);
+  const result = await callClaude({
+    system: `You are Amrita, an ancient wise Ayurvedic mentor. Speak with extreme warmth, grace, and human empathy.\n\n${foodRulesPrompt(food)}`,
+    prompt,
+    schema: coachResponseSchema,
+    fallbackData: fallbacks.recommendation,
+    enricher: enrichRecommendation,
+    check: (data) => foodRejection(foodHitsIn(data, food, practiceNames(catalog))),
+  });
   return res.json(result);
 });
 
@@ -1939,12 +2066,13 @@ async function handleInsight(req: Request, res: Response) {
     );
   }
 
+  const [catalog, food] = await Promise.all([servedCatalog(), getFoodRules()]);
   const result = await callClaude({
-    system:
-      'You are Amrita, a concise Ayurvedic mentor. All responses must be extremely brief — follow word limits strictly. Vary your angle day to day; avoid stock phrases.',
+    system: `You are Amrita, a concise Ayurvedic mentor. All responses must be extremely brief — follow word limits strictly. Vary your angle day to day; avoid stock phrases.\n\n${foodRulesPrompt(food)}`,
     prompt: `${contextLines.join('\n')}\n\nGenerate a brief Ayurvedic daily reflection for this moment of their day. Be short. No breathing instructions — those belong elsewhere.`,
     schema: insightResponseSchema,
     fallbackData: fallbacks.insight,
+    check: (data) => foodRejection(foodHitsIn(data, food, practiceNames(catalog))),
     // The daily insight is a lightweight 4-field snippet — Haiku handles it
     // well at a fraction of Sonnet's cost.
     model: 'claude-haiku-4-5-20251001',

@@ -1,0 +1,1 @@
+ALTER TABLE "exclusions" ADD COLUMN "not_when" text[] DEFAULT '{}'::text[] NOT NULL;

@@ -35,7 +35,7 @@ function sheet(over: Partial<Record<keyof typeof HEADERS, Cells[]>> = {}): Tabs 
       { english_name: 'lotus (flower, leaf or stamens)', 'sanskrit_names (as spelled in source)': 'Kamala', group: 'herb', kitchen: 'N', sattvik: 'ok' },
     ],
     Exclusions: [
-      { item: 'Honey', status: 'excluded', 'match terms': 'honey; madhu; shahad', 'applies to': 'All diet suggestions' },
+      { item: 'Honey', status: 'excluded', 'match terms': 'honey; madhu; shahad', 'applies to': 'All diet suggestions', 'not when': 'honey, I; honeymoon' },
       { item: 'Figs (udumbara family)', status: 'excluded', 'match terms': 'fig; anjeer', notes: 'All parts of Ficus trees are excluded.' },
       {
         item: 'Milk or curd + sour fruit',
@@ -142,6 +142,7 @@ describe('food library import', () => {
     ]);
     expect(library.exclusionTerms.filter((t) => t.exclusionId === 'figs_udumbara_family').map((t) => t.term)).toEqual(['fig', 'anjeer']);
     expect(library.exclusionTerms.some((t) => t.exclusionId === 'milk_or_curd_sour_fruit')).toBe(false);
+    expect(library.exclusions.map((e) => e.notWhen)).toEqual([['honey, I', 'honeymoon'], [], []]);
     expect(library.substitutions[0]).toMatchObject({ exclusionId: 'honey', role: 'primary' });
   });
 
