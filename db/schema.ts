@@ -2,11 +2,13 @@ import { sql } from 'drizzle-orm';
 import {
   bigserial,
   boolean,
+  date,
   index,
   integer,
   jsonb,
   pgTable,
   primaryKey,
+  real,
   serial,
   text,
   timestamp,
@@ -337,4 +339,250 @@ export const foodSubstitutions = pgTable('food_substitutions', {
   ayurvedicQuality: text('ayurvedic_quality'), // still to be reviewed
   howToUse: text('how_to_use'),
   role: text('role', { enum: SUBSTITUTION_ROLES }),
+});
+
+// ---------------------------------------------------------------------------
+// Practice library. Reference data, like the food library: the "PranaVeda –
+// Practice Library" Google Sheet is where it is edited, and these tables are a
+// copy of it that `npm run practice:import` replaces whole (db/practice/).
+// Never edit these rows in the database: the next import overwrites them.
+// ---------------------------------------------------------------------------
+
+export const PRACTICE_TYPES = ['asana', 'pranayama'] as const;
+export const WHERE_SHOWN = ['right_now', 'explore_only', 'hidden'] as const;
+export const MIN_EXPERIENCE = ['any', 'experienced'] as const;
+export const INTENSITIES = ['gentle', 'moderate', 'strong'] as const;
+export const DOSHA_EFFECTS = ['balances', 'neutral', 'aggravates'] as const;
+export const PRACTICE_EFFECTS = [
+  'grounding', 'calming', 'energizing', 'warming', 'cooling', 'balancing', 'digestive', 'focusing', 'restorative',
+] as const;
+export const SETTINGS = ['floor', 'standing', 'chair', 'lying'] as const;
+export const BEST_TIMES = ['morning', 'midday', 'evening', 'any', 'after_meals'] as const;
+export const WEATHER = ['hot', 'cold', 'any'] as const;
+export const REVIEW_STATUSES = ['draft', 'reviewed', 'approved'] as const;
+export const RULE_KINDS = ['guardrail', 'hint'] as const;
+export const SOURCE_LEVELS = ['Beginner', 'Intermediate', 'Advanced'] as const;
+export const PRACTICE_BASIS = ['AI-drafted', 'app_catalog', 'cited'] as const;
+export const CONDITION_LEVELS = ['avoid', 'caution'] as const;
+export const SOURCE_STATUSES = ['approved', 'proposed'] as const;
+
+const textArray = (name: string) => text(name).array().notNull().default(sql`'{}'::text[]`);
+
+export const practiceImports = pgTable('practice_imports', {
+  id: serial('id').primaryKey(),
+  importedAt: timestamptz('imported_at').notNull().defaultNow(),
+  fileName: text('file_name').notNull(),
+  fileSha256: text('file_sha256').notNull(),
+  counts: jsonb('counts').notNull(),
+  warnings: jsonb('warnings').notNull(),
+});
+
+export const practiceSources = pgTable('practice_sources', {
+  id: text('id').primaryKey(), // S1, S2…
+  title: text('title').notNull(),
+  author: text('author'),
+  role: text('role'),
+  edition: text('edition'),
+  rights: text('rights'),
+  status: text('status', { enum: SOURCE_STATUSES }).notNull(),
+  notes: text('notes'),
+});
+
+// The health conditions a practice can be avoided or adapted for. Shared:
+// the wellness profile's conditions should come to use the same codes.
+export const conditions = pgTable('conditions', {
+  code: text('code').primaryKey(), // knee_injury
+  label: text('label').notNull(),
+  userWords: textArray('user_words'), // how people say it: "bad knee"
+  sourcePhrases: text('source_phrases'),
+});
+
+// The states a session can serve: N1 Ground … N6 Wind down.
+export const needs = pgTable('needs', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  typicalSignals: text('typical_signals'),
+  effectsThatServe: textArray('effects_that_serve'),
+  doshaFocus: text('dosha_focus'),
+  avoidEffects: text('avoid_effects'),
+  whyTemplate: text('why_template'),
+});
+
+// One row per pose (P01…) or breath practice (B01…). A practice dropped from
+// the sheet is retired, not deleted: a user may have it in a saved ritual.
+export const practices = pgTable(
+  'practices',
+  {
+    id: text('id').primaryKey(),
+    appId: text('app_id'), // the app's catalog id, e.g. downward_dog
+    type: text('type', { enum: PRACTICE_TYPES }).notNull(),
+    nameSanskrit: text('name_sanskrit').notNull(),
+    nameEnglish: text('name_english').notNull(),
+    sourceLevel: text('source_level', { enum: SOURCE_LEVELS }),
+    sourceBodyArea: text('source_body_area'),
+    // Blank until the practice is tagged; the engine skips untagged rows.
+    whereShown: text('where_shown', { enum: WHERE_SHOWN }),
+    mergedInto: text('merged_into'),
+    minExperience: text('min_experience', { enum: MIN_EXPERIENCE }),
+    intensity: text('intensity', { enum: INTENSITIES }),
+    settings: textArray('settings'),
+    settingNote: text('setting_note'),
+    durationMin: real('duration_min'),
+    effects: textArray('effects'),
+    vata: text('vata', { enum: DOSHA_EFFECTS }),
+    pitta: text('pitta', { enum: DOSHA_EFFECTS }),
+    kapha: text('kapha', { enum: DOSHA_EFFECTS }),
+    bestTimes: textArray('best_times'), // in order: the first is preferred
+    timingNote: text('timing_note'),
+    bestWeather: textArray('best_weather'),
+    counterPoseId: text('counter_pose_id'),
+    avoidNotes: text('avoid_notes'),
+    avoidWeather: textArray('avoid_weather'),
+    avoidAfterMeal: boolean('avoid_after_meal').notNull().default(false),
+    plainBenefit: text('plain_benefit'),
+    image: text('image'), // file name under public/poses/
+    cues: textArray('cues'),
+    commonMistakes: textArray('common_mistakes'),
+    modifications: text('modifications'),
+    breathDescription: text('breath_description'),
+    inhaleSec: integer('inhale_sec'),
+    holdInSec: integer('hold_in_sec'),
+    exhaleSec: integer('exhale_sec'),
+    holdOutSec: integer('hold_out_sec'),
+    cycles: integer('cycles'),
+    ayurvedicNote: text('ayurvedic_note'),
+    sourceCaution: text('source_caution'),
+    dataFlag: text('data_flag'),
+    basis: text('basis', { enum: PRACTICE_BASIS }),
+    status: text('status', { enum: REVIEW_STATUSES }),
+    reviewedBy: text('reviewed_by'),
+    reviewedOn: date('reviewed_on'),
+    iyengarRef: text('iyengar_ref'),
+    classicalRef: text('classical_ref'),
+    classicalSourceId: text('classical_source_id').references(() => practiceSources.id),
+    retiredAt: timestamptz('retired_at'),
+  },
+  (t) => [uniqueIndex('practices_app_id_key').on(t.appId)]
+);
+
+// avoid: a user with the condition never gets the practice (guardrail G1).
+// caution: they get it, with its avoid_notes (G13).
+export const practiceConditions = pgTable(
+  'practice_conditions',
+  {
+    practiceId: text('practice_id')
+      .notNull()
+      .references(() => practices.id, { onDelete: 'cascade' }),
+    conditionCode: text('condition_code')
+      .notNull()
+      .references(() => conditions.code, { onUpdate: 'cascade' }),
+    level: text('level', { enum: CONDITION_LEVELS }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.practiceId, t.conditionCode] }),
+    index('practice_conditions_condition_idx').on(t.conditionCode),
+  ]
+);
+
+export const practiceNeeds = pgTable(
+  'practice_needs',
+  {
+    practiceId: text('practice_id')
+      .notNull()
+      .references(() => practices.id, { onDelete: 'cascade' }),
+    needId: text('need_id')
+      .notNull()
+      .references(() => needs.id),
+  },
+  (t) => [primaryKey({ columns: [t.practiceId, t.needId] }), index('practice_needs_need_idx').on(t.needId)]
+);
+
+export const practicePrinciples = pgTable('practice_principles', {
+  id: text('id').primaryKey(), // PR1…
+  statement: text('statement').notNull(),
+  concept: text('concept'),
+  reference: text('reference'),
+  basis: text('basis'),
+  status: text('status', { enum: REVIEW_STATUSES }).notNull(),
+  reviewedBy: text('reviewed_by'),
+  reviewedOn: date('reviewed_on'),
+});
+
+export const practicePrincipleSources = pgTable(
+  'practice_principle_sources',
+  {
+    principleId: text('principle_id')
+      .notNull()
+      .references(() => practicePrinciples.id, { onDelete: 'cascade' }),
+    sourceId: text('source_id')
+      .notNull()
+      .references(() => practiceSources.id),
+  },
+  (t) => [primaryKey({ columns: [t.principleId, t.sourceId] })]
+);
+
+// The engine's rules, as reference text. The checks themselves live in code;
+// enforced_by says where (or "not yet").
+export const practiceRules = pgTable('practice_rules', {
+  id: text('id').primaryKey(), // G1…, H1…
+  kind: text('kind', { enum: RULE_KINDS }).notNull(),
+  whenText: text('when_text').notNull(),
+  thenText: text('then_text').notNull(),
+  why: text('why'),
+  enforcedBy: text('enforced_by'),
+  basis: text('basis'),
+  status: text('status', { enum: REVIEW_STATUSES }).notNull(),
+  reviewedBy: text('reviewed_by'),
+  reviewedOn: date('reviewed_on'),
+});
+
+export const practiceRulePrinciples = pgTable(
+  'practice_rule_principles',
+  {
+    ruleId: text('rule_id')
+      .notNull()
+      .references(() => practiceRules.id, { onDelete: 'cascade' }),
+    principleId: text('principle_id')
+      .notNull()
+      .references(() => practicePrinciples.id),
+  },
+  (t) => [primaryKey({ columns: [t.ruleId, t.principleId] })]
+);
+
+// The named sequences in the original Yogism dataset ("Hatha Yoga",
+// "Stress relief"…), and which poses each one uses.
+export const practiceFlows = pgTable('practice_flows', {
+  id: text('id').primaryKey(), // slug of name and category
+  name: text('name').notNull(),
+  category: text('category').notNull(), // e.g. yoga-styles, life-style-yoga
+});
+
+export const practiceFlowMembers = pgTable(
+  'practice_flow_members',
+  {
+    flowId: text('flow_id')
+      .notNull()
+      .references(() => practiceFlows.id, { onDelete: 'cascade' }),
+    practiceId: text('practice_id')
+      .notNull()
+      .references(() => practices.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.flowId, t.practiceId] }), index('practice_flow_members_practice_idx').on(t.practiceId)]
+);
+
+// The original Yogism text for P01–P46, kept for reference. A community
+// dataset, not a clinical source.
+export const practiceSourceText = pgTable('practice_source_text', {
+  practiceId: text('practice_id')
+    .primaryKey()
+    .references(() => practices.id, { onDelete: 'cascade' }),
+  level: text('level'),
+  bodyArea: text('body_area'),
+  time: text('time'),
+  benefits: text('benefits'),
+  target: text('target'),
+  variations: text('variations'),
+  cautionNotes: text('caution_notes'),
+  steps: text('steps'),
 });
