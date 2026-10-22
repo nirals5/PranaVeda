@@ -35,9 +35,15 @@ function sheet(over: Partial<Record<keyof typeof HEADERS, Cells[]>> = {}): Tabs 
       { english_name: 'lotus (flower, leaf or stamens)', 'sanskrit_names (as spelled in source)': 'Kamala', group: 'herb', kitchen: 'N', sattvik: 'ok' },
     ],
     Exclusions: [
-      { item: 'Honey', status: 'excluded', 'match terms': 'honey; madhu; shahad' },
-      { item: 'Figs (udumbara family)', status: 'excluded', 'match terms': 'fig; anjeer. All parts of Ficus trees are excluded.' },
-      { item: 'Milk or curd + sour fruit', status: 'combination rule', 'match terms': 'milk or curd with sour fruits (lemon, citron). Recipes marked Check.' },
+      { item: 'Honey', status: 'excluded', 'match terms': 'honey; madhu; shahad', 'applies to': 'All diet suggestions' },
+      { item: 'Figs (udumbara family)', status: 'excluded', 'match terms': 'fig; anjeer', notes: 'All parts of Ficus trees are excluded.' },
+      {
+        item: 'Milk or curd + sour fruit',
+        status: 'combination rule',
+        'match terms': 'milk or curd with lemon, citron or other sour fruit',
+        'applies to': 'Meal and recipe suggestions',
+        notes: 'Recipes marked Check.',
+      },
     ],
     Sources: [{ id: 'F1', title: 'Ayurveda Aahara Compendium' }],
     ...over,
@@ -122,15 +128,30 @@ describe('food library import', () => {
     expect(parseFoodLibrary(tabs).errors[0]).toMatch(/^Sources: columns are \[id, title, publisher,/);
   });
 
-  it('splits exclusion terms from their notes, and keeps a combination rule as wording', () => {
+  it('reads exclusion terms, notes and where they apply, and keeps a combination rule as wording', () => {
     const { library } = parseFoodLibrary(sheet());
-    expect(library.exclusions.map((e) => [e.id, e.status, e.notes])).toEqual([
-      ['honey', 'excluded', null],
-      ['figs_udumbara_family', 'excluded', 'All parts of Ficus trees are excluded.'],
-      ['milk_or_curd_sour_fruit', 'combination_rule', 'milk or curd with sour fruits (lemon, citron). Recipes marked Check.'],
+    expect(library.exclusions.map((e) => [e.id, e.status, e.appliesTo, e.notes])).toEqual([
+      ['honey', 'excluded', 'All diet suggestions', null],
+      ['figs_udumbara_family', 'excluded', null, 'All parts of Ficus trees are excluded.'],
+      [
+        'milk_or_curd_sour_fruit',
+        'combination_rule',
+        'Meal and recipe suggestions',
+        'milk or curd with lemon, citron or other sour fruit. Recipes marked Check.',
+      ],
     ]);
     expect(library.exclusionTerms.filter((t) => t.exclusionId === 'figs_udumbara_family').map((t) => t.term)).toEqual(['fig', 'anjeer']);
+    expect(library.exclusionTerms.some((t) => t.exclusionId === 'milk_or_curd_sour_fruit')).toBe(false);
     expect(library.substitutions[0]).toMatchObject({ exclusionId: 'honey', role: 'primary' });
+  });
+
+  it('refuses a sentence left in the match terms', () => {
+    const tabs = sheet();
+    const header = tabs.Exclusions[0];
+    tabs.Exclusions[2][header.indexOf('match terms')] = 'fig; anjeer. All parts of Ficus trees are excluded.';
+    expect(parseFoodLibrary(tabs).errors).toEqual([
+      'Exclusions row 3 ("Figs (udumbara family)"): match term "anjeer. All parts of Ficus trees are excluded." reads as a sentence; move it to notes.',
+    ]);
   });
 
   it('warns about candidates that are not Sattvik and skips notes in Substitutions', () => {
