@@ -93,7 +93,7 @@ export const HEADERS = {
     'english_name', 'sanskrit_names (as spelled in source)', 'botanical / source name', 'group', 'kitchen', 'sattvik',
     'note', 'used_in_recipes',
   ],
-  Exclusions: ['item', 'status', 'match terms'],
+  Exclusions: ['item', 'status', 'match terms', 'applies to', 'notes'],
   Sources: ['id', 'title', 'publisher / author', 'edition / location', 'rights', 'role'],
 } as const;
 
@@ -410,8 +410,9 @@ export function parseFoodLibrary(tabs: Tabs): ParseResult {
     });
   }
 
-  // Exclusions. "match terms" holds the terms, separated by ";", and may end
-  // with sentences of notes; a combination rule is all wording, no terms.
+  // Exclusions. "match terms" holds only the terms, separated by ";"; any
+  // explanation goes in "notes". A combination rule has no terms: its "match
+  // terms" cell is the rule's wording.
   for (const r of rows('Exclusions')) {
     const where = `Exclusions row ${r.line} ("${r.item}")`;
     const id = slug(r.item);
@@ -425,16 +426,21 @@ export function parseFoodLibrary(tabs: Tabs): ParseResult {
     }
     const status = pick(EXCLUSION_STATUS, r.status, where, 'status');
     if (!status) continue;
-    const text = r['match terms'];
     let terms: string[] = [];
-    let notes: string | null = null;
-    if (status === 'combination_rule') notes = blank(text);
-    else {
-      const stop = text.search(/\.(\s|$)/);
-      notes = stop === -1 ? null : blank(text.slice(stop + 1));
-      terms = [...new Set((stop === -1 ? text : text.slice(0, stop)).split(';').map((t) => t.trim()).filter(Boolean))];
+    let notes = blank(r.notes);
+    if (status === 'combination_rule') {
+      const rule = r['match terms'] && !/[.!?]$/.test(r['match terms']) ? `${r['match terms']}.` : r['match terms'];
+      notes = blank([rule, r.notes].filter(Boolean).join(' '));
     }
-    library.exclusions.push({ id, item: r.item, status, notes, appliesTo: null });
+    else {
+      terms = [...new Set(r['match terms'].split(';').map((t) => t.trim()).filter(Boolean))];
+      const sentence = terms.find((t) => /\.(\s|$)/.test(t));
+      if (sentence) {
+        errors.push(`${where}: match term "${sentence}" reads as a sentence; move it to notes.`);
+        continue;
+      }
+    }
+    library.exclusions.push({ id, item: r.item, status, notes, appliesTo: blank(r['applies to']) });
     library.exclusionTerms.push(...terms.map((term) => ({ exclusionId: id, term })));
   }
 
