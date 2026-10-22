@@ -50,6 +50,13 @@
       "when": 1792646523568,
       "tag": "0006_practice_library",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792651757052,
+      "tag": "0007_practice_dosha_notes",
+      "breakpoints": true
     }
   ]
 }
