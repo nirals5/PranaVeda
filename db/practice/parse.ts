@@ -439,6 +439,10 @@ export function parsePracticeLibrary(tabs: Tabs): ParseResult {
     const caution = many(conditionCodes, r.caution_conditions, where, 'caution_conditions');
     const both = avoid.filter((c) => caution.includes(c));
     if (both.length) errors.push(`${where}: ${both.join(', ')} is in both avoid_conditions and caution_conditions.`);
+    // G13: the app shows avoid_notes to a user with a caution condition, so it must say how to adapt.
+    if (caution.length && !blank(r.avoid_notes)) {
+      errors.push(`${where}: caution_conditions needs avoid_notes saying how to adapt the practice.`);
+    }
 
     const breath = {
       inhaleSec: num(r.inhale_sec, where, 'inhale_sec', true),

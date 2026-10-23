@@ -9,6 +9,7 @@ import { RecommendationResult, SavedPractice } from '../types';
 import { NewPracticeLogEntry } from '../hooks/usePracticeLog';
 import { HeartRateMonitor } from '../hooks/useHeartRateMonitor';
 import { useSpeech } from '../hooks/useSpeech';
+import CautionNote, { cautionSpeech } from './CautionNote';
 
 const getFallbackPoseImage = (pose: { nameEnglish: string; nameSanskrit?: string }) => {
   const name = (pose.nameEnglish || '').toLowerCase();
@@ -332,7 +333,7 @@ export default function CoachingDashboard({
         heart?.startSession();
       }
       prefetchPhaseCues();
-      speakVocalPhase(`Beginning ${result.breathwork.name}`);
+      speakVocalPhase(`Beginning ${result.breathwork.name}${result.breathwork.caution ? `. Take care. ${result.breathwork.caution}` : ''}`);
     }
     setIsBreathingRunning(!isBreathingRunning);
   };
@@ -369,7 +370,7 @@ export default function CoachingDashboard({
     setPoseTimerInternal(seconds);
     setIsPoseTimerRunning(true);
     // Guide the practitioner INTO the pose, not just its name
-    speak(`Starting posture: ${speakableName(initialPose.nameEnglish)}, or ${speakableName(initialPose.nameSanskrit)}. <break time="1.2s" /> ${pacedInstructions(initialPose.instructions)}`);
+    speak(`Starting posture: ${speakableName(initialPose.nameEnglish)}, or ${speakableName(initialPose.nameSanskrit)}. <break time="1.2s" /> ${cautionSpeech(initialPose.caution)}${pacedInstructions(initialPose.instructions)}`);
   };
 
   const parseDurationToSeconds = (durStr: string): number => {
@@ -412,7 +413,7 @@ export default function CoachingDashboard({
       const nextPose = result.yogaPractice.poses[nextIdx];
       const seconds = parseDurationToSeconds(nextPose.duration);
       setPoseTimerInternal(seconds);
-      speak(`Entering posture: ${speakableName(nextPose.nameEnglish)}. <break time="1.2s" /> ${pacedInstructions(nextPose.instructions)}`);
+      speak(`Entering posture: ${speakableName(nextPose.nameEnglish)}. <break time="1.2s" /> ${cautionSpeech(nextPose.caution)}${pacedInstructions(nextPose.instructions)}`);
     } else {
       setIsPoseTimerRunning(false);
       let heartSummary: ReturnType<NonNullable<typeof heart>['endSession']> = null;
@@ -449,7 +450,7 @@ export default function CoachingDashboard({
       const prevPose = result.yogaPractice.poses[prevIdx];
       const seconds = parseDurationToSeconds(prevPose.duration);
       setPoseTimerInternal(seconds);
-      speak(`Returning to posture: ${speakableName(prevPose.nameEnglish)}. <break time="1.2s" /> ${pacedInstructions(prevPose.instructions)}`);
+      speak(`Returning to posture: ${speakableName(prevPose.nameEnglish)}. <break time="1.2s" /> ${cautionSpeech(prevPose.caution)}${pacedInstructions(prevPose.instructions)}`);
     }
   };
 
@@ -685,6 +686,7 @@ export default function CoachingDashboard({
                     <div>
                       <span className="text-[12px] uppercase font-mono tracking-wider text-[#8A79A5] font-bold">PRANAYAMA TIMERS</span>
                       <h4 className="text-base font-serif font-semibold text-stone-800 mt-1">{result.breathwork.name}</h4>
+                      <CautionNote text={result.breathwork.caution} />
                       <p className="text-xs text-stone-500 mt-1">Ratios: {result.breathwork.inhale}-{result.breathwork.holdActive}-{result.breathwork.exhale}-{result.breathwork.holdEmpty}</p>
                     </div>
                     <ChevronRight className="w-5 h-5 text-stone-400 group-hover:translate-x-1 transition-transform animate-pulse" />
@@ -773,6 +775,7 @@ export default function CoachingDashboard({
                           <p className="text-xs md:text-sm text-stone-400 font-mono italic">
                             {result.yogaPractice.poses[currentPoseIndex].nameSanskrit}
                           </p>
+                          <CautionNote dark text={result.yogaPractice.poses[currentPoseIndex].caution} />
                         </div>
 
                         <div className="border border-stone-850 bg-stone-950 p-4.5 rounded-xl space-y-1 pl-12 relative">
@@ -908,6 +911,7 @@ export default function CoachingDashboard({
                                   {pose.nameSanskrit}
                                 </span>
                               </div>
+                              <CautionNote text={pose.caution} />
                               <p className="text-xs text-stone-500 font-medium font-mono leading-tight bg-stone-50 p-2 rounded-lg border border-stone-100/50 block">
                                 Benefits: {pose.benefits}
                               </p>
@@ -1107,6 +1111,7 @@ export default function CoachingDashboard({
                       <h3 className="text-xl font-serif font-bold text-stone-850 tracking-tight mt-2 px-0.5">
                         {result.breathwork.name}
                       </h3>
+                      <div className="px-0.5 pt-1"><CautionNote text={result.breathwork.caution} /></div>
                     </div>
 
                     <p className="text-sm sm:text-base font-serif text-stone-605 leading-relaxed italic">

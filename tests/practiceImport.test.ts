@@ -149,6 +149,12 @@ describe('practice library import', () => {
     expect(errors).toEqual(['Practices row 2 (P09): knee_injury is in both avoid_conditions and caution_conditions.']);
   });
 
+  it('requires avoid_notes when a practice has caution_conditions', () => {
+    const { errors } = parsePracticeLibrary(sheet({ Practices: [pose({ avoid_notes: '' }), breath()] }));
+    expect(errors).toEqual(['Practices row 2 (P09): caution_conditions needs avoid_notes saying how to adapt the practice.']);
+    expect(parsePracticeLibrary(sheet({ Practices: [pose({ avoid_notes: '', caution_conditions: '' }), breath()] })).errors).toEqual([]);
+  });
+
   it('keeps breath counts to breath practices, and P and B ids to their types', () => {
     const { errors } = parsePracticeLibrary(sheet({ Practices: [pose({ cycles: '5' }), breath({ type: 'asana' })] }));
     expect(errors).toEqual([

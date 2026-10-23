@@ -31,6 +31,8 @@ data class BreathworkPattern(
     val holdEmpty: Double = 0.0,
     val cycles: Int,
     val benefits: String? = null,
+    /** How to adapt it for one of the user's conditions (G13); the server adds it only when it applies. */
+    val caution: String? = null,
 ) {
     /** "In 4 · hold 4 · out 4 · rest 4" */
     val rhythm: String
@@ -55,6 +57,8 @@ data class YogaPose(
     val poseImageUrl: String? = null,
     val sceneImageUrl: String? = null,
     val videoUrl: String? = null,
+    /** How to adapt it for one of the user's conditions (G13); the server adds it only when it applies. */
+    val caution: String? = null,
 ) {
     /** Niral's room scene when the pose has one, else the flat photo. */
     val imageUrl: String? get() = AppConfig.resolve(sceneImageUrl ?: poseImageUrl)
@@ -167,3 +171,8 @@ data class ChatItem(
             else -> "[Presented: " + cards.joinToString(", ") { it.modelMarker } + "]"
         }
 }
+
+/** The poses and breath practice that carry a caution note (G13), in order, as name to note. */
+val RecommendationResult.cautions: List<Pair<String, String>>
+    get() = yogaPractice.poses.mapNotNull { p -> p.caution?.let { p.nameEnglish to it } } +
+        listOfNotNull(breathwork?.let { b -> b.caution?.let { b.name to it } })

@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { Mic, ArrowRight, Sparkles, RotateCcw, Wind, Play, Clock, Volume2, VolumeX, Flame, Droplet } from 'lucide-react';
 import { ChatItem, ChatCard, RecommendationResult, BreathworkPattern, DoshaProfileResult, AnswerOption } from '../types';
 import pranavedaIcon from '../assets/pranaveda_icon.svg';
+import CautionNote from './CautionNote';
 
 interface AmritaChatProps {
   items: ChatItem[];
@@ -70,6 +71,12 @@ function RitualCard({ result, onOpen }: { result: RecommendationResult; onOpen: 
         </span>
       </div>
 
+      {[...result.yogaPractice.poses.map((p) => ({ name: p.nameEnglish, caution: p.caution })), { name: result.breathwork.name, caution: result.breathwork.caution }]
+        .filter((x) => x.caution)
+        .map((x) => (
+          <CautionNote key={x.name} label={x.name} text={x.caution} />
+        ))}
+
       <button
         onClick={onOpen}
         className="w-full py-2.5 bg-[#8A79A5] hover:bg-[#72618F] text-white text-[11px] uppercase tracking-widest font-mono font-bold rounded-xl shadow-[0_8px_20px_rgba(138,121,165,0.3)] transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:translate-y-[-1px]"
@@ -107,6 +114,8 @@ function BreathworkCard({ pattern, note }: { pattern: BreathworkPattern; note?: 
         </h4>
         {note && <p className="text-[13px] text-stone-600 font-serif italic mt-1 leading-relaxed">"{note}"</p>}
       </div>
+
+      <CautionNote text={pattern.caution} />
 
       <div className="flex items-center gap-2">
         {phases.map((phase) => (

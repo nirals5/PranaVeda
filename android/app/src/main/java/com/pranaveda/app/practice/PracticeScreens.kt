@@ -64,6 +64,7 @@ import com.pranaveda.app.model.BreathworkPattern
 import com.pranaveda.app.model.PracticeLogEntry
 import com.pranaveda.app.model.PracticeStore
 import com.pranaveda.app.model.RecommendationResult
+import com.pranaveda.app.ui.chat.CautionNote
 import com.pranaveda.app.ui.chat.PoseImage
 import com.pranaveda.app.ui.chat.SectionLabel
 import com.pranaveda.app.ui.theme.Pv
@@ -231,6 +232,7 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
                         PoseImage(pose.imageUrl, Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(18.dp)))
                         Text(pose.nameEnglish, style = Pv.headingLarge, color = Pv.ink)
                         pose.nameSanskrit?.let { Text(it, style = Pv.bodySmall.copy(fontStyle = FontStyle.Italic), color = Pv.lavenderDeep) }
+                        CautionNote(pose.caution)
                         Text(
                             clockString(sequence.secondsLeft),
                             fontSize = 44.sp,
@@ -297,7 +299,7 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
     fun toggle() {
         if (!started) {
             started = true
-            guide.speak(Guidance.beginBreathwork(pattern.name))
+            guide.speak(Guidance.beginBreathwork(pattern.name, pattern.caution))
             handle(listOf(pacer.startEvent), speak = false)
         }
         running = !running
@@ -353,6 +355,7 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
         val phaseName = breathPhaseName(pacer.phase)
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             PracticeTopBar(pattern.name, guide, onClose)
+            CautionNote(pattern.caution, Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.weight(1f))
             Box(Modifier.size(280.dp), contentAlignment = Alignment.Center) {
                 Box(

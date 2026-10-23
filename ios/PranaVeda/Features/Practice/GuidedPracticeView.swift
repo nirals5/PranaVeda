@@ -76,6 +76,7 @@ struct GuidedPracticeView: View {
                     if let sanskrit = pose.nameSanskrit {
                         Text(sanskrit).font(Theme.bodySmall).italic().foregroundStyle(Theme.lavenderDeep)
                     }
+                    CautionNote(text: pose.caution)
                     Text(clockString(sequence.secondsLeft))
                         .font(.system(.largeTitle, design: .rounded, weight: .light).monospacedDigit())
                         .foregroundStyle(Theme.ink)
@@ -201,6 +202,7 @@ struct BreathworkPacerView: View {
     private var pacerScreen: some View {
         VStack(spacing: 0) {
             PracticeTopBar(title: pattern.name, guide: guide, onClose: { dismiss() })
+            CautionNote(text: pattern.caution).padding(.horizontal, 20)
             Spacer()
             ZStack {
                 // The circle grows with the in-breath and shrinks with the
@@ -244,7 +246,7 @@ struct BreathworkPacerView: View {
     private func toggle() {
         if !started {
             started = true
-            guide.speak(Guidance.beginBreathwork(pattern.name))
+            guide.speak(Guidance.beginBreathwork(pattern.name, caution: pattern.caution))
             handle([pacer.startEvent], speakFirst: false)
         }
         isRunning.toggle()

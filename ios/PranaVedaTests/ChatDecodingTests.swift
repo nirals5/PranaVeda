@@ -15,6 +15,20 @@ struct ChatDecodingTests {
         #expect(APIClient.decodeEvent("not json") == nil)
     }
 
+    @Test func decodesCautionNotesWhenTheServerSendsThem() {
+        let json = #"""
+        {"type":"card","card":{"kind":"ritual","result":{
+          "yogaPractice":{"title":"Steady","poses":[
+            {"poseId":"warrior_1","nameEnglish":"Warrior I","caution":"High blood pressure: keep arms down."},
+            {"poseId":"tadasana","nameEnglish":"Mountain Pose"}]},
+          "breathwork":{"name":"Equal Breathing","inhale":4,"holdActive":0,"exhale":4,"holdEmpty":0,"cycles":6,"caution":"Asthma: keep the holds short."}}}}
+        """#
+        guard case .card(.ritual(let result))? = APIClient.decodeEvent(json) else { Issue.record("ritual"); return }
+        #expect(result.yogaPractice.poses[0].caution == "High blood pressure: keep arms down.")
+        #expect(result.yogaPractice.poses[1].caution == nil)
+        #expect(result.cautions.map(\.name) == ["Warrior I", "Equal Breathing"])
+    }
+
     @Test func decodesARitualCardAsTheServerSendsIt() throws {
         let json = #"""
         {"type":"card","card":{"kind":"ritual","result":{

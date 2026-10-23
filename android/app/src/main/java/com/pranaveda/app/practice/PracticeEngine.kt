@@ -169,20 +169,24 @@ object Guidance {
     /** A 1.4 s pause after each sentence, so there is time to move into position. */
     fun paced(text: String): String = text.replace(Regex("""\.\s+"""), """. <break time="1.4s" /> """)
 
+    /** The caution note (G13), said before the instructions. */
+    fun takeCare(caution: String?): String = caution?.let { """Take care. $it <break time="0.8s" /> """ } ?: ""
+
     fun startPose(pose: YogaPose): String {
         val also = pose.nameSanskrit?.let { ", or ${speakableName(it)}" } ?: ""
-        return """Starting posture: ${speakableName(pose.nameEnglish)}$also. <break time="1.2s" /> ${paced(pose.instructions ?: "")}"""
+        return """Starting posture: ${speakableName(pose.nameEnglish)}$also. <break time="1.2s" /> ${takeCare(pose.caution)}${paced(pose.instructions ?: "")}"""
     }
 
     fun enterPose(pose: YogaPose): String =
-        """Entering posture: ${speakableName(pose.nameEnglish)}. <break time="1.2s" /> ${paced(pose.instructions ?: "")}"""
+        """Entering posture: ${speakableName(pose.nameEnglish)}. <break time="1.2s" /> ${takeCare(pose.caution)}${paced(pose.instructions ?: "")}"""
 
     fun returnToPose(pose: YogaPose): String =
-        """Returning to posture: ${speakableName(pose.nameEnglish)}. <break time="1.2s" /> ${paced(pose.instructions ?: "")}"""
+        """Returning to posture: ${speakableName(pose.nameEnglish)}. <break time="1.2s" /> ${takeCare(pose.caution)}${paced(pose.instructions ?: "")}"""
 
     const val RITUAL_COMPLETE = "Yoga ritual completed. Sit quietly and feel the light of integration."
 
-    fun beginBreathwork(name: String) = "Beginning the nourishing practice of $name"
+    fun beginBreathwork(name: String, caution: String? = null) =
+        "Beginning the nourishing practice of $name" + (caution?.let { """. <break time="0.8s" /> Take care. $it""" } ?: "")
 
     fun breathworkComplete(name: String) =
         """Beautiful. <break time="0.8s" /> You've completed your $name. <break time="0.8s" /> Rest here, and let your breath return to its natural rhythm."""
