@@ -105,6 +105,7 @@ export interface WellnessProfile {
   prakriti?: string;
   vikriti?: string;
   prakritiConfidence?: 'low' | 'medium' | 'high';
+  experience?: 'beginner' | 'regular' | 'experienced'; // only "experienced" unlocks experienced-only practices (G2)
   doshaProfile?: DoshaProfileResult & { assessedDate?: string };
   goals?: string[];
   conditions?: string[];

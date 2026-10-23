@@ -81,6 +81,8 @@ export interface CatalogPose {
   // Conditions for which it is offered with an adaptation, and that adaptation.
   cautions?: string[];
   safetyNote?: string;
+  // Offered only to users whose profile says they are experienced (G2).
+  minExperience?: 'experienced';
   dosha: { vata: string; pitta: string; kapha: string };
   bestTime: string;
   counterPoseId?: string;
@@ -102,6 +104,8 @@ export interface CatalogBreathwork {
   benefits: string;
   doshaSuitability: string;
   contraindications: string[];
+  // Offered only to users whose profile says they are experienced (G2).
+  minExperience?: 'experienced';
   cautions?: string[];
   safetyNote?: string;
   bestTime: string;
@@ -477,6 +481,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'half_moon',
+    minExperience: 'experienced',
     nameSanskrit: 'Ardha Chandrasana',
     nameEnglish: 'Half Moon Pose',
     level: 'Intermediate',
@@ -494,6 +499,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'dancer',
+    minExperience: 'experienced',
     nameSanskrit: 'Natarajasana',
     nameEnglish: 'Dancer Pose',
     level: 'Intermediate',
@@ -511,6 +517,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'bow',
+    minExperience: 'experienced',
     nameSanskrit: 'Dhanurasana',
     nameEnglish: 'Bow Pose',
     level: 'Intermediate',
@@ -613,6 +620,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'warrior_3',
+    minExperience: 'experienced',
     nameSanskrit: 'Virabhadrasana III',
     nameEnglish: 'Warrior III',
     level: 'Intermediate',
@@ -722,6 +730,7 @@ export const BREATHWORK: CatalogBreathwork[] = [
   },
   {
     id: 'bhastrika',
+    minExperience: 'experienced',
     name: 'Bellows Breath',
     sanskritName: 'Bhastrika',
     description: 'Vigorous, even inhales and exhales that stoke inner fire — practiced gently and briefly.',
@@ -834,10 +843,11 @@ export function publicCatalog(base: string, catalog: Catalog = BUILT_IN_CATALOG)
 }
 
 // " Avoid with: …. Adapt for: … (note)." for one practice's prompt line.
-function safetyLine(x: { contraindications: string[]; cautions?: string[]; safetyNote?: string }): string {
+function safetyLine(x: { contraindications: string[]; cautions?: string[]; safetyNote?: string; minExperience?: string }): string {
+  const experienced = x.minExperience === 'experienced' ? ' Experienced practitioners only.' : '';
   const avoid = x.contraindications.length ? ` Avoid with: ${x.contraindications.join(', ')}.` : '';
   const adapt = x.cautions?.length ? ` Adapt for: ${x.cautions.join(', ')}${x.safetyNote ? ` (${x.safetyNote})` : ''}.` : '';
-  return avoid + adapt;
+  return experienced + avoid + adapt;
 }
 
 // Compact catalog summaries injected into Amrita's system prompt so she can
@@ -865,11 +875,17 @@ export function catalogPromptSummary(catalog: Catalog = BUILT_IN_CATALOG): strin
 // capabilities — promote those sections from AMRITA.md only when they ship.
 
 
+export const EXPERIENCE_LEVELS = ['beginner', 'regular', 'experienced'] as const;
+export type Experience = (typeof EXPERIENCE_LEVELS)[number];
+
 export interface WellnessProfile {
   name?: string;
   prakriti?: string;
   vikriti?: string;
   prakritiConfidence?: 'low' | 'medium' | 'high';
+  // How much yoga they have practised, in their own words; only "experienced"
+  // unlocks the practices marked for experienced practitioners (G2).
+  experience?: Experience;
   doshaProfile?: {
     primary: string;
     secondary?: string;
@@ -1073,6 +1089,7 @@ Your purpose is not to generate wellness plans. Your purpose is to build a long-
 
 - NEVER include a pose or breath whose contraindications match the user's known conditions; choose alternatives and, if relevant, briefly say why you steered away.
 - If the profile mentions pregnancy or a heart condition, keep everything gentle and explicitly invite professional guidance.
+- Practices marked "Experienced practitioners only" are for profiles whose experience is "experienced". If their experience is not known and they want one, ask once how long they have practised (show_answer_options suits this), record it, and only then offer it; otherwise choose a gentler alternative. Never guess their experience from a single request.
 
 ${foodRulesPrompt(food)}
 
@@ -1246,6 +1263,12 @@ const tools: Anthropic.Tool[] = [
             prakriti: { type: 'string', description: 'Dominant (and secondary) constitution, e.g. "Vata-Pitta"' },
             vikriti: { type: 'string', description: 'Current imbalance, if assessed' },
             prakritiConfidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+            experience: {
+              type: 'string',
+              enum: [...EXPERIENCE_LEVELS],
+              description:
+                'How much yoga they have practised, only from what they tell you: "beginner" (new, or returning after a long break), "regular" (practises regularly), "experienced" (years of steady practice, or teaches). Never infer it from a single request.',
+            },
           },
           additionalProperties: false,
         },
@@ -1402,6 +1425,7 @@ export function applyProfileUpdate(profile: WellnessProfile, input: any, today =
     for (const k of ['name', 'prakriti', 'vikriti', 'prakritiConfidence'] as const) {
       if (input.set[k] !== undefined) (next as any)[k] = input.set[k];
     }
+    if (EXPERIENCE_LEVELS.includes(input.set.experience)) next.experience = input.set.experience;
   }
   const merge = (key: 'goals' | 'conditions' | 'preferences', addRaw?: unknown, removeRaw?: unknown) => {
     const add = asList(addRaw);
@@ -1436,6 +1460,16 @@ export function toolsFor(catalog: Catalog): Anthropic.Tool[] {
   });
 }
 
+// G2: a practice for experienced practitioners is offered only when the
+// profile says so; an unknown experience counts as not experienced.
+export function tooAdvanced(x: { minExperience?: string }, profile: WellnessProfile): boolean {
+  return x.minExperience === 'experienced' && profile.experience !== 'experienced';
+}
+const experienceReason = (profile: WellnessProfile) =>
+  `for experienced practitioners only; their experience is ${profile.experience ?? 'not known'}`;
+const EXPERIENCE_HINT =
+  ' If they want an experienced-only practice and their experience is not known, ask how long they have practised and record it before offering it.';
+
 // G13: when the user's condition is one a practice is adapted for (a
 // caution, not an avoid), the card carries the practice's note on how.
 export function cautionFor(
@@ -1460,6 +1494,7 @@ export function buildRitual(
     if (!pose) return { error: `Unknown poseId "${p.poseId}". Choose ids from the catalog.` };
     const bad = conditionConflicts(pose.contraindications, profile.conditions, catalog.conditions);
     if (bad.length) conflicts.push(`${pose.id} (contraindicated for ${bad.join(', ')})`);
+    if (tooAdvanced(pose, profile)) conflicts.push(`${pose.id} (${experienceReason(profile)})`);
     const mins = Math.max(1, Math.round(p.durationMinutes));
     const caution = cautionFor(pose, profile, catalog);
     poses.push({
@@ -1479,8 +1514,9 @@ export function buildRitual(
   if (!breath) return { error: `Unknown breathworkId "${input.breathworkId}". Choose ids from the catalog.` };
   const badBreath = conditionConflicts(breath.contraindications, profile.conditions, catalog.conditions);
   if (badBreath.length) conflicts.push(`${breath.id} (contraindicated for ${badBreath.join(', ')})`);
+  if (tooAdvanced(breath, profile)) conflicts.push(`${breath.id} (${experienceReason(profile)})`);
   if (conflicts.length) {
-    return { error: `Rejected for safety — the user's conditions conflict with: ${conflicts.join('; ')}. Pick alternatives from the catalog.` };
+    return { error: `Rejected for safety — the user's conditions conflict with: ${conflicts.join('; ')}. Pick alternatives from the catalog.${EXPERIENCE_HINT}` };
   }
   const breathCaution = cautionFor(breath, profile, catalog);
   const durationMinutes = (input.poses ?? []).reduce((s: number, p: any) => s + Math.max(1, Math.round(p.durationMinutes)), 0);
@@ -1517,6 +1553,9 @@ export function buildBreathworkCard(input: any, profile: WellnessProfile, catalo
   const bad = conditionConflicts(breath.contraindications, profile.conditions, catalog.conditions);
   if (bad.length) {
     return { error: `Rejected for safety — ${breath.id} is contraindicated for ${bad.join(', ')}. Pick an alternative.` };
+  }
+  if (tooAdvanced(breath, profile)) {
+    return { error: `Rejected for safety — ${breath.id} is ${experienceReason(profile)}. Pick an alternative.${EXPERIENCE_HINT}` };
   }
   const caution = cautionFor(breath, profile, catalog);
   return {
