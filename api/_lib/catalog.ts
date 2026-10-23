@@ -136,6 +136,7 @@ export function catalogFromRows(
       contraindications: avoid.get(r.id) ?? [],
       ...(cautions.length ? { cautions } : {}),
       ...(r.avoidNotes ? { safetyNote: r.avoidNotes } : {}),
+      ...(r.minExperience === 'experienced' ? { minExperience: 'experienced' as const } : {}),
     };
   };
 
