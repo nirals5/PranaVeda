@@ -94,6 +94,19 @@ class PracticeEngineTest {
         assertEquals(2, box.totalMinutes)
     }
 
+    @Test fun saysTheCautionNoteBeforeTheInstructions() {
+        val warrior = YogaPose(nameEnglish = "Warrior I", instructions = "Step back.", caution = "High blood pressure: keep arms down.")
+        assertEquals(
+            """Entering posture: Warrior One. <break time="1.2s" /> Take care. High blood pressure: keep arms down. <break time="0.8s" /> Step back.""",
+            Guidance.enterPose(warrior),
+        )
+        assertEquals(
+            """Beginning the nourishing practice of Equal Breathing. <break time="0.8s" /> Take care. Asthma: keep the holds short.""",
+            Guidance.beginBreathwork("Equal Breathing", "Asthma: keep the holds short."),
+        )
+        assertEquals("Beginning the nourishing practice of Equal Breathing", Guidance.beginBreathwork("Equal Breathing"))
+    }
+
     @Test fun speaksTheWebsitesWords() {
         val warrior = YogaPose(nameEnglish = "Warrior II", nameSanskrit = "Virabhadrasana II", duration = "2 minutes", instructions = "Step wide. Bend the front knee.")
         assertEquals(

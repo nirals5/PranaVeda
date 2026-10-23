@@ -10,6 +10,7 @@ export interface YogaPose {
   poseImageUrl?: string;
   sceneImageUrl?: string; // Niral's room scene, when the pose has one
   videoUrl?: string;
+  caution?: string; // how to adapt it for one of the user's conditions (G13)
 }
 
 export interface AyurvedicAdvice {
@@ -30,6 +31,7 @@ export interface BreathworkPattern {
   holdEmpty: number; // in seconds
   cycles: number;
   benefits: string;
+  caution?: string; // how to adapt it for one of the user's conditions (G13)
 }
 
 export interface RecommendationResult {

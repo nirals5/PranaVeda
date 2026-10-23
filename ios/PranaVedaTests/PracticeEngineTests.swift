@@ -82,6 +82,17 @@ struct PracticeEngineTests {
         #expect(Guidance.cue(for: .holdEmpty, seconds: 8) == "Rest in the quiet emptiness")
     }
 
+    @Test func saysTheCautionNoteBeforeTheInstructions() {
+        var warrior = YogaPose(poseId: "warrior_1", nameEnglish: "Warrior I", nameSanskrit: nil, duration: "2 minutes",
+                               benefits: nil, instructions: "Step back.", poseImageUrl: nil, sceneImageUrl: nil, videoUrl: nil)
+        warrior.caution = "High blood pressure: keep arms down."
+        #expect(Guidance.enterPose(warrior)
+                == #"Entering posture: Warrior One. <break time="1.2s" /> Take care. High blood pressure: keep arms down. <break time="0.8s" /> Step back."#)
+        #expect(Guidance.beginBreathwork("Equal Breathing", caution: "Asthma: keep the holds short.")
+                == #"Beginning the nourishing practice of Equal Breathing. <break time="0.8s" /> Take care. Asthma: keep the holds short."#)
+        #expect(Guidance.beginBreathwork("Equal Breathing") == "Beginning the nourishing practice of Equal Breathing")
+    }
+
     @Test func turnsPauseMarkersIntoSilences() {
         let parts = Guidance.script(#"Beautiful. <break time="0.8s" /> You've completed it. <break time="0.8s" /> Rest here."#)
         #expect(parts.map(\.words) == ["Beautiful.", "You've completed it.", "Rest here."])

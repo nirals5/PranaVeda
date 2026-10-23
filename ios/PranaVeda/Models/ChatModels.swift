@@ -14,6 +14,9 @@ struct BreathworkPattern: Codable, Hashable, Sendable {
     let holdEmpty: Double
     let cycles: Int
     let benefits: String?
+    /// How to adapt it for one of the user's conditions (G13); the server
+    /// adds it only when it applies.
+    var caution: String? = nil
 
     /// "In 4 · hold 4 · out 4 · rest 4"
     var rhythm: String {
@@ -36,6 +39,9 @@ struct YogaPose: Codable, Hashable, Sendable, Identifiable {
     let poseImageUrl: String?
     let sceneImageUrl: String?
     let videoUrl: String?
+    /// How to adapt it for one of the user's conditions (G13); the server
+    /// adds it only when it applies.
+    var caution: String? = nil
 
     var id: String { (poseId ?? "") + nameEnglish }
     /// Niral's room scene when the pose has one, else the flat photo.

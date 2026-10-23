@@ -4,6 +4,7 @@ import com.pranaveda.app.config.AppConfig
 import com.pranaveda.app.model.BreathworkPattern
 import com.pranaveda.app.model.ChatCard
 import com.pranaveda.app.model.ChatItem
+import com.pranaveda.app.model.cautions
 import com.pranaveda.app.net.ApiClient
 import com.pranaveda.app.net.ChatEvent
 import com.pranaveda.app.ui.chat.inlineMarkdown
@@ -30,6 +31,21 @@ class ChatDecodingTest {
         assertEquals(ChatEvent.Done, ApiClient.decodeEvent("""{"type":"done"}"""))
         assertNull(ApiClient.decodeEvent("not json"))
         assertNull(ApiClient.decodeEvent("""{"type":"something_new"}"""))
+    }
+
+    @Test fun decodesCautionNotesWhenTheServerSendsThem() {
+        val json = """
+        {"type":"card","card":{"kind":"ritual","result":{
+          "yogaPractice":{"title":"Steady","poses":[
+            {"poseId":"warrior_1","nameEnglish":"Warrior I","caution":"High blood pressure: keep arms down."},
+            {"poseId":"tadasana","nameEnglish":"Mountain Pose"}]},
+          "breathwork":{"name":"Equal Breathing","inhale":4,"holdActive":0,"exhale":4,"holdEmpty":0,"cycles":6,"caution":"Asthma: keep the holds short."}}}}
+        """.trimIndent().replace("\n", "")
+        val event = ApiClient.decodeEvent(json) as ChatEvent.Card
+        val result = (event.card as ChatCard.Ritual).result
+        assertEquals("High blood pressure: keep arms down.", result.yogaPractice.poses[0].caution)
+        assertNull(result.yogaPractice.poses[1].caution)
+        assertEquals(listOf("Warrior I", "Equal Breathing"), result.cautions.map { it.first })
     }
 
     @Test fun decodesARitualCardAsTheServerSendsIt() {

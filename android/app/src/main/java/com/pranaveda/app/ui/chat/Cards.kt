@@ -47,6 +47,7 @@ import com.pranaveda.app.model.ChatCard
 import com.pranaveda.app.model.DoshaProfileCard
 import com.pranaveda.app.model.RecommendationResult
 import com.pranaveda.app.model.YogaPose
+import com.pranaveda.app.model.cautions
 import com.pranaveda.app.practice.BookmarkButton
 import com.pranaveda.app.practice.BreathworkPacerScreen
 import com.pranaveda.app.practice.GuidedPracticeScreen
@@ -74,6 +75,23 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier, heading: Boolean =
 
 private val italicSmall: TextStyle = Pv.bodySmall.copy(fontStyle = FontStyle.Italic)
 
+/**
+ * G13: how to adapt a practice for one of the user's conditions, in the
+ * theme's warm accent. Shows nothing when there is no note.
+ */
+@Composable
+fun CautionNote(text: String?, modifier: Modifier = Modifier, label: String? = null) {
+    if (text == null) return
+    val line = label?.let { "$it: $text" } ?: text
+    Row(
+        modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = "Caution. $line" },
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("⚠", style = Pv.bodySmall, color = Pv.terracotta)
+        Text(line, style = Pv.bodySmall, color = Pv.terracotta)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RitualCard(result: RecommendationResult) {
@@ -92,6 +110,7 @@ private fun RitualCard(result: RecommendationResult) {
         result.breathwork?.let {
             Text("🌬  ${it.name} · ${it.rhythm}", style = Pv.bodySmall, color = Pv.stone700)
         }
+        result.cautions.forEach { (name, caution) -> CautionNote(caution, label = name) }
         Button(
             onClick = { showingDetail = true },
             colors = ButtonDefaults.buttonColors(containerColor = Pv.lavender, contentColor = Color.White),
@@ -177,6 +196,7 @@ private fun RitualDetail(result: RecommendationResult, onBegin: () -> Unit) {
                 SectionLabel("Posture ${index + 1}" + (pose.duration?.let { " · $it" } ?: ""))
                 Text(pose.nameEnglish, style = Pv.heading, color = Pv.ink)
                 pose.nameSanskrit?.let { Text(it, style = italicSmall, color = Pv.lavenderDeep) }
+                CautionNote(pose.caution)
                 pose.instructions?.let { Text(it, style = Pv.bodySmall, color = Pv.stone700) }
             }
         }
@@ -193,6 +213,7 @@ private fun BreathworkCard(note: String?, pattern: BreathworkPattern, result: Re
         pattern.sanskritName?.let { Text(it, style = italicSmall, color = Pv.lavenderDeep) }
         Text("${pattern.rhythm} · ${pattern.cycles} cycles", style = Pv.bodySmall, color = Pv.stone700)
         note?.let { Text(it, style = Pv.bodySmall, color = Pv.stone700) }
+        CautionNote(pattern.caution)
         Button(
             onClick = { pacing = true },
             colors = ButtonDefaults.buttonColors(containerColor = Pv.lavender, contentColor = Color.White),

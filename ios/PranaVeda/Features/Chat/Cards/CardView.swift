@@ -45,6 +45,9 @@ struct RitualCardView: View {
                     .font(Theme.bodySmall)
                     .foregroundStyle(Theme.stone700)
             }
+            ForEach(result.cautions, id: \.name) { item in
+                CautionNote(text: item.caution, label: item.name)
+            }
             Button {
                 showingDetail = true
             } label: {
@@ -60,6 +63,35 @@ struct RitualCardView: View {
         }
         .cardSurface()
         .sheet(isPresented: $showingDetail) { RitualDetailView(result: result) }
+    }
+}
+
+/// G13: how to adapt a practice for one of the user's conditions, in the
+/// theme's warm accent. Shows nothing when there is no note.
+struct CautionNote: View {
+    let text: String?
+    var label: String? = nil
+
+    var body: some View {
+        if let text {
+            Label {
+                Text(label.map { "\($0): \(text)" } ?? text)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle")
+            }
+            .font(Theme.bodySmall)
+            .foregroundStyle(Theme.terracotta)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel("Caution. \(label.map { "\($0): " } ?? "")\(text)")
+        }
+    }
+}
+
+extension RecommendationResult {
+    /// The poses and breath practice that carry a caution note, in order.
+    var cautions: [(name: String, caution: String)] {
+        yogaPractice.poses.compactMap { pose in pose.caution.map { (pose.nameEnglish, $0) } }
+            + [breathwork].compactMap { b in b?.caution.map { (b!.name, $0) } }
     }
 }
 
@@ -142,6 +174,7 @@ struct RitualDetailView: View {
                             if let sanskrit = pose.nameSanskrit {
                                 Text(sanskrit).font(Theme.bodySmall).italic().foregroundStyle(Theme.lavenderDeep)
                             }
+                            CautionNote(text: pose.caution)
                             if let instructions = pose.instructions {
                                 Text(instructions).font(Theme.bodySmall).foregroundStyle(Theme.stone700)
                             }
@@ -184,6 +217,7 @@ struct BreathworkCardView: View {
             if let note {
                 Text(note).font(Theme.bodySmall).foregroundStyle(Theme.stone700)
             }
+            CautionNote(text: pattern.caution)
             Button { pacing = true } label: {
                 Label("Begin breathwork", systemImage: "wind")
                     .labelFont()

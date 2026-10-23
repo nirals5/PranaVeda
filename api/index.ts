@@ -1298,6 +1298,16 @@ function haikuFoodJudge(client: Anthropic): FoodJudge {
   };
 }
 
+// What Amrita is told about the adaptation notes a card shows, so what she
+// says agrees with them.
+function cautionsShown(card: any): string {
+  const notes = [
+    ...(card?.result?.yogaPractice?.poses ?? []).filter((p: any) => p.caution).map((p: any) => `${p.nameEnglish}: ${p.caution}`),
+    ...[card?.result?.breathwork, card?.pattern].filter((b: any) => b?.caution).map((b: any) => `${b.name}: ${b.caution}`),
+  ];
+  return notes.length ? ` For their conditions, the card shows these adaptation notes: ${notes.join(' ')} Keep any advice consistent with them.` : '';
+}
+
 // Tools whose cards carry advice the user reads (diet tips, herbs, guidance),
 // checked against the exclusions before they are shown.
 const FOOD_CHECKED_TOOLS = new Set(['create_ritual', 'suggest_breathwork', 'present_dosha_profile']);
@@ -1426,7 +1436,18 @@ export function toolsFor(catalog: Catalog): Anthropic.Tool[] {
   });
 }
 
-function buildRitual(
+// G13: when the user's condition is one a practice is adapted for (a
+// caution, not an avoid), the card carries the practice's note on how.
+export function cautionFor(
+  x: { cautions?: string[]; safetyNote?: string },
+  profile: WellnessProfile,
+  catalog: Catalog
+): string | undefined {
+  if (!x.safetyNote || !x.cautions?.length) return undefined;
+  return conditionConflicts(x.cautions, profile.conditions, catalog.conditions).length ? x.safetyNote : undefined;
+}
+
+export function buildRitual(
   input: any,
   profile: WellnessProfile,
   catalog: Catalog,
@@ -1440,6 +1461,7 @@ function buildRitual(
     const bad = conditionConflicts(pose.contraindications, profile.conditions, catalog.conditions);
     if (bad.length) conflicts.push(`${pose.id} (contraindicated for ${bad.join(', ')})`);
     const mins = Math.max(1, Math.round(p.durationMinutes));
+    const caution = cautionFor(pose, profile, catalog);
     poses.push({
       poseId: pose.id,
       nameEnglish: pose.nameEnglish,
@@ -1450,6 +1472,7 @@ function buildRitual(
       poseImageUrl: assetUrl(pose.poseImageUrl, assetBase),
       sceneImageUrl: assetUrl(sceneImagePath(pose.id), assetBase),
       videoUrl: pose.videoUrl,
+      ...(caution ? { caution } : {}),
     });
   }
   const breath = catalog.breathworkById.get(input.breathworkId);
@@ -1459,6 +1482,7 @@ function buildRitual(
   if (conflicts.length) {
     return { error: `Rejected for safety — the user's conditions conflict with: ${conflicts.join('; ')}. Pick alternatives from the catalog.` };
   }
+  const breathCaution = cautionFor(breath, profile, catalog);
   const durationMinutes = (input.poses ?? []).reduce((s: number, p: any) => s + Math.max(1, Math.round(p.durationMinutes)), 0);
   return {
     card: {
@@ -1479,6 +1503,7 @@ function buildRitual(
           holdEmpty: breath.holdEmpty,
           cycles: input.breathworkCycles ?? breath.cycles,
           benefits: breath.benefits,
+          ...(breathCaution ? { caution: breathCaution } : {}),
         },
         lifestyleTips: input.lifestyleTips ?? [],
       },
@@ -1486,13 +1511,14 @@ function buildRitual(
   };
 }
 
-function buildBreathworkCard(input: any, profile: WellnessProfile, catalog: Catalog): { error?: string; card?: any } {
+export function buildBreathworkCard(input: any, profile: WellnessProfile, catalog: Catalog): { error?: string; card?: any } {
   const breath = catalog.breathworkById.get(input.breathworkId);
   if (!breath) return { error: `Unknown breathworkId "${input.breathworkId}". Choose ids from the catalog.` };
   const bad = conditionConflicts(breath.contraindications, profile.conditions, catalog.conditions);
   if (bad.length) {
     return { error: `Rejected for safety — ${breath.id} is contraindicated for ${bad.join(', ')}. Pick an alternative.` };
   }
+  const caution = cautionFor(breath, profile, catalog);
   return {
     card: {
       kind: 'breathwork',
@@ -1507,6 +1533,7 @@ function buildBreathworkCard(input: any, profile: WellnessProfile, catalog: Cata
         holdEmpty: breath.holdEmpty,
         cycles: input.cycles ?? breath.cycles,
         benefits: breath.benefits,
+        ...(caution ? { caution } : {}),
       },
     },
   };
@@ -1761,7 +1788,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
               send(res, { type: 'card', card });
               const entry = { date: today, title: (block.input as any).title, kind: 'ritual' as const };
               changeProfile((p) => ({ ...p, practiceHistory: [...(p.practiceHistory ?? []), entry].slice(-30) }));
-              resultText = 'Ritual card shown to the user. Continue with one or two warm sentences; do not restate its contents.';
+              resultText = 'Ritual card shown to the user. Continue with one or two warm sentences; do not restate its contents.' + cautionsShown(card);
             }
           } else if (block.name === 'suggest_breathwork') {
             const { error, card } = buildBreathworkCard(block.input, profile, catalog);
@@ -1772,7 +1799,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
               send(res, { type: 'card', card });
               const entry = { date: today, title: (card as any).pattern.name, kind: 'breathwork' as const };
               changeProfile((p) => ({ ...p, practiceHistory: [...(p.practiceHistory ?? []), entry].slice(-30) }));
-              resultText = 'Breathwork card shown to the user. Continue with one warm sentence; do not restate its contents.';
+              resultText = 'Breathwork card shown to the user. Continue with one warm sentence; do not restate its contents.' + cautionsShown(card);
             }
           } else {
             resultText = `Unknown tool ${block.name}`;

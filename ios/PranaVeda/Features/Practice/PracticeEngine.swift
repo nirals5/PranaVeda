@@ -156,22 +156,29 @@ enum Guidance {
         text.replacingOccurrences(of: #"\.\s+"#, with: ". <break time=\"1.4s\" /> ", options: .regularExpression)
     }
 
+    /// The caution note (G13), said before the instructions.
+    static func takeCare(_ caution: String?) -> String {
+        caution.map { "Take care. \($0) <break time=\"0.8s\" /> " } ?? ""
+    }
+
     static func startPose(_ pose: YogaPose) -> String {
         let also = pose.nameSanskrit.map { ", or \(speakableName($0))" } ?? ""
-        return "Starting posture: \(speakableName(pose.nameEnglish))\(also). <break time=\"1.2s\" /> \(paced(pose.instructions ?? ""))"
+        return "Starting posture: \(speakableName(pose.nameEnglish))\(also). <break time=\"1.2s\" /> \(takeCare(pose.caution))\(paced(pose.instructions ?? ""))"
     }
 
     static func enterPose(_ pose: YogaPose) -> String {
-        "Entering posture: \(speakableName(pose.nameEnglish)). <break time=\"1.2s\" /> \(paced(pose.instructions ?? ""))"
+        "Entering posture: \(speakableName(pose.nameEnglish)). <break time=\"1.2s\" /> \(takeCare(pose.caution))\(paced(pose.instructions ?? ""))"
     }
 
     static func returnToPose(_ pose: YogaPose) -> String {
-        "Returning to posture: \(speakableName(pose.nameEnglish)). <break time=\"1.2s\" /> \(paced(pose.instructions ?? ""))"
+        "Returning to posture: \(speakableName(pose.nameEnglish)). <break time=\"1.2s\" /> \(takeCare(pose.caution))\(paced(pose.instructions ?? ""))"
     }
 
     static let ritualComplete = "Yoga ritual completed. Sit quietly and feel the light of integration."
 
-    static func beginBreathwork(_ name: String) -> String { "Beginning the nourishing practice of \(name)" }
+    static func beginBreathwork(_ name: String, caution: String? = nil) -> String {
+        "Beginning the nourishing practice of \(name)" + (caution.map { ". <break time=\"0.8s\" /> Take care. \($0)" } ?? "")
+    }
 
     static func breathworkComplete(_ name: String) -> String {
         "Beautiful. <break time=\"0.8s\" /> You've completed your \(name). <break time=\"0.8s\" /> Rest here, and let your breath return to its natural rhythm."
