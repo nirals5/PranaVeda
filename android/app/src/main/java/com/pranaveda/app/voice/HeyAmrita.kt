@@ -132,6 +132,9 @@ class HeyAmrita(context: Context) {
         refresh()
     }
 
+    /** Listen again after a wake the app did not act on (a stale "Hey Amrita" request). */
+    fun resume() = refresh()
+
     fun hold(reason: Hold, on: Boolean) {
         val changed = if (on) holds.add(reason) else holds.remove(reason)
         if (changed) refresh()

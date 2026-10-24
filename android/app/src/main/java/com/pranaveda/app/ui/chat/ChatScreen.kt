@@ -1,6 +1,5 @@
 package com.pranaveda.app.ui.chat
 
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.heading
 import com.pranaveda.app.ui.theme.rememberReduceMotion
@@ -15,6 +14,9 @@ import androidx.compose.ui.platform.LocalContext
 import com.pranaveda.app.voice.VoiceListener
 import com.pranaveda.app.PranaVedaApplication
 import com.pranaveda.app.voice.HeyAmrita
+import kotlinx.coroutines.delay
+import com.pranaveda.app.voice.VoiceRequest
+import android.os.SystemClock
 import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -82,7 +84,13 @@ import java.time.LocalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: AmritaVoice? = null, voiceRequest: Int = 0) {
+fun ChatScreen(
+    model: ChatViewModel,
+    insight: DailyInsightStore? = null,
+    voice: AmritaVoice? = null,
+    voiceRequestedAt: Long = 0L,
+    onVoiceRequestHandled: () -> Unit = {},
+) {
     var draft by rememberSaveable { mutableStateOf("") }
     val focus = LocalFocusManager.current
     val listState = rememberLazyListState()
@@ -155,12 +163,28 @@ fun ChatScreen(model: ChatViewModel, insight: DailyInsightStore? = null, voice: 
     // The microphone is never left on: leaving the tab or the app stops it.
     DisposableEffect(Unit) { onDispose { stopRecording() } }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { stopRecording() }
-    // A widget's "Talk to Amrita": start listening, once per request.
-    var handledVoiceRequest by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(voiceRequest) {
-        if (voiceRequest > handledVoiceRequest && voice != null) {
-            handledVoiceRequest = voiceRequest
-            if (listener == null && !model.isStreaming) startRecording()
+    // "Hey Amrita" or a widget's "Talk to Amrita": start listening, once per
+    // request. One made while Amrita is replying waits for the reply; a stale one
+    // is dropped, and Hey Amrita, which let go of the microphone, listens again.
+    LaunchedEffect(voiceRequestedAt, model.isStreaming) {
+        val at = voiceRequestedAt
+        if (at == 0L || voice == null) return@LaunchedEffect
+        val now = SystemClock.elapsedRealtime()
+        when (VoiceRequest.action(at, now, model.isStreaming)) {
+            VoiceRequest.Action.Start -> {
+                onVoiceRequestHandled()
+                if (listener == null) startRecording()
+            }
+            VoiceRequest.Action.Wait -> {
+                // Cancelled, and decided again, as soon as the reply ends.
+                delay(VoiceRequest.TTL_MILLIS - (now - at) + 1)
+                onVoiceRequestHandled()
+                heyAmrita.resume()
+            }
+            VoiceRequest.Action.Drop -> {
+                onVoiceRequestHandled()
+                heyAmrita.resume()
+            }
         }
     }
 

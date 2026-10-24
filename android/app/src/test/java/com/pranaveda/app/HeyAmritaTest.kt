@@ -1,5 +1,7 @@
 package com.pranaveda.app
 
+import com.pranaveda.app.voice.VoiceRequest
+import com.pranaveda.app.voice.VoiceRequest.Action
 import com.pranaveda.app.voice.WakePhrase
 import com.pranaveda.app.voice.WakePhrase.Command
 import com.pranaveda.app.voice.WakePhrase.Match
@@ -62,5 +64,16 @@ class HeyAmritaTest {
         assertNull(WakePhrase.command("Hold"))
         assertNull(WakePhrase.command("Hold, steady"))
         assertNull(WakePhrase.command("Breathe in"))
+    }
+
+    @Test fun aRequestToListenIsActedOnOnceAndNeverLate() {
+        val at = 100_000L
+        assertEquals(Action.Start, VoiceRequest.action(at, at + 200, replying = false))
+        // Said while Amrita is replying: wait for the reply to end.
+        assertEquals(Action.Wait, VoiceRequest.action(at, at + 200, replying = true))
+        assertEquals(Action.Start, VoiceRequest.action(at, at + 8_000, replying = false))
+        // Too old to act on, replying or not: never start the microphone late.
+        assertEquals(Action.Drop, VoiceRequest.action(at, at + VoiceRequest.TTL_MILLIS + 1, replying = true))
+        assertEquals(Action.Drop, VoiceRequest.action(at, at + VoiceRequest.TTL_MILLIS + 1, replying = false))
     }
 }
