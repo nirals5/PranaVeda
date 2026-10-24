@@ -209,9 +209,10 @@ describe('getCatalog', () => {
   });
 });
 
-// Against the real database, when one is configured: the served catalog has
-// exactly the ids the built-in catalog has today, so saved rituals still
-// resolve, and every safety tag the built-in catalog enforces is still there.
+// Against the real database, when one is configured: the served catalog keeps
+// every id the built-in catalog has, in the same order, so saved rituals still
+// resolve (practices added in the sheet follow them), and every safety tag the
+// built-in catalog enforces is still there.
 // The sheet turns these few into cautions (offered with an adaptation, G13);
 // any other loosening fails here.
 const NOW_CAUTIONS = [
@@ -228,8 +229,10 @@ describe.skipIf(!hasDb)('catalog from the configured database', () => {
     dbMock.fail = false;
     const catalog = await getCatalog(builtIn);
     expect(catalog.source).toBe('database');
-    expect(catalog.poses.map((p) => p.id)).toEqual(BUILT_IN_CATALOG.poses.map((p) => p.id));
-    expect(catalog.breathwork.map((b) => b.id)).toEqual(BUILT_IN_CATALOG.breathwork.map((b) => b.id));
+    const builtInPoses = BUILT_IN_CATALOG.poses.map((p) => p.id);
+    const builtInBreaths = BUILT_IN_CATALOG.breathwork.map((b) => b.id);
+    expect(catalog.poses.map((p) => p.id).slice(0, builtInPoses.length)).toEqual(builtInPoses);
+    expect(catalog.breathwork.map((b) => b.id).slice(0, builtInBreaths.length)).toEqual(builtInBreaths);
     const sameAs = (tag: string) => (tag === 'vertigo' ? 'balance_issues' : tag);
     const becameCautions: string[] = [];
     for (const x of [...BUILT_IN_CATALOG.poses, ...BUILT_IN_CATALOG.breathwork]) {
