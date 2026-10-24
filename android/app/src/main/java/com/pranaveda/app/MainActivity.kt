@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -42,6 +43,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -83,8 +85,10 @@ class MainActivity : ComponentActivity() {
                 val insight = (application as PranaVedaApplication).insight
                 val scope = rememberCoroutineScope()
                 var tab by rememberSaveable { mutableIntStateOf(0) }
-                // Raised by the widgets' "Talk to Amrita": the chat starts listening.
-                var voiceRequest by remember { mutableIntStateOf(0) }
+                // When "Hey Amrita" or a widget's "Talk to Amrita" asked the chat to
+                // start listening (0: no request). Kept here, not in the chat, so
+                // leaving the tab and coming back never replays it.
+                var voiceRequestedAt by remember { mutableLongStateOf(0L) }
                 var openedRitual by remember { mutableStateOf<RecommendationResult?>(null) }
                 // A saved ritual begun straight away ("Start my practice").
                 var practicing by remember { mutableStateOf<RecommendationResult?>(null) }
@@ -93,7 +97,7 @@ class MainActivity : ComponentActivity() {
                     when (uri.host) {
                         "talk" -> {
                             tab = 0
-                            voiceRequest++
+                            voiceRequestedAt = SystemClock.elapsedRealtime()
                         }
                         "you" -> tab = 3
                         "practice" -> {
@@ -116,7 +120,7 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     heyAmrita.onWake = {
                         tab = 0
-                        voiceRequest++
+                        voiceRequestedAt = SystemClock.elapsedRealtime()
                     }
                 }
                 LaunchedEffect(tab == 0 && openedRitual == null) { heyAmrita.chatShowing = tab == 0 && openedRitual == null }
@@ -179,7 +183,9 @@ class MainActivity : ComponentActivity() {
                     ) { padding ->
                         Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
                             when (tab) {
-                                0 -> ChatScreen(chat, insight, (application as PranaVedaApplication).voice, voiceRequest)
+                                0 -> ChatScreen(chat, insight, (application as PranaVedaApplication).voice, voiceRequestedAt) {
+                                    voiceRequestedAt = 0L
+                                }
                                 1 -> DoshaScreen(chat.profile, doshaGuide) { message ->
                                     // As on the website: over to the chat, with the question asked.
                                     tab = 0
