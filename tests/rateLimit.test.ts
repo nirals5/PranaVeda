@@ -5,7 +5,7 @@ import express from 'express';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { getDb, schema } from '../api/_lib/db.js';
-import { LIMITS, checkLimit, clientAddress, limitMessage, rateLimited } from '../api/_lib/rateLimit.js';
+import { LIMITS, checkLimit, clientAddress, limitMessage, limitsFor, rateLimited } from '../api/_lib/rateLimit.js';
 import { registerChatRoute } from '../api/index.js';
 
 // Rate limits on the routes that cost money (Claude, ElevenLabs) or fetch for
@@ -23,6 +23,26 @@ describe('who is counted', () => {
   it('counts an IPv6 caller by their /64 network', () => {
     expect(clientAddress(reqWith({ 'x-real-ip': '2001:db8:abcd:12:1111:2222:3333:4444' }))).toBe('2001:db8:abcd:12::/64');
     expect(clientAddress(reqWith({ 'x-real-ip': '2001:0db8::1' }))).toBe('2001:db8:0:0::/64');
+  });
+});
+
+describe('configured limits', () => {
+  it('reads "<per minute>/<per day>" from RATE_LIMIT_<ROUTE>, and keeps the built-in limit otherwise', () => {
+    const saved = process.env.RATE_LIMIT_CHAT;
+    try {
+      delete process.env.RATE_LIMIT_CHAT;
+      expect(limitsFor('chat')).toEqual(LIMITS.chat);
+      process.env.RATE_LIMIT_CHAT = '20 / 500';
+      expect(limitsFor('chat')).toEqual({ minute: 20, day: 500 });
+      expect(limitsFor('voice')).toEqual(LIMITS.voice);
+      for (const bad of ['20', '0/500', 'lots', '20/500/1']) {
+        process.env.RATE_LIMIT_CHAT = bad;
+        expect(limitsFor('chat')).toEqual(LIMITS.chat);
+      }
+    } finally {
+      if (saved === undefined) delete process.env.RATE_LIMIT_CHAT;
+      else process.env.RATE_LIMIT_CHAT = saved;
+    }
   });
 });
 
@@ -73,6 +93,19 @@ describe.skipIf(!hasDb)('counting', () => {
     for (let i = 0; i < LIMITS.chat.minute; i++) expect(await checkLimit(caller, 'chat', now)).toBeNull();
     expect(await checkLimit(caller, 'chat', now)).toEqual({ window: 'minute', retryAfter: 45 });
     expect(await checkLimit(caller, 'chat', new Date(now.getTime() + MINUTE))).toBeNull();
+  });
+
+  it('applies a configured limit', async () => {
+    const caller = `user:${run}-configured`;
+    process.env.RATE_LIMIT_INSIGHT = '2/50';
+    try {
+      const now = new Date(Math.floor(Date.now() / MINUTE) * MINUTE + 15_000);
+      expect(await checkLimit(caller, 'insight', now)).toBeNull();
+      expect(await checkLimit(caller, 'insight', now)).toBeNull();
+      expect(await checkLimit(caller, 'insight', now)).toMatchObject({ window: 'minute' });
+    } finally {
+      delete process.env.RATE_LIMIT_INSIGHT;
+    }
   });
 
   it('counts each route on its own, and the daily limit outlasts a new minute', async () => {

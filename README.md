@@ -154,6 +154,23 @@ Limits:
 
 The 150-metre match radius and the 2 km accuracy cut-off are constants at the top of `src/hooks/usePlace.ts`; the per-place guidance is `PLACE_GUIDANCE` in `api/index.ts`.
 
+### Rate limits
+
+The routes that cost money per request or fetch for the caller are limited per person, or per network address for guests. Counts are kept in Postgres (`rate_limit_counts`), so every server instance shares them; the day resets at midnight UTC.
+
+| Route | Variable | Built-in limit (per minute / per day) |
+|---|---|---|
+| `/api/chat` | `RATE_LIMIT_CHAT` | 10 / 300 |
+| `/api/tts` (voice) | `RATE_LIMIT_VOICE` | 30 / 600 |
+| `/api/insight` | `RATE_LIMIT_INSIGHT` | 5 / 50 |
+| `/api/coaching` | `RATE_LIMIT_COACHING` | 5 / 50 |
+| `/api/calendar/ics` | `RATE_LIMIT_CALENDAR` | 10 / 300 |
+
+- **Change a limit:** set its variable to `<per minute>/<per day>`, e.g. `RATE_LIMIT_CHAT=20/500`. A malformed value is logged and the built-in limit kept.
+- **Turn limiting off:** `RATE_LIMITS=off`.
+- On Vercel, redeploy after changing either.
+- Over a chat limit, Amrita says so in her reply. The other routes answer `429` with `Retry-After`, and the apps fall back (built-in voice, no insight card). If the counts can't be read, requests go through.
+
 ### Accounts and sync (optional, off by default)
 
 Signing in is optional, and only offered where `VITE_ACCOUNTS_ENABLED` is `"true"`. With it unset (production today), the sign-in code is left out of the build and the app behaves exactly as a signed-out app always has.

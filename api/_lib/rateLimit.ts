@@ -23,6 +23,23 @@ export const LIMITS: Record<LimitedRoute, { minute: number; day: number }> = {
   calendar: { minute: 10, day: 300 },
 };
 
+// Each route's limits can be changed without a code change: RATE_LIMIT_CHAT,
+// RATE_LIMIT_VOICE… set to "<per minute>/<per day>", e.g. RATE_LIMIT_CHAT=10/300.
+// Read on every request; an unset or malformed value keeps the numbers above.
+const warned = new Set<string>();
+export function limitsFor(route: LimitedRoute): { minute: number; day: number } {
+  const name = `RATE_LIMIT_${route.toUpperCase()}`;
+  const value = process.env[name]?.trim();
+  if (!value) return LIMITS[route];
+  const match = /^(\d+)\s*\/\s*(\d+)$/.exec(value);
+  if (match && Number(match[1]) > 0 && Number(match[2]) > 0) return { minute: Number(match[1]), day: Number(match[2]) };
+  if (!warned.has(`${name}=${value}`)) {
+    warned.add(`${name}=${value}`);
+    console.error(`[rate limit] ignoring ${name}="${value}": expected "<per minute>/<per day>", e.g. 10/300`);
+  }
+  return LIMITS[route];
+}
+
 // A limit that was reached: which window, and the seconds until it resets.
 export interface LimitReached {
   window: 'minute' | 'day';
@@ -54,9 +71,10 @@ export async function checkLimit(caller: string, route: LimitedRoute, now: Date 
 
     const countFor = (window: string) => rows.find((r) => r.bucket.startsWith(`${route}:${window}:`))?.count ?? 0;
     const seconds = (ends: number) => Math.max(1, Math.ceil((ends - now.getTime()) / 1000));
+    const limits = limitsFor(route);
     // The longer wait wins: past the daily limit, a new minute does not help.
-    if (countFor('day') > LIMITS[route].day) return { window: 'day', retryAfter: seconds(dayEnds) };
-    if (countFor('minute') > LIMITS[route].minute) return { window: 'minute', retryAfter: seconds(minuteEnds) };
+    if (countFor('day') > limits.day) return { window: 'day', retryAfter: seconds(dayEnds) };
+    if (countFor('minute') > limits.minute) return { window: 'minute', retryAfter: seconds(minuteEnds) };
     return null;
   } catch (err: any) {
     console.error('[rate limit] count failed, letting the request through:', err?.message || err);
@@ -84,8 +102,8 @@ function ipv6Network(ip: string): string {
 
 export const callerFor = (req: Request, userId?: string) => (userId ? `user:${userId}` : `ip:${clientAddress(req)}`);
 
-// Switched off with RATE_LIMITS=off (the test suite does, so tests that call
-// a route many times are not counted).
+// Switched off everywhere with RATE_LIMITS=off (the test suite does, so tests
+// that call a route many times are not counted).
 const enabled = () => process.env.RATE_LIMITS !== 'off';
 
 export async function limitRequest(req: Request, route: LimitedRoute, userId?: string): Promise<LimitReached | null> {
