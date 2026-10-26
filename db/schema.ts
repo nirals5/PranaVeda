@@ -183,6 +183,20 @@ export const savedRituals = pgTable(
   (t) => [uniqueIndex('saved_rituals_user_ritual_key').on(t.userId, t.ritualId)]
 );
 
+// Request counts for rate limiting (api/_lib/rateLimit.ts): one row per caller
+// (a user, or a guest's network address) per route and time window. Rows are
+// deleted once their window has passed, so nothing here is kept for long.
+export const rateLimitCounts = pgTable(
+  'rate_limit_counts',
+  {
+    caller: text('caller').notNull(), // "user:<id>" or "ip:<address>"
+    bucket: text('bucket').notNull(), // route and window, e.g. "chat:minute:29384756"
+    count: integer('count').notNull(),
+    expiresAt: timestamptz('expires_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.caller, t.bucket] }), index('rate_limit_counts_expires_idx').on(t.expiresAt)]
+);
+
 // ---------------------------------------------------------------------------
 // Food library. Reference data, not user data: the "PranaVeda – Food Library"
 // Google Sheet is where it is edited, and these tables are a copy of it that

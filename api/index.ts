@@ -8,6 +8,7 @@ import { authenticate } from './_lib/auth.js';
 import { applyProfileChanges, loadAccountProfile } from './_lib/profiles.js';
 import { moveUpFor, moveUpPrompt, recentPracticeDates } from './_lib/moveUp.js';
 import type { MoveUp } from './_lib/moveUp.js';
+import { limitMessage, limitRequest, rateLimited } from './_lib/rateLimit.js';
 import type { VersionedProfile } from './_lib/profiles.js';
 import { EXPERIENCE_LEVELS } from './_lib/profileSchema.js';
 import type { Experience } from './_lib/profileSchema.js';
@@ -1609,6 +1610,17 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
     if (auth.kind === 'invalid') {
       return res.status(401).json({ error: auth.reason === 'expired' ? 'token_expired' : 'invalid_token' });
     }
+    // Over a limit, Amrita says so in the chat: sent as an error event, which
+    // every app shows in her reply, where a 429 would read as a lost connection.
+    const limit = await limitRequest(req, 'chat', auth.kind === 'user' ? auth.userId : undefined);
+    if (limit) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Retry-After', String(limit.retryAfter));
+      send(res, { type: 'error', message: limitMessage(limit) });
+      send(res, { type: 'done' });
+      return res.end();
+    }
     let account: { userId: string; stored: VersionedProfile } | null = null;
     if (auth.kind === 'user') {
       try {
@@ -2105,7 +2117,7 @@ async function callClaude(params: { system: string; prompt: string; schema: Reco
   return params.enricher ? params.enricher(withFlag) : withFlag;
 }
 
-app.post('/api/coaching', async (req, res) => {
+app.post('/api/coaching', rateLimited('coaching'), async (req, res) => {
   const { feeling, timeOfDay } = req.body;
   if (!feeling) return res.status(400).json({ error: "Feeling description is required." });
   if (!apiKey) return res.json(enrichRecommendation({ ...fallbacks.recommendation, _isFallback: true }));
@@ -2164,7 +2176,7 @@ async function handleInsight(req: Request, res: Response) {
   });
   return res.json(result);
 }
-app.get('/api/insight', handleInsight);
+app.get('/api/insight', rateLimited('insight'), handleInsight);
 
 // The practice catalog (poses and breathwork) for clients that do not carry
 // their own copy — the iOS and Android apps. The same data Amrita composes
@@ -2180,7 +2192,7 @@ app.get('/api/dosha-guide', (_req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.json({ doshas: DOSHA_GUIDE, note: DOSHA_GUIDE_NOTE });
 });
-app.post('/api/insight', handleInsight);
+app.post('/api/insight', rateLimited('insight'), handleInsight);
 
 // ====================== Calendar: private iCal link → busy ======================
 
@@ -2312,7 +2324,7 @@ function icsBusyIntervals(text: string, from: Date, to: Date): { start: string; 
   return merged.map(([s, e]) => ({ start: new Date(s).toISOString(), end: new Date(e).toISOString() }));
 }
 
-app.post('/api/calendar/ics', async (req, res) => {
+app.post('/api/calendar/ics', rateLimited('calendar'), async (req, res) => {
   const { url, timeMin, timeMax } = req.body ?? {};
   const from = new Date(timeMin);
   const to = new Date(timeMax);
@@ -2333,7 +2345,7 @@ app.post('/api/calendar/ics', async (req, res) => {
   }
 });
 
-app.post('/api/tts', async (req, res) => {
+app.post('/api/tts', rateLimited('voice'), async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'text is required' });
   const elevenKey = process.env.ELEVENLABS_API_KEY;
