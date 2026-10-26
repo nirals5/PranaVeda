@@ -46,6 +46,8 @@ final class ChatViewModel {
     }
 
     var profileName: String? { profile["name"]?.stringValue }
+    /// "beginner", "regular" or "experienced"; nil when not set (G2).
+    var experience: String? { profile["experience"]?.stringValue }
 
     /// The device's calendar day as "YYYY-MM-DD", in whatever timezone it is
     /// in right now.
@@ -146,6 +148,26 @@ final class ChatViewModel {
             // Offline or unavailable: the copy here stays; sync runs again
             // next launch.
         }
+    }
+
+    /// Changed in the You tab. Signed in, the account is the profile, so the
+    /// server sets it; signed out, the profile here goes with every message.
+    /// False when it could not be saved.
+    func changeExperience(_ value: String?) async -> Bool {
+        if let auth, auth.user != nil {
+            guard let token = await auth.validAccessToken() else { return false }
+            do {
+                setProfile(try await api.saveAccountExperience(value, accessToken: token).profile)
+                return true
+            } catch {
+                return false
+            }
+        }
+        var fields: [String: JSONValue] = [:]
+        if case .object(let current) = profile { fields = current }
+        fields["experience"] = value.map(JSONValue.string)
+        setProfile(.object(fields))
+        return true
     }
 
     /// After sign-out (by any route): the account's profile leaves this device,

@@ -192,7 +192,7 @@ class MainActivity : ComponentActivity() {
                                     chat.send(message)
                                 }
                                 2 -> LibraryScreen(catalog)
-                                else -> AccountScreen(auth, onBegin = { tab = 0 })
+                                else -> AccountScreen(auth, chat, onBegin = { tab = 0 })
                             }
                         }
                     }

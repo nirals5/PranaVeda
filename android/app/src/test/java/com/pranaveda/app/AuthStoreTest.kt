@@ -85,6 +85,19 @@ class AuthStoreTest {
     private fun bodyOf(request: RecordedRequest) = PvJson.parseToJsonElement(request.body!!.utf8()).jsonObject
     private fun path(request: RecordedRequest) = "${request.method} ${request.url.encodedPath}"
 
+    @Test fun setsAndClearsExperienceOnTheAccount() = runTest {
+        routes["POST /api/sync/profile/experience"] = { json(200, """{"profile":{"name":"Meera","experience":"experienced"},"version":4}""") }
+        val saved = AccountApi(api).saveAccountExperience("experienced", accessToken = "access-1")
+        assertEquals("experienced", saved.profile["experience"]?.jsonPrimitive?.content)
+        val set = requests.last { path(it) == "POST /api/sync/profile/experience" }
+        assertEquals("Bearer access-1", set.headers["Authorization"])
+        assertEquals("experienced", bodyOf(set)["experience"]?.jsonPrimitive?.content)
+
+        AccountApi(api).saveAccountExperience(null, accessToken = "access-1")
+        // Clearing sends an explicit null, which the server needs.
+        assertEquals("null", bodyOf(requests.last()).getValue("experience").toString())
+    }
+
     @Test fun signsInWithGoogleAndKeepsTheSession() = runTest {
         routes["POST /api/auth/google"] = { session("access-1", "refresh-1") }
         val storage = InMemorySessionStorage()

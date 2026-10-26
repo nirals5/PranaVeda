@@ -55,7 +55,7 @@ struct PranaVedaApp: App {
                 LibraryView(catalog: catalog)
                     .tabItem { Label("Library", systemImage: "figure.mind.and.body") }
                     .tag(AppTab.library)
-                AccountView(auth: auth, practice: practice, saved: saved, health: health) { tab = .amrita }
+                AccountView(auth: auth, practice: practice, saved: saved, health: health, chat: chat) { tab = .amrita }
                     .tabItem { Label("You", systemImage: "person.crop.circle") }
                     .tag(AppTab.you)
             }

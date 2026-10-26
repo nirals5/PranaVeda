@@ -48,6 +48,17 @@ class ChatDecodingTest {
         assertEquals(listOf("Warrior I", "Equal Breathing"), result.cautions.map { it.first })
     }
 
+    @Test fun catalogMarksExperiencedOnlyPoses() {
+        val catalog = com.pranaveda.app.model.PvJson.decodeFromString(
+            com.pranaveda.app.model.Catalog.serializer(),
+            """{"poses":[
+              {"id":"warrior_3","nameSanskrit":"Virabhadrasana III","nameEnglish":"Warrior III","level":"Intermediate","bodyFocus":"Balance","benefits":"x","minExperience":"experienced"},
+              {"id":"tadasana","nameSanskrit":"Tadasana","nameEnglish":"Mountain Pose","level":"Beginner","bodyFocus":"Posture","benefits":"x"}],
+             "breathwork":[]}""",
+        )
+        assertEquals(listOf(true, false), catalog.poses.map { it.experiencedOnly })
+    }
+
     @Test fun decodesARitualCardAsTheServerSendsIt() {
         val json = """
         {"type":"card","card":{"kind":"ritual","result":{

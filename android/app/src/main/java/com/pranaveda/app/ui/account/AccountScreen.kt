@@ -4,6 +4,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,6 +47,7 @@ import com.pranaveda.app.practice.SavedRitualsCard
 import com.pranaveda.app.ui.chat.RitualSheet
 import com.pranaveda.app.auth.AccountUser
 import com.pranaveda.app.auth.AuthStore
+import com.pranaveda.app.ui.chat.ChatViewModel
 import com.pranaveda.app.ui.chat.SectionLabel
 import com.pranaveda.app.ui.theme.Pv
 import com.pranaveda.app.ui.theme.cardSurface
@@ -50,7 +56,7 @@ import kotlinx.coroutines.launch
 /** Optional sign-in, and the account once signed in. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountScreen(auth: AuthStore, onBegin: () -> Unit = {}) {
+fun AccountScreen(auth: AuthStore, chat: ChatViewModel? = null, onBegin: () -> Unit = {}) {
     var notice by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
@@ -75,6 +81,7 @@ fun AccountScreen(auth: AuthStore, onBegin: () -> Unit = {}) {
                 SignedOut(auth, onStart = { notice = null })
             }
             (auth.problem ?: notice)?.let { Text(it, style = Pv.bodySmall, color = Pv.terracotta) }
+            chat?.let { ExperienceSetting(it) }
             val app = LocalContext.current.applicationContext as PranaVedaApplication
             var reopening by remember { mutableStateOf<RecommendationResult?>(null) }
             PracticeCalendarCard(app.practice, onOpenRitual = { reopening = it }, onBegin = onBegin)
@@ -166,5 +173,54 @@ private fun SignedIn(user: AccountUser, auth: AuthStore, onNotice: (String?) -> 
             dismissButton = { TextButton(onClick = { confirmingDelete = false }) { Text("Cancel") } },
             containerColor = Pv.warmWhite,
         )
+    }
+}
+
+private val EXPERIENCE_CHOICES = listOf(null to "Not set", "beginner" to "Beginner", "regular" to "Regular", "experienced" to "Experienced")
+
+/**
+ * How much yoga they have practised. Amrita records it from what they tell
+ * her; it can be changed here too. Only "Experienced" unlocks the few
+ * practices offered to experienced practitioners (G2).
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun ExperienceSetting(chat: ChatViewModel) {
+    val scope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
+    var problem by remember { mutableStateOf<String?>(null) }
+    Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionLabel("Your experience", heading = true)
+        // Pills that wrap, as on the website, so every label shows whole at large text sizes.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            EXPERIENCE_CHOICES.forEach { (value, label) ->
+                FilterChip(
+                    selected = chat.experience == value,
+                    onClick = {
+                        if (saving || chat.experience == value) return@FilterChip
+                        saving = true
+                        problem = null
+                        scope.launch {
+                            if (!chat.changeExperience(value)) problem = "That didn’t save. Check your connection and try again."
+                            saving = false
+                        }
+                    },
+                    enabled = !saving,
+                    label = { Text(label, style = Pv.bodySmall) },
+                    shape = RoundedCornerShape(50),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Pv.lavender,
+                        selectedLabelColor = Color.White,
+                        labelColor = Pv.stone700,
+                    ),
+                )
+            }
+        }
+        Text(
+            "A few demanding practices are offered only to experienced practitioners. Amrita also updates this when you tell her.",
+            style = Pv.bodySmall,
+            color = Pv.stone700,
+        )
+        problem?.let { Text(it, style = Pv.bodySmall, color = Pv.terracotta) }
     }
 }

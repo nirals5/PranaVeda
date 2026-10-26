@@ -10,6 +10,11 @@ import { z } from 'zod';
 
 export const MAX_PROFILE_BYTES = 48 * 1024;
 
+// How much yoga someone has practised; only "experienced" unlocks the practices
+// marked for experienced practitioners (G2).
+export const EXPERIENCE_LEVELS = ['beginner', 'regular', 'experienced'] as const;
+export type Experience = (typeof EXPERIENCE_LEVELS)[number];
+
 const text = (max: number) => z.string().max(max);
 const list = (items: number, length: number) => z.array(text(length)).max(items);
 const day = text(32);
@@ -19,7 +24,7 @@ export const wellnessProfileSchema = z.looseObject({
   prakriti: text(60).optional(),
   vikriti: text(60).optional(),
   prakritiConfidence: z.enum(['low', 'medium', 'high']).optional(),
-  experience: z.enum(['beginner', 'regular', 'experienced']).optional(),
+  experience: z.enum(EXPERIENCE_LEVELS).optional(),
   experienceOfferedOn: day.optional(), // when Amrita last offered a move up
   doshaProfile: z
     .looseObject({

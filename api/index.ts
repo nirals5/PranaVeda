@@ -9,6 +9,9 @@ import { applyProfileChanges, loadAccountProfile } from './_lib/profiles.js';
 import { moveUpFor, moveUpPrompt, recentPracticeDates } from './_lib/moveUp.js';
 import type { MoveUp } from './_lib/moveUp.js';
 import type { VersionedProfile } from './_lib/profiles.js';
+import { EXPERIENCE_LEVELS } from './_lib/profileSchema.js';
+import type { Experience } from './_lib/profileSchema.js';
+export { EXPERIENCE_LEVELS };
 import { getUser } from './_lib/users.js';
 import { DOSHA_GUIDE, DOSHA_GUIDE_NOTE } from './_lib/doshaGuide.js';
 import { catalogOf, conditionConflicts, getCatalog } from './_lib/catalog.js';
@@ -877,8 +880,6 @@ export function catalogPromptSummary(catalog: Catalog = BUILT_IN_CATALOG): strin
 // capabilities — promote those sections from AMRITA.md only when they ship.
 
 
-export const EXPERIENCE_LEVELS = ['beginner', 'regular', 'experienced'] as const;
-export type Experience = (typeof EXPERIENCE_LEVELS)[number];
 
 export interface WellnessProfile {
   name?: string;

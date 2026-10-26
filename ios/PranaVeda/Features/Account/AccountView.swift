@@ -8,6 +8,8 @@ struct AccountView: View {
     let practice: PracticeStore
     let saved: SavedRitualStore
     var health: HealthStore? = nil
+    /// Holds the wellness profile, where the experience setting lives.
+    var chat: ChatViewModel? = nil
     /// Over to the chat ("Begin with Amrita" on the calendar).
     var onBegin: () -> Void = {}
     @State private var confirmingDelete = false
@@ -21,6 +23,7 @@ struct AccountView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         if let user = auth.user { signedIn(user) } else { signedOut }
+                        if let chat { ExperienceSetting(chat: chat) }
                         PracticeCalendarView(practice: practice, onBegin: onBegin)
                         PracticeTrendsView(practice: practice, health: health)
                         SavedRitualsView(saved: saved)
@@ -126,5 +129,51 @@ private struct AppleSignInButton: UIViewRepresentable {
         var action: () -> Void
         init(action: @escaping () -> Void) { self.action = action }
         @objc func tapped() { action() }
+    }
+}
+
+/// How much yoga they have practised. Amrita records it from what they tell
+/// her; it can be changed here too. Only "Experienced" unlocks the few
+/// practices offered to experienced practitioners (G2).
+struct ExperienceSetting: View {
+    let chat: ChatViewModel
+    @State private var saving = false
+    @State private var problem: String?
+
+    private static let choices: [(value: String?, label: String)] = [
+        (nil, "Not set"), ("beginner", "Beginner"), ("regular", "Regular"), ("experienced", "Experienced"),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Your experience").sectionLabel().accessibilityAddTraits(.isHeader)
+            // A closure, not `set: choose`: passing the method itself crashes the
+            // Swift 6.3 compiler (Xcode 26) while it generates code.
+            Picker("Your experience", selection: Binding(get: { chat.experience ?? "" }, set: { choose($0) })) {
+                ForEach(Self.choices, id: \.label) { choice in
+                    Text(choice.label).tag(choice.value ?? "")
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(saving)
+            Text("A few demanding practices are offered only to experienced practitioners. Amrita also updates this when you tell her.")
+                .font(Theme.bodySmall)
+                .foregroundStyle(Theme.stone700)
+            if let problem {
+                Text(problem).font(Theme.bodySmall).foregroundStyle(Theme.terracotta)
+            }
+        }
+        .cardSurface()
+    }
+
+    private func choose(_ tag: String) {
+        let value = tag.isEmpty ? nil : tag
+        guard value != chat.experience, !saving else { return }
+        saving = true
+        problem = nil
+        Task {
+            if await !chat.changeExperience(value) { problem = "That didn’t save. Check your connection and try again." }
+            saving = false
+        }
     }
 }

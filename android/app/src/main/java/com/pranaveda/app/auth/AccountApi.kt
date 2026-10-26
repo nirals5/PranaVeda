@@ -1,5 +1,7 @@
 package com.pranaveda.app.auth
 
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
 import com.pranaveda.app.model.SavedRitual
@@ -120,6 +122,15 @@ class AccountApi(private val api: ApiClient = ApiClient()) {
 
     suspend fun fetchAccountProfile(accessToken: String): VersionedProfile {
         val reply = send("GET", "api/sync/profile", bearer = accessToken)
+        if (reply.status != 200) throw AccountException.Unavailable(reply.status)
+        return PvJson.decodeFromString(VersionedProfile.serializer(), reply.body)
+    }
+
+    /** Sets the account's experience (null clears it); the rest of the profile is left as it is. Returns what is stored now. */
+    suspend fun saveAccountExperience(experience: String?, accessToken: String): VersionedProfile {
+        // Sent as an explicit null to clear it (PvJson leaves nulls out).
+        val body = JsonObject(mapOf("experience" to (experience?.let(::JsonPrimitive) ?: JsonNull))).toString()
+        val reply = send("POST", "api/sync/profile/experience", bearer = accessToken, body = body)
         if (reply.status != 200) throw AccountException.Unavailable(reply.status)
         return PvJson.decodeFromString(VersionedProfile.serializer(), reply.body)
     }

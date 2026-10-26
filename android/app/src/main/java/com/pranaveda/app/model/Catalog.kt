@@ -25,8 +25,11 @@ data class CatalogPose(
     val defaultDurationMin: Double? = null,
     val poseImageUrl: String? = null,
     val sceneImageUrl: String? = null,
+    /** "experienced" for the few practices Amrita offers only to experienced practitioners. */
+    val minExperience: String? = null,
 ) {
     val imageUrl: String? get() = AppConfig.resolve(sceneImageUrl ?: poseImageUrl)
+    val experiencedOnly: Boolean get() = minExperience == "experienced"
 }
 
 @Serializable

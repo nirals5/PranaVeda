@@ -22,6 +22,7 @@ import com.pranaveda.app.net.HttpStatusException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -79,6 +80,24 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     val profileName: String?
         get() = runCatching { profile["name"]?.jsonPrimitive?.contentOrNull }.getOrNull()?.takeIf { it.isNotBlank() }
+
+    /** "beginner", "regular" or "experienced"; null when not set (G2). */
+    val experience: String?
+        get() = runCatching { profile["experience"]?.jsonPrimitive?.contentOrNull }.getOrNull()
+
+    /**
+     * Changed in the You tab. Signed in, the account is the profile, so the
+     * server sets it; signed out, the profile here goes with every message.
+     * False when it could not be saved.
+     */
+    suspend fun changeExperience(value: String?): Boolean {
+        if (auth.user != null) {
+            val token = auth.validAccessToken() ?: return false
+            return runCatching { storeProfile(accounts.saveAccountExperience(value, token).profile) }.isSuccess
+        }
+        storeProfile(JsonObject(profile.toMutableMap().apply { if (value == null) remove("experience") else put("experience", JsonPrimitive(value)) }))
+        return true
+    }
 
     /**
      * Who to greet: the name they gave Amrita, else (signed in) their account
