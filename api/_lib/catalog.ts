@@ -16,12 +16,22 @@ export interface CatalogCondition {
   userWords: string[];
 }
 
+// A principle from the Practice Library's Principles tab (PR1…), which Amrita
+// may cite on a card (G12). Only the database has them: with the built-in
+// catalog there is nothing to cite, so no citation is shown.
+export interface CatalogPrinciple {
+  id: string;
+  statement: string;
+}
+
 export interface Catalog {
   poses: CatalogPose[];
   breathwork: CatalogBreathwork[];
   conditions: CatalogCondition[];
+  principles: CatalogPrinciple[];
   poseById: Map<string, CatalogPose>;
   breathworkById: Map<string, CatalogBreathwork>;
+  principleById: Map<string, CatalogPrinciple>;
   source: 'database' | 'built-in';
 }
 
@@ -51,14 +61,17 @@ export function catalogOf(
   poses: CatalogPose[],
   breathwork: CatalogBreathwork[],
   conditions: CatalogCondition[],
-  source: Catalog['source']
+  source: Catalog['source'],
+  principles: CatalogPrinciple[] = []
 ): Catalog {
   return {
     poses,
     breathwork,
     conditions,
+    principles,
     poseById: new Map(poses.map((p) => [p.id, p])),
     breathworkById: new Map(breathwork.map((b) => [b.id, b])),
+    principleById: new Map(principles.map((p) => [p.id, p])),
     source,
   };
 }
@@ -115,7 +128,8 @@ export function catalogFromRows(
   rows: PracticeRow[],
   conditions: ConditionRow[],
   builtIn: BuiltIn,
-  conditionList: CatalogCondition[] = builtIn.conditions
+  conditionList: CatalogCondition[] = builtIn.conditions,
+  principles: CatalogPrinciple[] = []
 ): Catalog {
   const avoid = new Map<string, string[]>();
   const caution = new Map<string, string[]>();
@@ -189,12 +203,12 @@ export function catalogFromRows(
       bestTime: describeTimes(r.bestTimes, r.timingNote),
     }));
 
-  return catalogOf(poses, breathwork, conditionList, 'database');
+  return catalogOf(poses, breathwork, conditionList, 'database', principles);
 }
 
 async function readCatalog(builtIn: BuiltIn): Promise<Catalog> {
   const db = getDb();
-  const [rows, conditions, conditionList] = await Promise.all([
+  const [rows, conditions, conditionList, principleRows] = await Promise.all([
     db.select().from(schema.practices).where(isNull(schema.practices.retiredAt)),
     db
       .select({
@@ -208,8 +222,11 @@ async function readCatalog(builtIn: BuiltIn): Promise<Catalog> {
       .select({ code: schema.conditions.code, label: schema.conditions.label, userWords: schema.conditions.userWords })
       .from(schema.conditions)
       .orderBy(asc(schema.conditions.code)),
+    db.select({ id: schema.practicePrinciples.id, statement: schema.practicePrinciples.statement }).from(schema.practicePrinciples),
   ]);
-  const catalog = catalogFromRows(rows, conditions, builtIn, conditionList);
+  // PR1, PR2 … PR10, in number order.
+  const principles = principleRows.sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }));
+  const catalog = catalogFromRows(rows, conditions, builtIn, conditionList, principles);
   // An empty result means the tables are not loaded yet, not that the app has no practices.
   if (!catalog.poses.length || !catalog.breathwork.length) throw new Error('the practices tables are empty');
   return catalog;

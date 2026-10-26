@@ -883,7 +883,10 @@ export function catalogPromptSummary(catalog: Catalog = BUILT_IN_CATALOG): strin
     (b) =>
       `- ${b.id} (${b.name} / ${b.sanskritName}) — ${b.doshaSuitability}. ${b.inhale}-${b.holdActive}-${b.exhale}-${b.holdEmpty} × ${b.cycles}. Best: ${b.bestTime}.${safetyLine(b)}`
   ).join('\n');
-  return `## Pose catalog (recommend ONLY these, by id)\n${poses}\n\n## Breathwork catalog (recommend ONLY these, by id)\n${breaths}`;
+  const principles = catalog.principles.length
+    ? `\n\n## Principles (cite at most one per card, by id, as principleId)\n${catalog.principles.map((p) => `- ${p.id}: ${p.statement}`).join('\n')}`
+    : '';
+  return `## Pose catalog (recommend ONLY these, by id)\n${poses}\n\n## Breathwork catalog (recommend ONLY these, by id)\n${breaths}${principles}`;
 }
 
 // ============================ Amrita system prompt ============================
@@ -1113,6 +1116,7 @@ Your purpose is not to generate wellness plans. Your purpose is to build a long-
 
 - Use create_ritual ONLY when a full guided practice genuinely serves them better than conversation — typically when they've asked for a practice, or you've understood their state and they're ready to move. Compose 3-5 poses from the catalog by id, honoring counter-poses and their available time.
 - Use suggest_breathwork when a single breathing exercise is the minimum effective intervention.
+- On either card, when one principle from the Principles list genuinely explains why it suits them now, pass its id as principleId; the card shows it. Never cite a principle that is not on that list, and leave it out when none fits.
 - Use update_wellness_profile whenever you learn something durable: goals, injuries or conditions (use the condition tags when applicable), preferences, constitution insights, or a meaningful observation. Update silently — never announce "I've updated your profile"; just weave remembering into how you speak. Do not store trivia, only what improves future guidance.
 - After a tool returns, continue naturally in one or two sentences (e.g. why this sequence, what to notice) — do not restate the card's contents.
 
@@ -1171,6 +1175,9 @@ ${catalogPromptSummary(catalog)}`;
 const MODEL = 'claude-sonnet-5';
 const MAX_LOOPS = 5;
 
+const PRINCIPLE_ID_DESCRIPTION =
+  'Optional: the id (e.g. PR4) of the one principle from the Principles list that best explains why this suits them now. Only ids from that list.';
+
 const tools: Anthropic.Tool[] = [
   {
     name: 'create_ritual',
@@ -1214,6 +1221,7 @@ const tools: Anthropic.Tool[] = [
           additionalProperties: false,
         },
         lifestyleTips: { type: 'array', items: { type: 'string' }, description: 'One or two general daily tips' },
+        principleId: { type: 'string', description: PRINCIPLE_ID_DESCRIPTION },
         repeatRequested: { type: 'boolean', description: 'true only when they asked by name for a practice they did in the last few days' },
       },
       required: ['title', 'description', 'summary', 'doshaTendency', 'primaryEnergy', 'poses', 'breathworkId', 'ayurvedic', 'lifestyleTips'],
@@ -1230,6 +1238,7 @@ const tools: Anthropic.Tool[] = [
         breathworkId: { type: 'string', description: 'Catalog breathwork id' },
         cycles: { type: 'integer', description: 'Override cycle count if needed' },
         note: { type: 'string', description: 'One personal line about why this breath, for this moment' },
+        principleId: { type: 'string', description: PRINCIPLE_ID_DESCRIPTION },
         repeatRequested: { type: 'boolean', description: 'true only when they asked by name for a practice they did in the last few days' },
       },
       required: ['breathworkId'],
@@ -1541,6 +1550,25 @@ const mealReason = (profile: WellnessProfile, now: Date) =>
   `not within two hours of a meal; they ate about ${minutesSinceMeal(profile, now)} minutes ago`;
 const MEAL_HINT = ' After a meal, choose gentle practices that help digestion (Wind-Relieving Pose, gentle seated or supine twists, calm breathing).';
 
+// G12: a card may cite one principle, but only one that exists in the
+// Practice Library's Principles tab; any other id is dropped, and the card
+// keeps its plain why (the ritual's summary, the breath's note).
+export function citedPrinciple(input: any, catalog: Catalog): { id: string; statement: string } | undefined {
+  const id = typeof input?.principleId === 'string' ? input.principleId.trim().toUpperCase() : '';
+  if (!id) return undefined;
+  const principle = catalog.principleById.get(id);
+  if (!principle) console.warn(`[G12] dropped a citation of unknown principle "${input.principleId}"`);
+  return principle ? { id: principle.id, statement: principle.statement } : undefined;
+}
+
+// What Amrita is told when a citation she made was dropped, so she does not
+// mention it.
+export function droppedCitationNote(input: any, cited: { id: string } | undefined): string {
+  return typeof input?.principleId === 'string' && input.principleId.trim() && !cited
+    ? ` The principle "${input.principleId}" is not on the Principles list, so the card shows no citation; do not mention it.`
+    : '';
+}
+
 // G6: a main practice they completed in the last three days is not offered
 // again unless they asked for it by name; anchors may repeat. `recent` comes
 // from a signed-in user's practice log (practice id → latest local date), and
@@ -1614,6 +1642,7 @@ export function buildRitual(
   const repeated = rotationError([...(input.poses ?? []).map((p: any) => p.poseId), breath.id], recent, input);
   if (repeated) return { error: repeated };
   const breathCaution = cautionFor(breath, profile, catalog);
+  const principle = citedPrinciple(input, catalog);
   const durationMinutes = (input.poses ?? []).reduce((s: number, p: any) => s + Math.max(1, Math.round(p.durationMinutes)), 0);
   return {
     card: {
@@ -1637,6 +1666,7 @@ export function buildRitual(
           ...(breathCaution ? { caution: breathCaution } : {}),
         },
         lifestyleTips: input.lifestyleTips ?? [],
+        ...(principle ? { principle } : {}),
       },
     },
   };
@@ -1664,10 +1694,12 @@ export function buildBreathworkCard(
   const repeated = rotationError([breath.id], recent, input);
   if (repeated) return { error: repeated };
   const caution = cautionFor(breath, profile, catalog);
+  const principle = citedPrinciple(input, catalog);
   return {
     card: {
       kind: 'breathwork',
       note: input.note,
+      ...(principle ? { principle } : {}),
       pattern: {
         name: breath.name,
         sanskritName: breath.sanskritName,
@@ -1969,7 +2001,10 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
               send(res, { type: 'card', card });
               const entry = { date: today, title: (block.input as any).title, kind: 'ritual' as const };
               changeProfile((p) => ({ ...p, practiceHistory: [...(p.practiceHistory ?? []), entry].slice(-30) }));
-              resultText = 'Ritual card shown to the user. Continue with one or two warm sentences; do not restate its contents.' + cautionsShown(card);
+              resultText =
+                'Ritual card shown to the user. Continue with one or two warm sentences; do not restate its contents.' +
+                cautionsShown(card) +
+                droppedCitationNote(block.input, (card as any).result.principle);
             }
           } else if (block.name === 'suggest_breathwork') {
             const { error, card } = buildBreathworkCard(block.input, profile, catalog, new Date(), recent);
@@ -1980,7 +2015,10 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
               send(res, { type: 'card', card });
               const entry = { date: today, title: (card as any).pattern.name, kind: 'breathwork' as const };
               changeProfile((p) => ({ ...p, practiceHistory: [...(p.practiceHistory ?? []), entry].slice(-30) }));
-              resultText = 'Breathwork card shown to the user. Continue with one warm sentence; do not restate its contents.' + cautionsShown(card);
+              resultText =
+                'Breathwork card shown to the user. Continue with one warm sentence; do not restate its contents.' +
+                cautionsShown(card) +
+                droppedCitationNote(block.input, (card as any).principle);
             }
           } else {
             resultText = `Unknown tool ${block.name}`;

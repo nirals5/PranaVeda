@@ -63,6 +63,12 @@ struct AyurvedicAdvice: Codable, Hashable, Sendable {
     let recommendedHerbs: [String]?
 }
 
+/// A principle from the Practice Library a card's practice rests on (G12).
+struct Principle: Codable, Hashable, Sendable {
+    let id: String
+    let statement: String
+}
+
 struct RecommendationResult: Codable, Hashable, Sendable {
     let summary: String?
     let doshaTendency: String?
@@ -71,6 +77,8 @@ struct RecommendationResult: Codable, Hashable, Sendable {
     let ayurvedicAdvice: AyurvedicAdvice?
     let breathwork: BreathworkPattern?
     let lifestyleTips: [String]?
+    /// The principle Amrita cited (G12); the server keeps only real ones.
+    var principle: Principle? = nil
 }
 
 struct AnswerOption: Codable, Hashable, Sendable {
@@ -97,13 +105,13 @@ struct DoshaProfileCard: Codable, Hashable, Sendable {
 
 enum ChatCard: Decodable, Hashable, Sendable {
     case ritual(RecommendationResult)
-    case breathwork(note: String?, pattern: BreathworkPattern)
+    case breathwork(note: String?, pattern: BreathworkPattern, principle: Principle? = nil)
     case doshaProfile(DoshaProfileCard)
     case options([AnswerOption])
     /// A card kind this version of the app does not know. Shown as nothing.
     case unsupported(String)
 
-    private enum Keys: String, CodingKey { case kind, result, note, pattern, options }
+    private enum Keys: String, CodingKey { case kind, result, note, pattern, principle, options }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
@@ -111,7 +119,11 @@ enum ChatCard: Decodable, Hashable, Sendable {
         switch kind {
         case "ritual": self = .ritual(try c.decode(RecommendationResult.self, forKey: .result))
         case "breathwork":
-            self = .breathwork(note: try c.decodeIfPresent(String.self, forKey: .note), pattern: try c.decode(BreathworkPattern.self, forKey: .pattern))
+            self = .breathwork(
+                note: try c.decodeIfPresent(String.self, forKey: .note),
+                pattern: try c.decode(BreathworkPattern.self, forKey: .pattern),
+                principle: try? c.decodeIfPresent(Principle.self, forKey: .principle)
+            )
         case "dosha_profile": self = .doshaProfile(try DoshaProfileCard(from: decoder))
         case "options": self = .options(try c.decode([AnswerOption].self, forKey: .options))
         default: self = .unsupported(kind)
@@ -122,7 +134,7 @@ enum ChatCard: Decodable, Hashable, Sendable {
     var modelMarker: String {
         switch self {
         case .ritual(let r): r.yogaPractice.title
-        case .breathwork(_, let p): p.name
+        case .breathwork(_, let p, _): p.name
         case .doshaProfile(let d): "Prakriti profile (\(d.primary))"
         case .options(let o): "answer options: " + o.map(\.label).joined(separator: " / ")
         case .unsupported(let kind): kind

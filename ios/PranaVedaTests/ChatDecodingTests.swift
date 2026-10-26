@@ -62,7 +62,7 @@ struct ChatDecodingTests {
         else { Issue.record("options"); return }
         #expect(options.map(\.label) == ["Calm", "Energise"])
 
-        guard case .card(.breathwork(let note, let pattern))? = APIClient.decodeEvent(#"{"type":"card","card":{"kind":"breathwork","note":"Before bed","pattern":{"name":"Ocean Breath","inhale":4,"holdActive":0,"exhale":6,"holdEmpty":0,"cycles":8}}}"#)
+        guard case .card(.breathwork(let note, let pattern, _))? = APIClient.decodeEvent(#"{"type":"card","card":{"kind":"breathwork","note":"Before bed","pattern":{"name":"Ocean Breath","inhale":4,"holdActive":0,"exhale":6,"holdEmpty":0,"cycles":8}}}"#)
         else { Issue.record("breathwork"); return }
         #expect(note == "Before bed")
         #expect(pattern.rhythm == "In 4 · out 6")
@@ -71,6 +71,21 @@ struct ChatDecodingTests {
         else { Issue.record("dosha"); return }
         #expect(dosha.primary == "Vata")
         #expect(dosha.balance.kapha == 20)
+    }
+
+    @Test func decodesTheCitedPrinciple() {
+        guard case .card(.breathwork(_, _, let principle))? = APIClient.decodeEvent(#"{"type":"card","card":{"kind":"breathwork","principle":{"id":"PR12","statement":"Cooling breaths reduce heat."},"pattern":{"name":"Cooling Breath","inhale":4,"holdActive":0,"exhale":6,"holdEmpty":0,"cycles":8}}}"#)
+        else { Issue.record("breathwork"); return }
+        #expect(principle == Principle(id: "PR12", statement: "Cooling breaths reduce heat."))
+
+        guard case .card(.ritual(let result))? = APIClient.decodeEvent(#"{"type":"card","card":{"kind":"ritual","result":{"principle":{"id":"PR4","statement":"Like increases like."},"yogaPractice":{"title":"Settle","poses":[]}}}}"#)
+        else { Issue.record("ritual"); return }
+        #expect(result.principle?.id == "PR4")
+
+        // Older servers send none, and a malformed one is ignored.
+        guard case .card(.breathwork(_, _, let none))? = APIClient.decodeEvent(#"{"type":"card","card":{"kind":"breathwork","principle":"PR4","pattern":{"name":"Ocean Breath","inhale":4,"holdActive":0,"exhale":6,"holdEmpty":0,"cycles":8}}}"#)
+        else { Issue.record("malformed"); return }
+        #expect(none == nil)
     }
 
     @Test func showsNothingForACardKindItDoesNotKnow() {

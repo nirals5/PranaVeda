@@ -4,6 +4,7 @@ import com.pranaveda.app.config.AppConfig
 import com.pranaveda.app.model.BreathworkPattern
 import com.pranaveda.app.model.ChatCard
 import com.pranaveda.app.model.ChatItem
+import com.pranaveda.app.model.Principle
 import com.pranaveda.app.model.cautions
 import com.pranaveda.app.net.ApiClient
 import com.pranaveda.app.net.ChatEvent
@@ -46,6 +47,24 @@ class ChatDecodingTest {
         assertEquals("High blood pressure: keep arms down.", result.yogaPractice.poses[0].caution)
         assertNull(result.yogaPractice.poses[1].caution)
         assertEquals(listOf("Warrior I", "Equal Breathing"), result.cautions.map { it.first })
+    }
+
+    @Test fun decodesTheCitedPrinciple() {
+        val ritual = ApiClient.decodeEvent(
+            """{"type":"card","card":{"kind":"ritual","result":{"principle":{"id":"PR4","statement":"Like increases like."},"yogaPractice":{"title":"Settle","poses":[]}}}}""",
+        ) as ChatEvent.Card
+        assertEquals(Principle("PR4", "Like increases like."), (ritual.card as ChatCard.Ritual).result.principle)
+
+        val breath = ApiClient.decodeEvent(
+            """{"type":"card","card":{"kind":"breathwork","principle":{"id":"PR12","statement":"Cooling breaths reduce heat."},"pattern":{"name":"Cooling Breath","inhale":4,"exhale":6,"cycles":8}}}""",
+        ) as ChatEvent.Card
+        assertEquals("PR12", (breath.card as ChatCard.Breathwork).principle?.id)
+
+        // Older servers send none, and a malformed one is ignored rather than losing the card.
+        val malformed = ApiClient.decodeEvent(
+            """{"type":"card","card":{"kind":"breathwork","principle":"PR4","pattern":{"name":"Ocean Breath","inhale":4,"exhale":6,"cycles":8}}}""",
+        ) as ChatEvent.Card
+        assertNull((malformed.card as ChatCard.Breathwork).principle)
     }
 
     @Test fun catalogMarksExperiencedOnlyPoses() {

@@ -81,6 +81,10 @@ data class AyurvedicAdvice(
     val recommendedHerbs: List<String>? = null,
 )
 
+/** A principle from the Practice Library a card's practice rests on (G12). */
+@Serializable
+data class Principle(val id: String, val statement: String)
+
 @Serializable
 data class RecommendationResult(
     val summary: String? = null,
@@ -90,6 +94,8 @@ data class RecommendationResult(
     val ayurvedicAdvice: AyurvedicAdvice? = null,
     val breathwork: BreathworkPattern? = null,
     val lifestyleTips: List<String>? = null,
+    /** The principle Amrita cited (G12); the server keeps only real ones. */
+    val principle: Principle? = null,
 )
 
 @Serializable
@@ -115,7 +121,7 @@ data class DoshaProfileCard(
 
 sealed interface ChatCard {
     data class Ritual(val result: RecommendationResult) : ChatCard
-    data class Breathwork(val note: String?, val pattern: BreathworkPattern) : ChatCard
+    data class Breathwork(val note: String?, val pattern: BreathworkPattern, val principle: Principle? = null) : ChatCard
     data class DoshaProfile(val profile: DoshaProfileCard) : ChatCard
     data class Options(val options: List<AnswerOption>) : ChatCard
 
@@ -141,6 +147,7 @@ sealed interface ChatCard {
                 "breathwork" -> Breathwork(
                     note = card["note"]?.let { PvJson.decodeFromJsonElement<String?>(it) },
                     pattern = PvJson.decodeFromJsonElement(card.getValue("pattern")),
+                    principle = card["principle"]?.let { runCatching { PvJson.decodeFromJsonElement<Principle>(it) }.getOrNull() },
                 )
                 "dosha_profile" -> DoshaProfile(PvJson.decodeFromJsonElement(card))
                 "options" -> Options(PvJson.decodeFromJsonElement(card.getValue("options")))

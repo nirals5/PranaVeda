@@ -7,7 +7,7 @@ struct CardView: View {
     var body: some View {
         switch card {
         case .ritual(let result): RitualCardView(result: result)
-        case .breathwork(let note, let pattern): BreathworkCardView(note: note, pattern: pattern)
+        case .breathwork(let note, let pattern, let principle): BreathworkCardView(note: note, pattern: pattern, principle: principle)
         case .doshaProfile(let profile): DoshaCardView(profile: profile)
         case .options(let options): OptionsView(options: options, onPick: onOption)
         case .unsupported: EmptyView()
@@ -45,6 +45,7 @@ struct RitualCardView: View {
                     .font(Theme.bodySmall)
                     .foregroundStyle(Theme.stone700)
             }
+            PrincipleNote(principle: result.principle)
             ForEach(result.cautions, id: \.name) { item in
                 CautionNote(text: item.caution, label: item.name)
             }
@@ -83,6 +84,25 @@ struct CautionNote: View {
             .foregroundStyle(Theme.terracotta)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityLabel("Caution. \(label.map { "\($0): " } ?? "")\(text)")
+        }
+    }
+}
+
+/// G12: the principle a card's practice rests on, from the Practice Library.
+/// The server adds it only when Amrita cited one that exists.
+struct PrincipleNote: View {
+    let principle: Principle?
+
+    var body: some View {
+        if let principle {
+            Label {
+                Text("**Rooted in:** \(principle.statement)")
+            } icon: {
+                Image(systemName: "leaf").foregroundStyle(Theme.lavender)
+            }
+            .font(Theme.bodySmall)
+            .foregroundStyle(Theme.stone700)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -202,6 +222,8 @@ struct RitualDetailView: View {
 struct BreathworkCardView: View {
     let note: String?
     let pattern: BreathworkPattern
+    /// The principle Amrita cited for it (G12), on a breathwork card.
+    var principle: Principle? = nil
     /// The ritual it belongs to, if any, saved with the practice log.
     var result: RecommendationResult? = nil
     @State private var pacing = false
@@ -217,6 +239,7 @@ struct BreathworkCardView: View {
             if let note {
                 Text(note).font(Theme.bodySmall).foregroundStyle(Theme.stone700)
             }
+            PrincipleNote(principle: principle)
             CautionNote(text: pattern.caution)
             Button { pacing = true } label: {
                 Label("Begin breathwork", systemImage: "wind")

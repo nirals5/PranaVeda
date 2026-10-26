@@ -34,6 +34,12 @@ export interface BreathworkPattern {
   caution?: string; // how to adapt it for one of the user's conditions (G13)
 }
 
+// A principle from the Practice Library a card's practice rests on (G12).
+export interface Principle {
+  id: string;
+  statement: string;
+}
+
 export interface RecommendationResult {
   summary: string;
   doshaTendency: string;
@@ -47,6 +53,7 @@ export interface RecommendationResult {
   ayurvedicAdvice: AyurvedicAdvice;
   breathwork: BreathworkPattern;
   lifestyleTips: string[];
+  principle?: Principle;
   savedAt?: string;
   _isFallback?: boolean;
 }
@@ -135,7 +142,7 @@ export interface DoshaProfileResult {
 
 export type ChatCard =
   | { kind: 'ritual'; result: RecommendationResult }
-  | { kind: 'breathwork'; note?: string; pattern: BreathworkPattern }
+  | { kind: 'breathwork'; note?: string; principle?: Principle; pattern: BreathworkPattern }
   | ({ kind: 'dosha_profile' } & DoshaProfileResult)
   | { kind: 'options'; options: AnswerOption[] };
 

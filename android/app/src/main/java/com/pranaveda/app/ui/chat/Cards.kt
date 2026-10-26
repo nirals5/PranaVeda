@@ -1,7 +1,5 @@
 package com.pranaveda.app.ui.chat
 
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.heading
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,14 +35,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import com.pranaveda.app.model.AnswerOption
 import com.pranaveda.app.model.BreathworkPattern
 import com.pranaveda.app.model.ChatCard
 import com.pranaveda.app.model.DoshaProfileCard
+import com.pranaveda.app.model.Principle
 import com.pranaveda.app.model.RecommendationResult
 import com.pranaveda.app.model.YogaPose
 import com.pranaveda.app.model.cautions
@@ -59,7 +64,7 @@ import kotlin.math.roundToInt
 fun CardView(card: ChatCard, onOption: (String) -> Unit) {
     when (card) {
         is ChatCard.Ritual -> RitualCard(card.result)
-        is ChatCard.Breathwork -> BreathworkCard(card.note, card.pattern)
+        is ChatCard.Breathwork -> BreathworkCard(card.note, card.pattern, principle = card.principle)
         is ChatCard.DoshaProfile -> DoshaCard(card.profile)
         is ChatCard.Options -> OptionsList(card.options, onOption)
         is ChatCard.Unsupported -> Unit
@@ -92,6 +97,23 @@ fun CautionNote(text: String?, modifier: Modifier = Modifier, label: String? = n
     }
 }
 
+/** G12: the principle a card's practice rests on, from the Practice Library. The server adds it only when Amrita cited one that exists. */
+@Composable
+fun PrincipleNote(principle: Principle?, modifier: Modifier = Modifier) {
+    if (principle == null) return
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("🌿", style = Pv.bodySmall, modifier = Modifier.clearAndSetSemantics {})
+        Text(
+            buildAnnotatedString {
+                withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append("Rooted in: ") }
+                append(principle.statement)
+            },
+            style = Pv.bodySmall,
+            color = Pv.stone700,
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RitualCard(result: RecommendationResult) {
@@ -110,6 +132,7 @@ private fun RitualCard(result: RecommendationResult) {
         result.breathwork?.let {
             Text("🌬  ${it.name} · ${it.rhythm}", style = Pv.bodySmall, color = Pv.stone700)
         }
+        PrincipleNote(result.principle)
         result.cautions.forEach { (name, caution) -> CautionNote(caution, label = name) }
         Button(
             onClick = { showingDetail = true },
@@ -205,7 +228,7 @@ private fun RitualDetail(result: RecommendationResult, onBegin: () -> Unit) {
 }
 
 @Composable
-private fun BreathworkCard(note: String?, pattern: BreathworkPattern, result: RecommendationResult? = null) {
+private fun BreathworkCard(note: String?, pattern: BreathworkPattern, result: RecommendationResult? = null, principle: Principle? = null) {
     var pacing by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionLabel("Breathwork")
@@ -213,6 +236,7 @@ private fun BreathworkCard(note: String?, pattern: BreathworkPattern, result: Re
         pattern.sanskritName?.let { Text(it, style = italicSmall, color = Pv.lavenderDeep) }
         Text("${pattern.rhythm} · ${pattern.cycles} cycles", style = Pv.bodySmall, color = Pv.stone700)
         note?.let { Text(it, style = Pv.bodySmall, color = Pv.stone700) }
+        PrincipleNote(principle)
         CautionNote(pattern.caution)
         Button(
             onClick = { pacing = true },
