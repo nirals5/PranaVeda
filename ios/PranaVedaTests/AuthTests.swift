@@ -129,6 +129,48 @@ struct AuthTests {
         for _ in 0..<200 where chat.isStreaming { try? await Task.sleep(for: .milliseconds(10)) }
     }
 
+    // MARK: Experience (G2)
+
+    @Test func signedOutExperienceIsKeptOnTheDevice() async {
+        StubURLProtocol.reset { _ in (404, "{}") }
+        let chat = ChatViewModel(api: stubAPI(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        #expect(chat.experience == nil)
+        #expect(await chat.changeExperience("regular"))
+        #expect(chat.experience == "regular")
+        #expect(await chat.changeExperience(nil))
+        #expect(chat.experience == nil)
+        #expect(StubURLProtocol.requests(to: "/api/sync/profile/experience").isEmpty)
+    }
+
+    @Test func signedInExperienceIsSetOnTheAccount() async {
+        let (chat, auth) = signedInChat(defaults: UserDefaults(suiteName: UUID().uuidString)!) { request in
+            switch request.path {
+            case "/api/auth/refresh": return (200, session("access-1", "refresh-2"))
+            case "/api/sync/profile/experience":
+                return (200, #"{"profile":{"name":"Meera","experience":"experienced"},"version":4}"#)
+            default: return (404, "{}")
+            }
+        }
+        #expect(await chat.changeExperience("experienced"))
+        #expect(chat.experience == "experienced")
+        #expect(chat.profileName == "Meera")
+        let sent = StubURLProtocol.requests(to: "/api/sync/profile/experience").first
+        #expect(sent?.body?["experience"] as? String == "experienced")
+        #expect(sent?.authorization == "Bearer access-1")
+        _ = auth
+    }
+
+    @Test func catalogMarksExperiencedOnlyPoses() throws {
+        let json = #"""
+        {"poses":[
+          {"id":"warrior_3","nameSanskrit":"Virabhadrasana III","nameEnglish":"Warrior III","level":"Intermediate","bodyFocus":"Balance","cues":[],"benefits":"x","contraindications":[],"minExperience":"experienced"},
+          {"id":"tadasana","nameSanskrit":"Tadasana","nameEnglish":"Mountain Pose","level":"Beginner","bodyFocus":"Posture","cues":[],"benefits":"x","contraindications":[]}],
+         "breathwork":[]}
+        """#
+        let catalog = try JSONDecoder().decode(Catalog.self, from: Data(json.utf8))
+        #expect(catalog.poses.map(\.experiencedOnly) == [true, false])
+    }
+
     @Test func chatIsSentAsTheSignedInPersonAndRetriedOnceAfterAnExpiredSignIn() async throws {
         let defaults = UserDefaults(suiteName: UUID().uuidString)!
         var refreshes = 0

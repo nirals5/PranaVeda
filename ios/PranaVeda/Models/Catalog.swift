@@ -20,8 +20,11 @@ struct CatalogPose: Decodable, Hashable, Sendable, Identifiable {
     let defaultDurationMin: Double?
     let poseImageUrl: String?
     let sceneImageUrl: String?
+    /// "experienced" for the few practices Amrita offers only to experienced practitioners.
+    let minExperience: String?
 
     var imageURL: URL? { AppConfig.resolve(sceneImageUrl ?? poseImageUrl) }
+    var experiencedOnly: Bool { minExperience == "experienced" }
 }
 
 struct CatalogBreathwork: Decodable, Hashable, Sendable, Identifiable {

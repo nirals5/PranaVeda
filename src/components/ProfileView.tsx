@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Activity, ArrowLeft, ArrowRight, CalendarDays, Link2, MapPin, User, Watch } from 'lucide-react';
-import { PracticeLogEntry, RecommendationResult, WellnessProfile } from '../types';
+import { Experience, PracticeLogEntry, RecommendationResult, WellnessProfile } from '../types';
 import PracticeCalendar from './PracticeCalendar';
 import CalendarConnections from './CalendarConnections';
 import WearableConnections from './WearableConnections';
@@ -27,7 +27,16 @@ interface ProfileViewProps {
   place: Place;
   onOpenRitual: (result: RecommendationResult) => void;
   onStartPractice: () => void;
+  // Resolves false when it could not be saved (signed in and offline, say).
+  onExperienceChange: (experience: Experience | null) => Promise<boolean>;
 }
+
+const EXPERIENCE_CHOICES: { value: Experience | null; label: string }[] = [
+  { value: null, label: 'Not set' },
+  { value: 'beginner', label: 'Beginner' },
+  { value: 'regular', label: 'Regular' },
+  { value: 'experienced', label: 'Experienced' },
+];
 
 // The profile shown here is what Amrita has learned, kept on this device.
 // Sign-in is optional, lives in the same header (a signed-in person is not a
@@ -70,8 +79,18 @@ const CONNECTORS: {
   },
 ];
 
-export default function ProfileView({ profile, auth, practiceLog, streak, calendar, notifications, heart, health, place, onOpenRitual, onStartPractice }: ProfileViewProps) {
+export default function ProfileView({ profile, auth, practiceLog, streak, calendar, notifications, heart, health, place, onOpenRitual, onStartPractice, onExperienceChange }: ProfileViewProps) {
   const [section, setSection] = useState<'connectors' | 'calendar' | 'wearables' | 'location'>('connectors');
+  const [savingExperience, setSavingExperience] = useState(false);
+  const [experienceNotice, setExperienceNotice] = useState<string | null>(null);
+  const chooseExperience = async (value: Experience | null) => {
+    if (savingExperience || value === (profile.experience ?? null)) return;
+    setSavingExperience(true);
+    setExperienceNotice(null);
+    const saved = await onExperienceChange(value);
+    setSavingExperience(false);
+    if (!saved) setExperienceNotice('That didn’t save. Check your connection and try again.');
+  };
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [accountNotice, setAccountNotice] = useState<string | null>(null);
@@ -225,6 +244,43 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
               {APPLE_SERVICES_ID && <AppleSignIn signIn={auth.signIn} />}
             </div>
           </div>
+        )}
+      </section>
+
+      {/* Experience: Amrita records it from what they tell her; it can be changed here too. */}
+      <section className="bg-white/50 border border-white/30 p-6 sm:p-8 rounded-[24px] shadow-[0_10px_30px_rgba(0,0,0,0.02)] backdrop-blur-md space-y-3">
+        <h2 id="experience-heading" className="text-[11px] font-mono tracking-widest font-bold text-stone-500 uppercase">
+          Your experience
+        </h2>
+        <div role="radiogroup" aria-labelledby="experience-heading" className="flex flex-wrap gap-2">
+          {EXPERIENCE_CHOICES.map(({ value, label }) => {
+            const selected = (profile.experience ?? null) === value;
+            return (
+              <button
+                key={label}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                disabled={savingExperience}
+                onClick={() => chooseExperience(value)}
+                className={`py-2 px-4 rounded-full text-[12.5px] font-sans border transition-all cursor-pointer disabled:opacity-60 ${
+                  selected
+                    ? 'bg-[#8A79A5] border-[#8A79A5] text-white'
+                    : 'bg-white/60 border-white/80 text-stone-700 hover:bg-white/90'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[13px] text-stone-600 font-sans leading-relaxed">
+          A few demanding practices are offered only to experienced practitioners. Amrita also updates this when you tell her.
+        </p>
+        {experienceNotice && (
+          <p role="status" className="text-[13px] text-[#9A5B2E] font-sans">
+            {experienceNotice}
+          </p>
         )}
       </section>
 

@@ -137,6 +137,13 @@ export async function saveAccountProfile<P>(profile: P, baseVersion: number): Pr
   return null;
 }
 
+// Sets (or, with null, clears) the account's experience; the rest of the
+// profile is left as it is. Returns the stored profile, or null if it failed.
+export async function saveAccountExperience<P>(experience: string | null): Promise<SyncedProfile<P> | null> {
+  const { response } = await fetchWithSession('/api/sync/profile/experience', json('POST', { experience }));
+  return response.ok ? response.json() : null;
+}
+
 // Practice log. Upload is safe to repeat: the server keeps one of each entry.
 export async function uploadPractices<E>(entries: E[]): Promise<boolean> {
   const { response } = await fetchWithSession('/api/sync/practice-log', json('POST', { entries }));

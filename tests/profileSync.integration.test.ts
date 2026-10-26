@@ -124,6 +124,36 @@ describe.skipIf(!hasDb)('profile sync and signed-in chat', () => {
     });
   });
 
+  describe('/api/sync/profile/experience', () => {
+    const setExperience = (auth: string, experience: unknown) =>
+      request(syncApp).post('/api/sync/profile/experience').set('Authorization', auth).send({ experience });
+
+    it('sets and clears experience, keeping the rest of the profile', async () => {
+      const user = await newUser();
+      await request(syncApp).put('/api/sync/profile').set('Authorization', user.auth).send({ profile: { name: 'Asha', goals: ['rest'] }, baseVersion: 0 });
+
+      const set = await setExperience(user.auth, 'experienced');
+      expect(set.body).toEqual({ profile: { name: 'Asha', goals: ['rest'], experience: 'experienced' }, version: 2 });
+      const cleared = await setExperience(user.auth, null);
+      expect(cleared.body).toEqual({ profile: { name: 'Asha', goals: ['rest'] }, version: 3 });
+      expect((await stored(user.id)).data).toEqual({ name: 'Asha', goals: ['rest'] });
+    });
+
+    it('creates the profile when the account has none yet', async () => {
+      const user = await newUser();
+      expect((await setExperience(user.auth, 'beginner')).body).toEqual({ profile: { experience: 'beginner' }, version: 1 });
+    });
+
+    it('refuses unknown levels, guests and other sites', async () => {
+      const user = await newUser();
+      expect((await setExperience(user.auth, 'expert')).body).toEqual({ error: 'invalid_experience' });
+      expect((await setExperience(user.auth, undefined)).status).toBe(400);
+      expect((await request(syncApp).post('/api/sync/profile/experience').send({ experience: 'beginner' })).status).toBe(401);
+      expect((await setExperience(user.auth, 'beginner').set('Origin', 'https://evil.example')).status).toBe(403);
+      expect(await stored(user.id)).toBeUndefined();
+    });
+  });
+
   describe('/api/chat', () => {
     const say = (app: express.Express, auth?: string, profile: object = {}) => {
       const req = request(app).post('/api/chat');

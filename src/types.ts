@@ -100,12 +100,14 @@ export interface Message {
 
 // --- Conversational Amrita ---
 
+export type Experience = 'beginner' | 'regular' | 'experienced';
+
 export interface WellnessProfile {
   name?: string;
   prakriti?: string;
   vikriti?: string;
   prakritiConfidence?: 'low' | 'medium' | 'high';
-  experience?: 'beginner' | 'regular' | 'experienced'; // only "experienced" unlocks experienced-only practices (G2)
+  experience?: Experience; // only "experienced" unlocks experienced-only practices (G2)
   doshaProfile?: DoshaProfileResult & { assessedDate?: string };
   goals?: string[];
   conditions?: string[];

@@ -134,7 +134,14 @@ private fun Tile(pose: CatalogPose, onClick: () -> Unit) {
         PoseImage(pose.imageUrl, Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(12.dp)))
         Text(pose.nameEnglish, style = Pv.itemTitle, color = Pv.ink, maxLines = 2)
         SectionLabel(pose.level)
+        if (pose.experiencedOnly) ExperiencedOnlyLabel()
     }
+}
+
+/** The practices Amrita offers only to experienced practitioners (G2). */
+@Composable
+private fun ExperiencedOnlyLabel() {
+    Text("For experienced practitioners".uppercase(), style = Pv.label, color = Pv.terracotta)
 }
 
 @Composable
@@ -146,6 +153,7 @@ private fun PoseDetail(pose: CatalogPose) {
         PoseImage(pose.imageUrl, Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(16.dp)))
         Text(pose.nameSanskrit, style = Pv.bodySmall.copy(fontStyle = FontStyle.Italic), color = Pv.lavenderDeep)
         SectionLabel("${pose.level} · ${pose.bodyFocus}")
+        if (pose.experiencedOnly) ExperiencedOnlyLabel()
         Text(pose.benefits, style = Pv.body, color = Pv.stone700)
         Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             SectionLabel("Cues")

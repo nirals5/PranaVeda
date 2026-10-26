@@ -1,8 +1,8 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import { isSameOrigin, requireUser } from './_lib/http.js';
-import { parseProfile } from './_lib/profileSchema.js';
-import { loadAccountProfile, saveProfile } from './_lib/profiles.js';
+import { EXPERIENCE_LEVELS, parseProfile } from './_lib/profileSchema.js';
+import { applyProfileChanges, loadAccountProfile, saveProfile } from './_lib/profiles.js';
 import { MAX_UPLOAD, entriesAfter, parseEntries, storeEntries } from './_lib/practiceLog.js';
 import { MAX_REMOVES, MAX_SAVES, applyChanges, listSaved, parseChanges } from './_lib/savedRituals.js';
 
@@ -53,6 +53,27 @@ app.put(
     // (Narrowed by property: this project compiles without strict null checks.)
     if ('current' in result) return res.status(409).json({ error: 'version_conflict', ...result.current });
     res.json({ profile, version: result.version });
+  })
+);
+
+// Sets the user's experience, or with null clears it: the one profile field
+// people change themselves in the app. Applied like Amrita's changes, on top of
+// whatever is stored now, so nothing else in the profile is touched.
+app.post(
+  '/api/sync/profile/experience',
+  route(async (req, res) => {
+    if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const experience = req.body?.experience;
+    if (experience !== null && !EXPERIENCE_LEVELS.includes(experience)) return res.status(400).json({ error: 'invalid_experience' });
+
+    const start = (await loadAccountProfile(user.id)) ?? { profile: {}, version: 0 };
+    const saved = await applyProfileChanges(user.id, start, [
+      ({ experience: _old, ...rest }) => (experience === null ? rest : { ...rest, experience }),
+    ]);
+    if (!saved) return res.status(409).json({ error: 'busy' });
+    res.json(saved);
   })
 );
 

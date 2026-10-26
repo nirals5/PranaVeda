@@ -133,6 +133,22 @@ extension APIClient {
         return try JSONDecoder().decode(VersionedProfile.self, from: data)
     }
 
+    /// Sets the account's experience (nil clears it); the rest of the profile is
+    /// left as it is. Returns what is stored now.
+    func saveAccountExperience(_ experience: String?, accessToken: String) async throws -> VersionedProfile {
+        struct Body: Encodable {
+            let experience: String?
+            func encode(to encoder: Encoder) throws {
+                var c = encoder.container(keyedBy: CodingKeys.self)
+                try c.encode(experience, forKey: .experience) // null, not left out, to clear it
+            }
+            enum CodingKeys: String, CodingKey { case experience }
+        }
+        let (data, status) = try await send(request("POST", "api/sync/profile/experience", bearer: accessToken, body: Body(experience: experience)))
+        guard status == 200 else { throw AccountError.unavailable(status) }
+        return try JSONDecoder().decode(VersionedProfile.self, from: data)
+    }
+
     /// Saves the profile if nobody has saved since `baseVersion`; either way,
     /// returns what is stored now.
     func saveAccountProfile(_ profile: JSONValue, baseVersion: Int, accessToken: String) async throws -> VersionedProfile {

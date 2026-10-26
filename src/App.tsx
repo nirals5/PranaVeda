@@ -9,7 +9,8 @@ import CoachingDashboard from './components/CoachingDashboard';
 import AmritaChat from './components/AmritaChat';
 import DoshaProfileView from './components/DoshaProfileView';
 import { useAmritaChat } from './hooks/useAmritaChat';
-import { RecommendationResult, SavedPractice } from './types';
+import { Experience, RecommendationResult, SavedPractice, WellnessProfile } from './types';
+import { saveAccountExperience } from './lib/auth';
 import { timeOfDay } from './lib/greeting';
 import RecoveryTrends from './components/RecoveryTrends';
 import ProfileView from './components/ProfileView';
@@ -75,6 +76,20 @@ export default function App() {
     auth.sessionEnded
   );
   useProfileSync(auth, profile, replaceProfile);
+
+  // Changed in the profile view. Signed in, the account is the profile, so the
+  // server sets it; a guest's profile lives here and goes with every message.
+  const changeExperience = async (experience: Experience | null): Promise<boolean> => {
+    if (auth.status === 'user') {
+      const saved = await saveAccountExperience<WellnessProfile>(experience);
+      if (!saved) return false;
+      replaceProfile(saved.profile);
+      return true;
+    }
+    const { experience: _old, ...rest } = profile;
+    replaceProfile(experience ? { ...rest, experience } : rest);
+    return true;
+  };
   usePracticeSync(auth, practiceLog, mergePractices, retainPractices);
   const lastPracticeAt = practiceLog.length ? Date.parse(practiceLog[practiceLog.length - 1].completedAt) : null;
   const notifications = useNudgeNotifications({
@@ -329,6 +344,7 @@ export default function App() {
                 heart={heart}
                 health={health}
                 place={place}
+                onExperienceChange={changeExperience}
                 onOpenRitual={(result) => {
                   handleOpenRitual(result);
                   setCurrentView('coach');

@@ -40,6 +40,7 @@ struct LibraryView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             Text(pose.nameEnglish).font(Theme.itemTitle).foregroundStyle(Theme.ink).lineLimit(2)
             Text(pose.level).sectionLabel()
+            if pose.experiencedOnly { ExperiencedOnlyLabel() }
         }
     }
 }
@@ -56,6 +57,7 @@ struct PoseDetailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 Text(pose.nameSanskrit).font(Theme.bodySmall).italic().foregroundStyle(Theme.lavenderDeep)
                 Text("\(pose.level) · \(pose.bodyFocus)").sectionLabel()
+                if pose.experiencedOnly { ExperiencedOnlyLabel() }
                 Text(pose.benefits).font(Theme.body).foregroundStyle(Theme.stone700)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Cues").sectionLabel()
@@ -73,6 +75,13 @@ struct PoseDetailView: View {
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle(pose.nameEnglish)
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// The practices Amrita offers only to experienced practitioners (G2).
+private struct ExperiencedOnlyLabel: View {
+    var body: some View {
+        Text("For experienced practitioners").labelFont().tracking(0.9).textCase(.uppercase).foregroundStyle(Theme.terracotta)
     }
 }
 
