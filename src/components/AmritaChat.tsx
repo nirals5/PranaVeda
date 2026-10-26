@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { Mic, ArrowRight, Sparkles, RotateCcw, Wind, Play, Clock, Volume2, VolumeX, Flame, Droplet } from 'lucide-react';
-import { ChatItem, ChatCard, RecommendationResult, BreathworkPattern, DoshaProfileResult, AnswerOption } from '../types';
+import { ChatItem, ChatCard, RecommendationResult, BreathworkPattern, DoshaProfileResult, AnswerOption, Principle } from '../types';
 import pranavedaIcon from '../assets/pranaveda_icon.svg';
 import CautionNote from './CautionNote';
+import PrincipleNote from './PrincipleNote';
 
 interface AmritaChatProps {
   items: ChatItem[];
@@ -57,6 +58,8 @@ function RitualCard({ result, onOpen }: { result: RecommendationResult; onOpen: 
         <p className="text-[13px] text-stone-600 font-sans mt-1 leading-relaxed">{result.yogaPractice.description}</p>
       </div>
 
+      <PrincipleNote principle={result.principle} />
+
       <div className="flex flex-wrap gap-2">
         {result.yogaPractice.poses.map((pose) => (
           <span
@@ -87,7 +90,7 @@ function RitualCard({ result, onOpen }: { result: RecommendationResult; onOpen: 
   );
 }
 
-function BreathworkCard({ pattern, note }: { pattern: BreathworkPattern; note?: string }) {
+function BreathworkCard({ pattern, note, principle }: { pattern: BreathworkPattern; note?: string; principle?: Principle }) {
   const phases = [
     { label: 'Inhale', value: pattern.inhale },
     { label: 'Hold', value: pattern.holdActive },
@@ -114,6 +117,8 @@ function BreathworkCard({ pattern, note }: { pattern: BreathworkPattern; note?: 
         </h4>
         {note && <p className="text-[13px] text-stone-600 font-serif italic mt-1 leading-relaxed">"{note}"</p>}
       </div>
+
+      <PrincipleNote principle={principle} />
 
       <CautionNote text={pattern.caution} />
 
@@ -234,7 +239,7 @@ function CardBlock({ card, active, onOpenRitual, onAnswer }: { card: ChatCard; a
   if (card.kind === 'ritual') return <RitualCard result={card.result} onOpen={() => onOpenRitual(card.result)} />;
   if (card.kind === 'dosha_profile') return <DoshaProfileCard profile={card} />;
   if (card.kind === 'options') return <OptionTiles options={card.options} active={active} onAnswer={onAnswer} />;
-  return <BreathworkCard pattern={card.pattern} note={card.note} />;
+  return <BreathworkCard pattern={card.pattern} note={card.note} principle={card.principle} />;
 }
 
 export default function AmritaChat({ items, isStreaming, onSend, onOpenRitual, onOpenVoice, onReset, voiceMuted, onToggleVoiceMuted }: AmritaChatProps) {
