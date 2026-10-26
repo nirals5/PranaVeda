@@ -9,6 +9,7 @@ import { applyProfileChanges, loadAccountProfile } from './_lib/profiles.js';
 import { moveUpFor, moveUpPrompt, recentPracticeDates } from './_lib/moveUp.js';
 import type { MoveUp } from './_lib/moveUp.js';
 import { limitMessage, limitRequest, rateLimited } from './_lib/rateLimit.js';
+import { ANCHORS, ROTATION_DAYS, recentMainPractices } from './_lib/rotation.js';
 import type { VersionedProfile } from './_lib/profiles.js';
 import { EXPERIENCE_LEVELS } from './_lib/profileSchema.js';
 import type { Experience } from './_lib/profileSchema.js';
@@ -1027,7 +1028,8 @@ export function buildSystemPrompt(
   catalog: Catalog = BUILT_IN_CATALOG,
   food: FoodRules = BUILT_IN_FOOD_RULES,
   moveUp: MoveUp | null = null,
-  now: Date = new Date()
+  now: Date = new Date(),
+  recent: ReadonlyMap<string, string> = new Map()
 ): string {
   const profileBlock = profile && Object.keys(profile).length
     ? JSON.stringify(profile, null, 1)
@@ -1070,6 +1072,13 @@ Read each against THEIR usual, never population norms. Resting heart rate clearl
     mealMinutes !== null && mealMinutes < AFTER_MEAL_MINUTES
       ? `\n# After a meal\n\nThey ate about ${mealMinutes} minutes ago. For about ${AFTER_MEAL_MINUTES - mealMinutes} more minutes, do not offer practices marked "Not within 2 hours of a meal". Favour gentle practices that help digestion (Wind-Relieving Pose, gentle seated or supine twists), and keep any breathwork calm. If they ask for something more vigorous, say kindly why you are keeping it gentle for now.\n`
       : '';
+
+  const recentNames = [...recent].map(
+    ([id, day]) => `${catalog.poseById.get(id)?.nameEnglish ?? catalog.breathworkById.get(id)?.name ?? id} (${id}, ${day})`
+  );
+  const recentBlock = recentNames.length
+    ? `\n# Recently practised\n\nIn the last ${ROTATION_DAYS} days they completed: ${recentNames.join('; ')}. Give their practice some variety: don't offer these again yet, and choose other practices that serve the same need. Anchors (Child's Pose, Corpse Pose, Easy Pose, Mountain Pose, Three-Part Breath) may repeat. If they ask for one of these by name, offer it and set repeatRequested: true.\n`
+    : '';
 
   const placeBlock = place
     ? `\n# Where they are
@@ -1134,7 +1143,7 @@ ${foodRulesPrompt(food)}
 - You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time${calendar ? ' and when their calendar is busy or free' : ''}${health ? ', and see the wearable readings listed below' : ''}${place ? ', and know the kind of place they are in' : ''}.
 - You CANNOT (yet): see the user's camera or posture, ${health ? 'read any wearable data beyond the readings listed below' : 'read wearables/sleep data'}, ${calendar ? 'see what their calendar events are or change their calendar' : 'access their calendar'}, control smart-home devices, or set reminders. If asked, say warmly that this isn't available yet — never pretend.
 
-${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${mealBlock}${moveUp ? moveUpPrompt(moveUp) : ''}${voiceBlock}
+${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${mealBlock}${recentBlock}${moveUp ? moveUpPrompt(moveUp) : ''}${voiceBlock}
 # Context
 
 Local time for the user: ${localTime}
@@ -1213,6 +1222,7 @@ const tools: Anthropic.Tool[] = [
         },
         lifestyleTips: { type: 'array', items: { type: 'string' }, description: 'One or two general daily tips' },
         principleId: { type: 'string', description: PRINCIPLE_ID_DESCRIPTION },
+        repeatRequested: { type: 'boolean', description: 'true only when they asked by name for a practice they did in the last few days' },
       },
       required: ['title', 'description', 'summary', 'doshaTendency', 'primaryEnergy', 'poses', 'breathworkId', 'ayurvedic', 'lifestyleTips'],
       additionalProperties: false,
@@ -1229,6 +1239,7 @@ const tools: Anthropic.Tool[] = [
         cycles: { type: 'integer', description: 'Override cycle count if needed' },
         note: { type: 'string', description: 'One personal line about why this breath, for this moment' },
         principleId: { type: 'string', description: PRINCIPLE_ID_DESCRIPTION },
+        repeatRequested: { type: 'boolean', description: 'true only when they asked by name for a practice they did in the last few days' },
       },
       required: ['breathworkId'],
       additionalProperties: false,
@@ -1558,6 +1569,17 @@ export function droppedCitationNote(input: any, cited: { id: string } | undefine
     : '';
 }
 
+// G6: a main practice they completed in the last three days is not offered
+// again unless they asked for it by name; anchors may repeat. `recent` comes
+// from a signed-in user's practice log (practice id → latest local date), and
+// is empty for guests.
+function rotationError(ids: string[], recent: ReadonlyMap<string, string>, input: any): string | undefined {
+  if (input?.repeatRequested === true) return undefined;
+  const repeats = [...new Set(ids)].filter((id) => recent.has(id) && !ANCHORS.has(id));
+  if (!repeats.length) return undefined;
+  return `Rejected for variety — they did ${repeats.map((id) => `${id} (on ${recent.get(id)})`).join(', ')} in the last ${ROTATION_DAYS} days. Choose other practices that serve the same need; anchors (Child's Pose, Corpse Pose, Easy Pose, Mountain Pose, Three-Part Breath) may repeat. If they asked for one of these by name, set repeatRequested: true.`;
+}
+
 // G13: when the user's condition is one a practice is adapted for (a
 // caution, not an avoid), the card carries the practice's note on how.
 export function cautionFor(
@@ -1574,7 +1596,8 @@ export function buildRitual(
   profile: WellnessProfile,
   catalog: Catalog,
   assetBase = configuredAssetBase(),
-  now: Date = new Date()
+  now: Date = new Date(),
+  recent: ReadonlyMap<string, string> = new Map()
 ): { error?: string; card?: any } {
   const conflicts: string[] = [];
   let afterMeal = false;
@@ -1616,6 +1639,8 @@ export function buildRitual(
   if (conflicts.length) {
     return { error: `Rejected for safety — the user's conditions conflict with: ${conflicts.join('; ')}. Pick alternatives from the catalog.${EXPERIENCE_HINT}${afterMeal ? MEAL_HINT : ''}` };
   }
+  const repeated = rotationError([...(input.poses ?? []).map((p: any) => p.poseId), breath.id], recent, input);
+  if (repeated) return { error: repeated };
   const breathCaution = cautionFor(breath, profile, catalog);
   const principle = citedPrinciple(input, catalog);
   const durationMinutes = (input.poses ?? []).reduce((s: number, p: any) => s + Math.max(1, Math.round(p.durationMinutes)), 0);
@@ -1647,7 +1672,13 @@ export function buildRitual(
   };
 }
 
-export function buildBreathworkCard(input: any, profile: WellnessProfile, catalog: Catalog, now: Date = new Date()): { error?: string; card?: any } {
+export function buildBreathworkCard(
+  input: any,
+  profile: WellnessProfile,
+  catalog: Catalog,
+  now: Date = new Date(),
+  recent: ReadonlyMap<string, string> = new Map()
+): { error?: string; card?: any } {
   const breath = catalog.breathworkById.get(input.breathworkId);
   if (!breath) return { error: `Unknown breathworkId "${input.breathworkId}". Choose ids from the catalog.` };
   const bad = conditionConflicts(breath.contraindications, profile.conditions, catalog.conditions);
@@ -1660,6 +1691,8 @@ export function buildBreathworkCard(input: any, profile: WellnessProfile, catalo
   if (tooSoonAfterMeal(breath, profile, now)) {
     return { error: `Rejected for safety — ${breath.id} is ${mealReason(profile, now)}. Pick an alternative.${MEAL_HINT}` };
   }
+  const repeated = rotationError([breath.id], recent, input);
+  if (repeated) return { error: repeated };
   const caution = cautionFor(breath, profile, catalog);
   const principle = citedPrinciple(input, catalog);
   return {
@@ -1790,6 +1823,18 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
     // and the safety checks must agree.
     const [catalog, food] = await Promise.all([servedCatalog(), getFoodRules()]);
     const notFood = practiceNames(catalog);
+
+    // Signed in: the main practices they completed in the last three days (G6).
+    let recent = new Map<string, string>();
+    if (account) {
+      try {
+        const breathIdByName = new Map(catalog.breathwork.map((b) => [b.name.toLowerCase(), b.id]));
+        recent = await recentMainPractices(account.userId, today, breathIdByName);
+      } catch (err: any) {
+        console.error('[chat] recent practices failed:', err?.message || err);
+      }
+    }
+
     const system = buildSystemPrompt(
       profile,
       localTime || new Date().toLocaleString(),
@@ -1802,7 +1847,9 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       sanitizeLocationContext(location),
       catalog,
       food,
-      moveUp
+      moveUp,
+      new Date(),
+      recent
     );
 
     // The last text sent, so that when a reply resumes after a tool call it
@@ -1946,7 +1993,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
                 'Dosha profile card shown and recorded. The full result now lives in their "Dosha Profile" tab, with balancing guidance — you may mention that. Close with one or two warm sentences; do not restate the card.';
             }
           } else if (block.name === 'create_ritual') {
-            const { error, card } = buildRitual(block.input, profile, catalog);
+            const { error, card } = buildRitual(block.input, profile, catalog, configuredAssetBase(), new Date(), recent);
             if (error) {
               resultText = error;
               isError = true;
@@ -1960,7 +2007,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
                 droppedCitationNote(block.input, (card as any).result.principle);
             }
           } else if (block.name === 'suggest_breathwork') {
-            const { error, card } = buildBreathworkCard(block.input, profile, catalog);
+            const { error, card } = buildBreathworkCard(block.input, profile, catalog, new Date(), recent);
             if (error) {
               resultText = error;
               isError = true;
