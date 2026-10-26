@@ -147,7 +147,9 @@ struct ExperienceSetting: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Your experience").sectionLabel().accessibilityAddTraits(.isHeader)
-            Picker("Your experience", selection: Binding(get: { chat.experience ?? "" }, set: choose)) {
+            // A closure, not `set: choose`: passing the method itself crashes the
+            // Swift 6.3 compiler (Xcode 26) while it generates code.
+            Picker("Your experience", selection: Binding(get: { chat.experience ?? "" }, set: { choose($0) })) {
                 ForEach(Self.choices, id: \.label) { choice in
                     Text(choice.label).tag(choice.value ?? "")
                 }
