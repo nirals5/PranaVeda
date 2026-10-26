@@ -6,6 +6,8 @@ import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
 import { authenticate } from './_lib/auth.js';
 import { applyProfileChanges, loadAccountProfile } from './_lib/profiles.js';
+import { moveUpFor, moveUpPrompt, recentPracticeDates } from './_lib/moveUp.js';
+import type { MoveUp } from './_lib/moveUp.js';
 import type { VersionedProfile } from './_lib/profiles.js';
 import { getUser } from './_lib/users.js';
 import { DOSHA_GUIDE, DOSHA_GUIDE_NOTE } from './_lib/doshaGuide.js';
@@ -886,6 +888,8 @@ export interface WellnessProfile {
   // How much yoga they have practised, in their own words; only "experienced"
   // unlocks the practices marked for experienced practitioners (G2).
   experience?: Experience;
+  // When Amrita last offered to move their experience up (YYYY-MM-DD).
+  experienceOfferedOn?: string;
   doshaProfile?: {
     primary: string;
     secondary?: string;
@@ -999,7 +1003,8 @@ export function buildSystemPrompt(
   health?: HealthContext,
   place?: string,
   catalog: Catalog = BUILT_IN_CATALOG,
-  food: FoodRules = BUILT_IN_FOOD_RULES
+  food: FoodRules = BUILT_IN_FOOD_RULES,
+  moveUp: MoveUp | null = null
 ): string {
   const profileBlock = profile && Object.keys(profile).length
     ? JSON.stringify(profile, null, 1)
@@ -1098,7 +1103,7 @@ ${foodRulesPrompt(food)}
 - You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time${calendar ? ' and when their calendar is busy or free' : ''}${health ? ', and see the wearable readings listed below' : ''}${place ? ', and know the kind of place they are in' : ''}.
 - You CANNOT (yet): see the user's camera or posture, ${health ? 'read any wearable data beyond the readings listed below' : 'read wearables/sleep data'}, ${calendar ? 'see what their calendar events are or change their calendar' : 'access their calendar'}, control smart-home devices, or set reminders. If asked, say warmly that this isn't available yet — never pretend.
 
-${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${voiceBlock}
+${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${moveUp ? moveUpPrompt(moveUp) : ''}${voiceBlock}
 # Context
 
 Local time for the user: ${localTime}
@@ -1284,6 +1289,7 @@ const tools: Anthropic.Tool[] = [
         addPreferences: { type: 'array', items: { type: 'string' }, description: 'e.g. "prefers evening practice", "dislikes fast flows"' },
         removePreferences: { type: 'array', items: { type: 'string' } },
         addObservation: { type: 'string', description: 'One meaningful longitudinal observation, e.g. "slept poorly three nights running"' },
+        markExperienceOffered: { type: 'boolean', description: 'true when you have just offered to move their experience up (see "Moving up"), whatever they answered' },
       },
       additionalProperties: false,
     },
@@ -1427,6 +1433,7 @@ export function applyProfileUpdate(profile: WellnessProfile, input: any, today =
     }
     if (EXPERIENCE_LEVELS.includes(input.set.experience)) next.experience = input.set.experience;
   }
+  if (input.markExperienceOffered === true) next.experienceOfferedOn = today;
   const merge = (key: 'goals' | 'conditions' | 'preferences', addRaw?: unknown, removeRaw?: unknown) => {
     const add = asList(addRaw);
     const remove = asList(removeRaw);
@@ -1660,6 +1667,16 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       .slice(-30)
       .map((m: any) => ({ role: m.role, content: m.content }));
 
+    // Signed in and practising steadily: Amrita may offer a move up in experience.
+    let moveUp: MoveUp | null = null;
+    if (account && (profile.experience === 'beginner' || profile.experience === 'regular')) {
+      try {
+        moveUp = moveUpFor(profile.experience, await recentPracticeDates(account.userId, today), today, profile.experienceOfferedOn);
+      } catch (err: any) {
+        console.error('[chat] practice count failed:', err?.message || err);
+      }
+    }
+
     // One catalog and one set of food rules for the whole reply: the prompt
     // and the safety checks must agree.
     const [catalog, food] = await Promise.all([servedCatalog(), getFoodRules()]);
@@ -1675,7 +1692,8 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       sanitizeHealthContext(health),
       sanitizeLocationContext(location),
       catalog,
-      food
+      food,
+      moveUp
     );
 
     // The last text sent, so that when a reply resumes after a tool call it
