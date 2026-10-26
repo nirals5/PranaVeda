@@ -137,6 +137,7 @@ export function catalogFromRows(
       ...(cautions.length ? { cautions } : {}),
       ...(r.avoidNotes ? { safetyNote: r.avoidNotes } : {}),
       ...(r.minExperience === 'experienced' ? { minExperience: 'experienced' as const } : {}),
+      ...(r.avoidAfterMeal ? { avoidAfterMeal: true as const } : {}),
     };
   };
 

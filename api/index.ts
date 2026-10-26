@@ -89,6 +89,8 @@ export interface CatalogPose {
   safetyNote?: string;
   // Offered only to users whose profile says they are experienced (G2).
   minExperience?: 'experienced';
+  // Not offered within two hours of a meal (G7).
+  avoidAfterMeal?: true;
   dosha: { vata: string; pitta: string; kapha: string };
   bestTime: string;
   counterPoseId?: string;
@@ -112,6 +114,8 @@ export interface CatalogBreathwork {
   contraindications: string[];
   // Offered only to users whose profile says they are experienced (G2).
   minExperience?: 'experienced';
+  // Not offered within two hours of a meal (G7).
+  avoidAfterMeal?: true;
   cautions?: string[];
   safetyNote?: string;
   bestTime: string;
@@ -181,6 +185,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'downward_dog',
+    avoidAfterMeal: true,
     nameSanskrit: 'Adho Mukha Svanasana',
     nameEnglish: 'Downward-Facing Dog',
     level: 'Intermediate',
@@ -199,6 +204,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'standing_forward_fold',
+    avoidAfterMeal: true,
     nameSanskrit: 'Uttanasana',
     nameEnglish: 'Standing Forward Fold',
     level: 'Beginner',
@@ -301,6 +307,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'cobra',
+    avoidAfterMeal: true,
     nameSanskrit: 'Bhujangasana',
     nameEnglish: 'Cobra Pose',
     level: 'Beginner',
@@ -385,6 +392,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'legs_up_the_wall',
+    avoidAfterMeal: true,
     nameSanskrit: 'Viparita Karani',
     nameEnglish: 'Legs-Up-the-Wall',
     level: 'Beginner',
@@ -505,6 +513,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'dancer',
+    avoidAfterMeal: true,
     minExperience: 'experienced',
     nameSanskrit: 'Natarajasana',
     nameEnglish: 'Dancer Pose',
@@ -523,6 +532,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'bow',
+    avoidAfterMeal: true,
     minExperience: 'experienced',
     nameSanskrit: 'Dhanurasana',
     nameEnglish: 'Bow Pose',
@@ -541,6 +551,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'side_plank',
+    avoidAfterMeal: true,
     nameSanskrit: 'Vasisthasana',
     nameEnglish: 'Side Plank',
     level: 'Intermediate',
@@ -558,6 +569,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'forearm_plank',
+    avoidAfterMeal: true,
     nameSanskrit: 'Phalakasana (forearm variation)',
     nameEnglish: 'Forearm Plank',
     level: 'Beginner',
@@ -609,6 +621,7 @@ export const POSES: CatalogPose[] = [
   },
   {
     id: 'wide_legged_forward_fold',
+    avoidAfterMeal: true,
     nameSanskrit: 'Prasarita Padottanasana',
     nameEnglish: 'Wide-Legged Forward Fold',
     level: 'Beginner',
@@ -736,6 +749,7 @@ export const BREATHWORK: CatalogBreathwork[] = [
   },
   {
     id: 'bhastrika',
+    avoidAfterMeal: true,
     minExperience: 'experienced',
     name: 'Bellows Breath',
     sanskritName: 'Bhastrika',
@@ -849,11 +863,12 @@ export function publicCatalog(base: string, catalog: Catalog = BUILT_IN_CATALOG)
 }
 
 // " Avoid with: …. Adapt for: … (note)." for one practice's prompt line.
-function safetyLine(x: { contraindications: string[]; cautions?: string[]; safetyNote?: string; minExperience?: string }): string {
+function safetyLine(x: { contraindications: string[]; cautions?: string[]; safetyNote?: string; minExperience?: string; avoidAfterMeal?: boolean }): string {
   const experienced = x.minExperience === 'experienced' ? ' Experienced practitioners only.' : '';
+  const meal = x.avoidAfterMeal ? ' Not within 2 hours of a meal.' : '';
   const avoid = x.contraindications.length ? ` Avoid with: ${x.contraindications.join(', ')}.` : '';
   const adapt = x.cautions?.length ? ` Adapt for: ${x.cautions.join(', ')}${x.safetyNote ? ` (${x.safetyNote})` : ''}.` : '';
-  return experienced + avoid + adapt;
+  return experienced + meal + avoid + adapt;
 }
 
 // Compact catalog summaries injected into Amrita's system prompt so she can
@@ -892,6 +907,8 @@ export interface WellnessProfile {
   experience?: Experience;
   // When Amrita last offered to move their experience up (YYYY-MM-DD).
   experienceOfferedOn?: string;
+  // When they last ate a meal, as they told Amrita (ISO time). For G7.
+  lastMealAt?: string;
   doshaProfile?: {
     primary: string;
     secondary?: string;
@@ -1006,7 +1023,8 @@ export function buildSystemPrompt(
   place?: string,
   catalog: Catalog = BUILT_IN_CATALOG,
   food: FoodRules = BUILT_IN_FOOD_RULES,
-  moveUp: MoveUp | null = null
+  moveUp: MoveUp | null = null,
+  now: Date = new Date()
 ): string {
   const profileBlock = profile && Object.keys(profile).length
     ? JSON.stringify(profile, null, 1)
@@ -1043,6 +1061,12 @@ ${healthPromptLines(health).map((l) => `- ${l}`).join('\n')}
 
 Read each against THEIR usual, never population norms. Resting heart rate clearly above usual, HRV clearly below usual, or short sleep suggest a taxed system: favor gentle, grounding, restorative choices and shorter holds. Readings at or better than usual can support a fuller practice. Let the readings quietly shape what you choose and mention them lightly, in a phrase — do not recite numbers unless asked. Never diagnose, never alarm; if they describe symptoms or a reading worries them, suggest checking with a clinician.\n`
     : '';
+
+  const mealMinutes = profile ? minutesSinceMeal(profile, now) : null;
+  const mealBlock =
+    mealMinutes !== null && mealMinutes < AFTER_MEAL_MINUTES
+      ? `\n# After a meal\n\nThey ate about ${mealMinutes} minutes ago. For about ${AFTER_MEAL_MINUTES - mealMinutes} more minutes, do not offer practices marked "Not within 2 hours of a meal". Favour gentle practices that help digestion (Wind-Relieving Pose, gentle seated or supine twists), and keep any breathwork calm. If they ask for something more vigorous, say kindly why you are keeping it gentle for now.\n`
+      : '';
 
   const placeBlock = place
     ? `\n# Where they are
@@ -1096,6 +1120,7 @@ Your purpose is not to generate wellness plans. Your purpose is to build a long-
 
 - NEVER include a pose or breath whose contraindications match the user's known conditions; choose alternatives and, if relevant, briefly say why you steered away.
 - If the profile mentions pregnancy or a heart condition, keep everything gentle and explicitly invite professional guidance.
+- Practices marked "Not within 2 hours of a meal" (inversions, strong backbends, strong core work, vigorous breathing) are not offered for two hours after they eat. Whenever they mention having eaten, record it with update_wellness_profile's ateMinutesAgo.
 - Practices marked "Experienced practitioners only" are for profiles whose experience is "experienced". If their experience is not known and they want one, ask once how long they have practised (show_answer_options suits this), record it, and only then offer it; otherwise choose a gentler alternative. Never guess their experience from a single request.
 
 ${foodRulesPrompt(food)}
@@ -1105,7 +1130,7 @@ ${foodRulesPrompt(food)}
 - You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time${calendar ? ' and when their calendar is busy or free' : ''}${health ? ', and see the wearable readings listed below' : ''}${place ? ', and know the kind of place they are in' : ''}.
 - You CANNOT (yet): see the user's camera or posture, ${health ? 'read any wearable data beyond the readings listed below' : 'read wearables/sleep data'}, ${calendar ? 'see what their calendar events are or change their calendar' : 'access their calendar'}, control smart-home devices, or set reminders. If asked, say warmly that this isn't available yet — never pretend.
 
-${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${moveUp ? moveUpPrompt(moveUp) : ''}${voiceBlock}
+${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${mealBlock}${moveUp ? moveUpPrompt(moveUp) : ''}${voiceBlock}
 # Context
 
 Local time for the user: ${localTime}
@@ -1291,6 +1316,11 @@ const tools: Anthropic.Tool[] = [
         addPreferences: { type: 'array', items: { type: 'string' }, description: 'e.g. "prefers evening practice", "dislikes fast flows"' },
         removePreferences: { type: 'array', items: { type: 'string' } },
         addObservation: { type: 'string', description: 'One meaningful longitudinal observation, e.g. "slept poorly three nights running"' },
+        ateMinutesAgo: {
+          type: 'number',
+          description:
+            'When they mention having eaten a meal or a substantial snack today: about how many minutes ago (0 if just now, or if they do not say). Not for a drink or a piece of fruit.',
+        },
         markExperienceOffered: { type: 'boolean', description: 'true when you have just offered to move their experience up (see "Moving up"), whatever they answered' },
       },
       additionalProperties: false,
@@ -1425,7 +1455,7 @@ export function normalizeProfileList(v: unknown): string[] {
   return v.filter((x): x is string => typeof x === 'string').map(cleanProfileText).filter(Boolean);
 }
 
-export function applyProfileUpdate(profile: WellnessProfile, input: any, today = todayStamp()): WellnessProfile {
+export function applyProfileUpdate(profile: WellnessProfile, input: any, today = todayStamp(), now = new Date()): WellnessProfile {
   const next: WellnessProfile = { ...profile };
   const uniq = (arr: string[]) => [...new Set(arr.filter(Boolean))];
   const asList = normalizeProfileList;
@@ -1436,6 +1466,10 @@ export function applyProfileUpdate(profile: WellnessProfile, input: any, today =
     if (EXPERIENCE_LEVELS.includes(input.set.experience)) next.experience = input.set.experience;
   }
   if (input.markExperienceOffered === true) next.experienceOfferedOn = today;
+  const ate = typeof input.ateMinutesAgo === 'number' ? input.ateMinutesAgo : typeof input.ateMinutesAgo === 'string' && input.ateMinutesAgo.trim() ? Number(input.ateMinutesAgo) : NaN;
+  if (Number.isFinite(ate) && ate >= 0 && ate <= 24 * 60) {
+    next.lastMealAt = new Date(now.getTime() - Math.round(ate) * 60_000).toISOString();
+  }
   const merge = (key: 'goals' | 'conditions' | 'preferences', addRaw?: unknown, removeRaw?: unknown) => {
     const add = asList(addRaw);
     const remove = asList(removeRaw);
@@ -1479,6 +1513,23 @@ const experienceReason = (profile: WellnessProfile) =>
 const EXPERIENCE_HINT =
   ' If they want an experienced-only practice and their experience is not known, ask how long they have practised and record it before offering it.';
 
+// G7: practices marked avoid-after-meal (inversions, strong backbends, strong
+// core work, vigorous breathing) are refused for two hours after the user said
+// they ate. Amrita records when (lastMealAt, from her ateMinutesAgo).
+export const AFTER_MEAL_MINUTES = 120;
+export function minutesSinceMeal(profile: WellnessProfile, now: Date = new Date()): number | null {
+  const at = profile.lastMealAt ? Date.parse(profile.lastMealAt) : NaN;
+  if (!Number.isFinite(at)) return null;
+  return Math.max(0, Math.round((now.getTime() - at) / 60_000));
+}
+export function tooSoonAfterMeal(x: { avoidAfterMeal?: boolean }, profile: WellnessProfile, now: Date = new Date()): boolean {
+  const since = minutesSinceMeal(profile, now);
+  return !!x.avoidAfterMeal && since !== null && since < AFTER_MEAL_MINUTES;
+}
+const mealReason = (profile: WellnessProfile, now: Date) =>
+  `not within two hours of a meal; they ate about ${minutesSinceMeal(profile, now)} minutes ago`;
+const MEAL_HINT = ' After a meal, choose gentle practices that help digestion (Wind-Relieving Pose, gentle seated or supine twists, calm breathing).';
+
 // G13: when the user's condition is one a practice is adapted for (a
 // caution, not an avoid), the card carries the practice's note on how.
 export function cautionFor(
@@ -1494,9 +1545,11 @@ export function buildRitual(
   input: any,
   profile: WellnessProfile,
   catalog: Catalog,
-  assetBase = configuredAssetBase()
+  assetBase = configuredAssetBase(),
+  now: Date = new Date()
 ): { error?: string; card?: any } {
   const conflicts: string[] = [];
+  let afterMeal = false;
   const poses: any[] = [];
   for (const p of input.poses ?? []) {
     const pose = catalog.poseById.get(p.poseId);
@@ -1504,6 +1557,10 @@ export function buildRitual(
     const bad = conditionConflicts(pose.contraindications, profile.conditions, catalog.conditions);
     if (bad.length) conflicts.push(`${pose.id} (contraindicated for ${bad.join(', ')})`);
     if (tooAdvanced(pose, profile)) conflicts.push(`${pose.id} (${experienceReason(profile)})`);
+    if (tooSoonAfterMeal(pose, profile, now)) {
+      conflicts.push(`${pose.id} (${mealReason(profile, now)})`);
+      afterMeal = true;
+    }
     const mins = Math.max(1, Math.round(p.durationMinutes));
     const caution = cautionFor(pose, profile, catalog);
     poses.push({
@@ -1524,8 +1581,12 @@ export function buildRitual(
   const badBreath = conditionConflicts(breath.contraindications, profile.conditions, catalog.conditions);
   if (badBreath.length) conflicts.push(`${breath.id} (contraindicated for ${badBreath.join(', ')})`);
   if (tooAdvanced(breath, profile)) conflicts.push(`${breath.id} (${experienceReason(profile)})`);
+  if (tooSoonAfterMeal(breath, profile, now)) {
+    conflicts.push(`${breath.id} (${mealReason(profile, now)})`);
+    afterMeal = true;
+  }
   if (conflicts.length) {
-    return { error: `Rejected for safety — the user's conditions conflict with: ${conflicts.join('; ')}. Pick alternatives from the catalog.${EXPERIENCE_HINT}` };
+    return { error: `Rejected for safety — the user's conditions conflict with: ${conflicts.join('; ')}. Pick alternatives from the catalog.${EXPERIENCE_HINT}${afterMeal ? MEAL_HINT : ''}` };
   }
   const breathCaution = cautionFor(breath, profile, catalog);
   const durationMinutes = (input.poses ?? []).reduce((s: number, p: any) => s + Math.max(1, Math.round(p.durationMinutes)), 0);
@@ -1556,7 +1617,7 @@ export function buildRitual(
   };
 }
 
-export function buildBreathworkCard(input: any, profile: WellnessProfile, catalog: Catalog): { error?: string; card?: any } {
+export function buildBreathworkCard(input: any, profile: WellnessProfile, catalog: Catalog, now: Date = new Date()): { error?: string; card?: any } {
   const breath = catalog.breathworkById.get(input.breathworkId);
   if (!breath) return { error: `Unknown breathworkId "${input.breathworkId}". Choose ids from the catalog.` };
   const bad = conditionConflicts(breath.contraindications, profile.conditions, catalog.conditions);
@@ -1565,6 +1626,9 @@ export function buildBreathworkCard(input: any, profile: WellnessProfile, catalo
   }
   if (tooAdvanced(breath, profile)) {
     return { error: `Rejected for safety — ${breath.id} is ${experienceReason(profile)}. Pick an alternative.${EXPERIENCE_HINT}` };
+  }
+  if (tooSoonAfterMeal(breath, profile, now)) {
+    return { error: `Rejected for safety — ${breath.id} is ${mealReason(profile, now)}. Pick an alternative.${MEAL_HINT}` };
   }
   const caution = cautionFor(breath, profile, catalog);
   return {

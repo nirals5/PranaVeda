@@ -26,6 +26,7 @@ export const wellnessProfileSchema = z.looseObject({
   prakritiConfidence: z.enum(['low', 'medium', 'high']).optional(),
   experience: z.enum(EXPERIENCE_LEVELS).optional(),
   experienceOfferedOn: day.optional(), // when Amrita last offered a move up
+  lastMealAt: text(40).optional(), // when they last ate, as an ISO time (G7)
   doshaProfile: z
     .looseObject({
       primary: text(20),
