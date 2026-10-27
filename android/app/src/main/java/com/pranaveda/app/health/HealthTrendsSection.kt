@@ -13,11 +13,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -71,7 +77,7 @@ fun HealthTrendsSection(health: HealthStore, practiceDays: Set<String>) {
             }
             HealthStore.State.NotConnected, HealthStore.State.Failed -> {
                 Text(
-                    "See your sleep, resting heart rate and heart-rate variability beside your practice. PranaVeda reads them from Health Connect on this phone; they are never sent anywhere.",
+                    "See your sleep, resting heart rate and heart-rate variability beside your practice. PranaVeda reads them from Health Connect on this phone, and they stay on it unless you choose to let Amrita see them.",
                     style = Pv.bodySmall,
                     color = Pv.stone700,
                 )
@@ -99,8 +105,32 @@ fun HealthTrendsSection(health: HealthStore, practiceDays: Set<String>) {
                     Metric("Resting heart rate", state.days.lastOrNull { it.restingHeartRate != null }?.restingHeartRate?.let { "${it.roundToInt()} bpm" }, state.days, practiceDays, "beats per minute", bars = false) { it.restingHeartRate }
                     Metric("Heart-rate variability (RMSSD)", state.days.lastOrNull { it.hrv != null }?.hrv?.let { "${it.roundToInt()} ms" }, state.days, practiceDays, "milliseconds", bars = false) { it.hrv }
                 }
+                ShareWithAmrita(health)
             }
         }
+    }
+}
+
+/** The opt-in: off until they turn it on. */
+@Composable
+private fun ShareWithAmrita(health: HealthStore) {
+    Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            Modifier.fillMaxWidth().toggleable(value = health.sharesWithAmrita, role = Role.Switch, onValueChange = health::shareWithAmrita),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Let Amrita see my sleep and heart readings", style = Pv.body, color = Pv.ink, modifier = Modifier.weight(1f))
+            Switch(
+                checked = health.sharesWithAmrita,
+                onCheckedChange = null,
+                colors = SwitchDefaults.colors(checkedTrackColor = Pv.lavender),
+            )
+        }
+        Text(
+            "With each message, Amrita gets a short summary: last night's sleep, resting heart rate and heart-rate variability, each beside your usual. It goes to PranaVeda's server and to Amrita, which runs on Anthropic's Claude, and PranaVeda does not store it. Off, your readings stay on this phone.",
+            style = Pv.caption,
+            color = Pv.stone500,
+        )
     }
 }
 

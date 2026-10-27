@@ -29,6 +29,7 @@ import com.pranaveda.app.config.AppConfig
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.lifecycleScope
 import com.pranaveda.app.voice.HeyAmrita
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -126,6 +127,8 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(tab == 0 && openedRitual == null) { heyAmrita.chatShowing = tab == 0 && openedRitual == null }
                 LaunchedEffect(app.voice.isSpeaking) { heyAmrita.hold(HeyAmrita.Hold.Replying, app.voice.isSpeaking) }
                 LifecycleEventEffect(Lifecycle.Event.ON_START) { heyAmrita.hold(HeyAmrita.Hold.Background, false) }
+                // This morning's readings, ready for the next message to Amrita.
+                LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { lifecycleScope.launch { app.health.load() } }
                 LifecycleEventEffect(Lifecycle.Event.ON_STOP) { heyAmrita.hold(HeyAmrita.Hold.Background, true) }
 
                 openedRitual?.let { RitualSheet(it) { openedRitual = null } }

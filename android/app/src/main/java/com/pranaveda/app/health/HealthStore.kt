@@ -21,7 +21,8 @@ import kotlin.reflect.KClass
 
 /**
  * Heart and sleep readings from Health Connect, read on the phone for
- * Recovery & Trends. Nothing read here leaves the phone.
+ * Recovery & Trends. They stay on the phone unless the person lets Amrita see
+ * them; then a short summary ([HealthSummary]) goes with each message.
  */
 class HealthStore(context: Context) {
     sealed interface State {
@@ -36,6 +37,23 @@ class HealthStore(context: Context) {
     private val appContext = context.applicationContext
     var state by mutableStateOf<State>(State.NotConnected)
         private set
+
+    private val prefs = appContext.getSharedPreferences("pranaveda", Context.MODE_PRIVATE)
+
+    /** Whether Amrita may see a summary of the readings. Off until they turn it on. */
+    var sharesWithAmrita by mutableStateOf(prefs.getBoolean(SHARE_KEY, false))
+        private set
+
+    fun shareWithAmrita(on: Boolean) {
+        sharesWithAmrita = on
+        prefs.edit().putBoolean(SHARE_KEY, on).apply()
+    }
+
+    /** What goes with a message: nothing unless they let Amrita see it. */
+    fun summaryForAmrita(today: LocalDate = LocalDate.now()): HealthSummary? {
+        val loaded = state as? State.Loaded ?: return null
+        return if (sharesWithAmrita) HealthTrends.summary(loaded.days, today) else null
+    }
 
     private val client: HealthConnectClient? by lazy {
         runCatching { HealthConnectClient.getOrCreate(appContext) }.getOrNull()
@@ -100,6 +118,7 @@ class HealthStore(context: Context) {
     }
 
     companion object {
+        private const val SHARE_KEY = "pranaveda_health_share_with_amrita"
         val READ_SLEEP = HealthPermission.getReadPermission(SleepSessionRecord::class)
         val READ_RESTING = HealthPermission.getReadPermission(RestingHeartRateRecord::class)
         val READ_HRV = HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class)

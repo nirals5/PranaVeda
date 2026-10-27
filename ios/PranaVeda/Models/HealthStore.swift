@@ -3,7 +3,8 @@ import HealthKit
 import Observation
 
 /// Heart and sleep readings from Apple Health, read on the phone for
-/// Recovery & Trends. Nothing read here leaves the phone.
+/// Recovery & Trends. They stay on the phone unless the person lets Amrita see
+/// them; then a short summary (HealthSummary) goes with each message.
 @MainActor
 @Observable
 final class HealthStore {
@@ -21,10 +22,23 @@ final class HealthStore {
     private let store = HKHealthStore()
     private let defaults: UserDefaults
     private static let connectedKey = "pranaveda_health_connected"
+    private static let shareKey = "pranaveda_health_share_with_amrita"
+
+    /// Whether Amrita may see a summary of the readings. Off until they turn it on.
+    var sharesWithAmrita: Bool {
+        didSet { defaults.set(sharesWithAmrita, forKey: Self.shareKey) }
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         state = !HKHealthStore.isHealthDataAvailable() ? .unavailable : defaults.bool(forKey: Self.connectedKey) ? .loading : .notConnected
+        sharesWithAmrita = defaults.bool(forKey: Self.shareKey)
+    }
+
+    /// What goes with a message: nothing unless they let Amrita see it.
+    func summaryForAmrita(today: Date = Date()) -> HealthSummary? {
+        guard sharesWithAmrita, case .loaded(let days) = state else { return nil }
+        return HealthTrends.summary(days, today: today)
     }
 
     /// Asks once for permission to read sleep, resting heart rate and HRV,

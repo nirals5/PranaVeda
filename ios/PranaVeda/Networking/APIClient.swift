@@ -34,6 +34,9 @@ struct APIClient: Sendable {
         /// short and written for the ear.
         var inputMode = "text"
         let previousSession: [Message]?
+        /// Their sleep and heart readings beside their usual, only when they
+        /// have let Amrita see them.
+        var health: HealthSummary? = nil
     }
 
     /// Streams Amrita's reply. Signed out, the device sends its profile and

@@ -988,11 +988,13 @@ export interface HealthContext {
   live?: { bpm: number; hrv?: number };
   lastPractice?: { title: string; startBpm: number; endBpm: number; daysAgo: number };
   restingHeartRate?: { latest: number; usual: number };
-  hrv?: { latest: number; usual: number };
+  // Apple Health measures HRV as SDNN, Health Connect as RMSSD; the apps say
+  // which. Readings are only ever compared with the same person's usual.
+  hrv?: { latest: number; usual: number; metric?: 'sdnn' | 'rmssd' };
   sleep?: { lastNightMinutes: number; usualMinutes: number };
 }
 
-function sanitizeHealthContext(raw: any): HealthContext | undefined {
+export function sanitizeHealthContext(raw: any): HealthContext | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const num = (v: unknown, min: number, max: number) => {
     const n = Math.round(Number(v));
@@ -1018,6 +1020,7 @@ function sanitizeHealthContext(raw: any): HealthContext | undefined {
   }
   out.restingHeartRate = pair(raw.restingHeartRate, 25, 150);
   out.hrv = pair(raw.hrv, 1, 300);
+  if (out.hrv && (raw.hrv.metric === 'sdnn' || raw.hrv.metric === 'rmssd')) out.hrv.metric = raw.hrv.metric;
   const lastNightMinutes = num(raw.sleep?.lastNightMinutes, 1, 1200);
   const usualMinutes = num(raw.sleep?.usualMinutes, 1, 1200);
   if (lastNightMinutes !== undefined && usualMinutes !== undefined) out.sleep = { lastNightMinutes, usualMinutes };
@@ -1038,7 +1041,7 @@ function sanitizeLocationContext(raw: any): string | undefined {
   return typeof raw?.place === 'string' && Object.hasOwn(PLACE_GUIDANCE, raw.place) ? raw.place : undefined;
 }
 
-function healthPromptLines(health: HealthContext): string[] {
+export function healthPromptLines(health: HealthContext): string[] {
   const hm = (minutes: number) => `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
   const lines: string[] = [];
   if (health.live) lines.push(`Heart rate right now: ${health.live.bpm} bpm${health.live.hrv ? ` (live HRV ${health.live.hrv} ms)` : ''}`);
@@ -1047,7 +1050,7 @@ function healthPromptLines(health: HealthContext): string[] {
     lines.push(`Last practice with a heart-rate device ("${health.lastPractice.title}", ${when}): ${health.lastPractice.startBpm} → ${health.lastPractice.endBpm} bpm from start to finish`);
   }
   if (health.restingHeartRate) lines.push(`Resting heart rate: ${health.restingHeartRate.latest} bpm (their usual: ${health.restingHeartRate.usual})`);
-  if (health.hrv) lines.push(`Overnight HRV: ${health.hrv.latest} ms (their usual: ${health.hrv.usual})`);
+  if (health.hrv) lines.push(`Overnight HRV${health.hrv.metric ? ` (${health.hrv.metric.toUpperCase()})` : ''}: ${health.hrv.latest} ms (their usual: ${health.hrv.usual})`);
   if (health.sleep) lines.push(`Sleep last night: ${hm(health.sleep.lastNightMinutes)} (their usual: ${hm(health.sleep.usualMinutes)})`);
   return lines;
 }

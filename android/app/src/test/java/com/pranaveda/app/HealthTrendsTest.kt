@@ -3,7 +3,11 @@ package com.pranaveda.app
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.metadata.Metadata
 import com.pranaveda.app.health.HealthStore
+import com.pranaveda.app.health.HealthSummary
 import com.pranaveda.app.health.HealthTrends
+import com.pranaveda.app.model.PvJson
+import com.pranaveda.app.net.ChatRequest
+import kotlinx.serialization.json.JsonObject
 import com.pranaveda.app.health.HealthTrends.Span
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -68,5 +72,51 @@ class HealthTrendsTest {
             metadata = Metadata.manualEntry(),
         )
         assertEquals(listOf(Span(start, start.plusSeconds(3600))), HealthStore.asleep(plain))
+    }
+
+    // What Amrita is told
+
+    private val today = LocalDate.parse("2026-10-16")
+    private fun days(sleep: Map<String, Int> = emptyMap(), resting: Map<String, Double> = emptyMap(), hrv: Map<String, Double> = emptyMap()) =
+        HealthTrends.combine(
+            today,
+            sleep.mapKeys { LocalDate.parse(it.key) },
+            resting.mapKeys { LocalDate.parse(it.key) },
+            hrv.mapKeys { LocalDate.parse(it.key) },
+        )
+
+    @Test fun summarisesEachReadingBesideTheirUsualAsTheWebsiteDoes() {
+        val summary = HealthTrends.summary(
+            days(
+                sleep = mapOf("2026-10-13" to 420, "2026-10-14" to 450, "2026-10-15" to 435, "2026-10-16" to 310),
+                resting = mapOf("2026-10-12" to 60.0, "2026-10-13" to 61.0, "2026-10-14" to 59.0, "2026-10-15" to 66.4),
+                hrv = mapOf("2026-10-10" to 50.0, "2026-10-12" to 46.0, "2026-10-14" to 48.0, "2026-10-16" to 38.6),
+            ),
+            today,
+        )
+        assertEquals(HealthSummary.Sleep(310, 435), summary?.sleep)
+        assertEquals(HealthSummary.Reading(66, 60), summary?.restingHeartRate)
+        assertEquals(HealthSummary.Reading(39, 48, "rmssd"), summary?.hrv)
+    }
+
+    @Test fun leavesOutAReadingThatIsStaleOrHasTooFewDays() {
+        val none = HealthTrends.summary(
+            days(
+                sleep = mapOf("2026-10-14" to 420, "2026-10-15" to 450, "2026-10-16" to 300),
+                resting = mapOf("2026-10-11" to 60.0, "2026-10-12" to 61.0, "2026-10-13" to 59.0, "2026-10-14" to 70.0),
+            ),
+            today,
+        )
+        assertNull(none)
+        val yesterday = HealthTrends.summary(days(resting = mapOf("2026-10-12" to 60.0, "2026-10-13" to 61.0, "2026-10-14" to 59.0, "2026-10-15" to 70.0)), today)
+        assertEquals(HealthSummary.Reading(70, 60), yesterday?.restingHeartRate)
+    }
+
+    @Test fun sendsTheSummaryInTheShapeTheServerReads() {
+        val summary = HealthSummary(hrv = HealthSummary.Reading(39, 48, "rmssd"), sleep = HealthSummary.Sleep(310, 435))
+        val json = PvJson.encodeToString(ChatRequest.serializer(), ChatRequest(emptyList(), JsonObject(emptyMap()), "x", "2026-10-16", health = summary))
+        assertTrue(json, json.contains(""""health":{"hrv":{"latest":39,"usual":48,"metric":"rmssd"},"sleep":{"lastNightMinutes":310,"usualMinutes":435}}"""))
+        val plain = PvJson.encodeToString(ChatRequest.serializer(), ChatRequest(emptyList(), JsonObject(emptyMap()), "x", "2026-10-16"))
+        assertTrue(plain, !plain.contains("health"))
     }
 }
