@@ -18,6 +18,8 @@ import { getUser } from './_lib/users.js';
 import { DOSHA_GUIDE, DOSHA_GUIDE_NOTE } from './_lib/doshaGuide.js';
 import { catalogOf, conditionConflicts, getCatalog } from './_lib/catalog.js';
 import type { Catalog, CatalogCondition } from './_lib/catalog.js';
+import { weatherFeel, weatherFor } from './_lib/weather.js';
+import type { Weather, WeatherFeel } from './_lib/weather.js';
 import {
   BUILT_IN_FOOD_RULES,
   FOOD_LEFT_OUT,
@@ -92,6 +94,8 @@ export interface CatalogPose {
   minExperience?: 'experienced';
   // Not offered within two hours of a meal (G7).
   avoidAfterMeal?: true;
+  // Not offered in this weather where they are (G14).
+  avoidWeather?: WeatherFeel[];
   dosha: { vata: string; pitta: string; kapha: string };
   bestTime: string;
   counterPoseId?: string;
@@ -117,6 +121,8 @@ export interface CatalogBreathwork {
   minExperience?: 'experienced';
   // Not offered within two hours of a meal (G7).
   avoidAfterMeal?: true;
+  // Not offered in this weather where they are (G14).
+  avoidWeather?: WeatherFeel[];
   cautions?: string[];
   safetyNote?: string;
   bestTime: string;
@@ -746,6 +752,7 @@ export const BREATHWORK: CatalogBreathwork[] = [
     benefits: 'Cools the body and temper, eases heat, irritability, and inflammation.',
     doshaSuitability: 'The classic pitta remedy; use sparingly for vata and kapha',
     contraindications: ['asthma', 'low_blood_pressure'],
+    avoidWeather: ['cold'],
     bestTime: 'Midday or when overheated',
   },
   {
@@ -864,12 +871,13 @@ export function publicCatalog(base: string, catalog: Catalog = BUILT_IN_CATALOG)
 }
 
 // " Avoid with: …. Adapt for: … (note)." for one practice's prompt line.
-function safetyLine(x: { contraindications: string[]; cautions?: string[]; safetyNote?: string; minExperience?: string; avoidAfterMeal?: boolean }): string {
+function safetyLine(x: { contraindications: string[]; cautions?: string[]; safetyNote?: string; minExperience?: string; avoidAfterMeal?: boolean; avoidWeather?: string[] }): string {
   const experienced = x.minExperience === 'experienced' ? ' Experienced practitioners only.' : '';
   const meal = x.avoidAfterMeal ? ' Not within 2 hours of a meal.' : '';
+  const weather = (x.avoidWeather ?? []).map((w) => ` Not in ${w} weather.`).join('');
   const avoid = x.contraindications.length ? ` Avoid with: ${x.contraindications.join(', ')}.` : '';
   const adapt = x.cautions?.length ? ` Adapt for: ${x.cautions.join(', ')}${x.safetyNote ? ` (${x.safetyNote})` : ''}.` : '';
-  return experienced + meal + avoid + adapt;
+  return experienced + meal + weather + avoid + adapt;
 }
 
 // Compact catalog summaries injected into Amrita's system prompt so she can
@@ -1029,7 +1037,8 @@ export function buildSystemPrompt(
   food: FoodRules = BUILT_IN_FOOD_RULES,
   moveUp: MoveUp | null = null,
   now: Date = new Date(),
-  recent: ReadonlyMap<string, string> = new Map()
+  recent: ReadonlyMap<string, string> = new Map(),
+  weather: Weather | null = null
 ): string {
   const profileBlock = profile && Object.keys(profile).length
     ? JSON.stringify(profile, null, 1)
@@ -1072,6 +1081,8 @@ Read each against THEIR usual, never population norms. Resting heart rate clearl
     mealMinutes !== null && mealMinutes < AFTER_MEAL_MINUTES
       ? `\n# After a meal\n\nThey ate about ${mealMinutes} minutes ago. For about ${AFTER_MEAL_MINUTES - mealMinutes} more minutes, do not offer practices marked "Not within 2 hours of a meal". Favour gentle practices that help digestion (Wind-Relieving Pose, gentle seated or supine twists), and keep any breathwork calm. If they ask for something more vigorous, say kindly why you are keeping it gentle for now.\n`
       : '';
+
+  const weatherBlock = weather ? weatherPrompt(weather) : '';
 
   const recentNames = [...recent].map(
     ([id, day]) => `${catalog.poseById.get(id)?.nameEnglish ?? catalog.breathworkById.get(id)?.name ?? id} (${id}, ${day})`
@@ -1134,16 +1145,17 @@ Your purpose is not to generate wellness plans. Your purpose is to build a long-
 - NEVER include a pose or breath whose contraindications match the user's known conditions; choose alternatives and, if relevant, briefly say why you steered away.
 - If the profile mentions pregnancy or a heart condition, keep everything gentle and explicitly invite professional guidance.
 - Practices marked "Not within 2 hours of a meal" (inversions, strong backbends, strong core work, vigorous breathing) are not offered for two hours after they eat. Whenever they mention having eaten, record it with update_wellness_profile's ateMinutesAgo.
+- Practices marked "Not in cold weather" or "Not in hot weather" are not offered in that weather. Whenever they say what the weather is like where they are now, pass it as weatherNow on the card; what they say wins over any forecast.
 - Practices marked "Experienced practitioners only" are for profiles whose experience is "experienced". If their experience is not known and they want one, ask once how long they have practised (show_answer_options suits this), record it, and only then offer it; otherwise choose a gentler alternative. Never guess their experience from a single request.
 
 ${foodRulesPrompt(food)}
 
 # What you can and cannot do
 
-- You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time${calendar ? ' and when their calendar is busy or free' : ''}${health ? ', and see the wearable readings listed below' : ''}${place ? ', and know the kind of place they are in' : ''}.
+- You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time${calendar ? ' and when their calendar is busy or free' : ''}${health ? ', and see the wearable readings listed below' : ''}${place ? ', and know the kind of place they are in' : ''}${weather ? ', and know roughly what the weather is like where they are' : ''}.
 - You CANNOT (yet): see the user's camera or posture, ${health ? 'read any wearable data beyond the readings listed below' : 'read wearables/sleep data'}, ${calendar ? 'see what their calendar events are or change their calendar' : 'access their calendar'}, control smart-home devices, or set reminders. If asked, say warmly that this isn't available yet — never pretend.
 
-${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${mealBlock}${recentBlock}${moveUp ? moveUpPrompt(moveUp) : ''}${voiceBlock}
+${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${weatherBlock}${mealBlock}${recentBlock}${moveUp ? moveUpPrompt(moveUp) : ''}${voiceBlock}
 # Context
 
 Local time for the user: ${localTime}
@@ -1175,6 +1187,9 @@ ${catalogPromptSummary(catalog)}`;
 const MODEL = 'claude-sonnet-5';
 const MAX_LOOPS = 5;
 
+// G14: what they said about their weather, which a card is checked against.
+const WEATHER_NOW_DESCRIPTION =
+  'Only when they have said what the weather is like where they are now: hot, cold or mild. What they say wins over the forecast.';
 const PRINCIPLE_ID_DESCRIPTION =
   'Optional: the id (e.g. PR4) of the one principle from the Principles list that best explains why this suits them now. Only ids from that list.';
 
@@ -1223,6 +1238,7 @@ const tools: Anthropic.Tool[] = [
         lifestyleTips: { type: 'array', items: { type: 'string' }, description: 'One or two general daily tips' },
         principleId: { type: 'string', description: PRINCIPLE_ID_DESCRIPTION },
         repeatRequested: { type: 'boolean', description: 'true only when they asked by name for a practice they did in the last few days' },
+        weatherNow: { type: 'string', enum: ['hot', 'cold', 'mild'], description: WEATHER_NOW_DESCRIPTION },
       },
       required: ['title', 'description', 'summary', 'doshaTendency', 'primaryEnergy', 'poses', 'breathworkId', 'ayurvedic', 'lifestyleTips'],
       additionalProperties: false,
@@ -1240,6 +1256,7 @@ const tools: Anthropic.Tool[] = [
         note: { type: 'string', description: 'One personal line about why this breath, for this moment' },
         principleId: { type: 'string', description: PRINCIPLE_ID_DESCRIPTION },
         repeatRequested: { type: 'boolean', description: 'true only when they asked by name for a practice they did in the last few days' },
+        weatherNow: { type: 'string', enum: ['hot', 'cold', 'mild'], description: WEATHER_NOW_DESCRIPTION },
       },
       required: ['breathworkId'],
       additionalProperties: false,
@@ -1550,6 +1567,24 @@ const mealReason = (profile: WellnessProfile, now: Date) =>
   `not within two hours of a meal; they ate about ${minutesSinceMeal(profile, now)} minutes ago`;
 const MEAL_HINT = ' After a meal, choose gentle practices that help digestion (Wind-Relieving Pose, gentle seated or supine twists, calm breathing).';
 
+// G14: practices marked avoid_weather are refused in that weather where they
+// are: what they said (weatherNow), else the forecast for their approximate
+// location (api/_lib/weather.ts).
+export function wrongWeather(x: { avoidWeather?: WeatherFeel[] }, feel: WeatherFeel | null): boolean {
+  return !!feel && !!x.avoidWeather?.includes(feel);
+}
+const weatherReason = (feel: WeatherFeel, weather: Weather | null, input: any) =>
+  `not for ${feel} weather; ${input?.weatherNow === feel || !weather ? 'they said it is' : `it feels like ${weather.feelsLikeC} °C where they are`}`;
+const WEATHER_HINT = ' Choose a practice that suits the weather: warming breath in the cold, cooling breath in the heat.';
+
+function weatherPrompt(weather: Weather): string {
+  const now = `About ${weather.temperatureC} °C${weather.feelsLikeC !== weather.temperatureC ? ` (feels like ${weather.feelsLikeC} °C)` : ''}, ${weather.description}${weather.windy ? ', windy' : ''}.`;
+  const rule = weather.feel
+    ? ` That counts as ${weather.feel} weather: do not offer practices marked "Not in ${weather.feel} weather", and favour ${weather.feel === 'cold' ? 'warming' : 'cooling'} choices.`
+    : '';
+  return `\n# Weather where they are\n\nThe current forecast for their approximate area, from their network connection, so it may be off (a VPN, a nearby town). ${now}${rule} Let it shape your choices quietly, mentioning it lightly when it helps. If they say their weather is different, believe them and pass it as weatherNow.\n`;
+}
+
 // G12: a card may cite one principle, but only one that exists in the
 // Practice Library's Principles tab; any other id is dropped, and the card
 // keeps its plain why (the ritual's summary, the breath's note).
@@ -1597,10 +1632,13 @@ export function buildRitual(
   catalog: Catalog,
   assetBase = configuredAssetBase(),
   now: Date = new Date(),
-  recent: ReadonlyMap<string, string> = new Map()
+  recent: ReadonlyMap<string, string> = new Map(),
+  weather: Weather | null = null
 ): { error?: string; card?: any } {
   const conflicts: string[] = [];
   let afterMeal = false;
+  const feel = weatherFeel(input, weather);
+  let badWeather = false;
   const poses: any[] = [];
   for (const p of input.poses ?? []) {
     const pose = catalog.poseById.get(p.poseId);
@@ -1611,6 +1649,10 @@ export function buildRitual(
     if (tooSoonAfterMeal(pose, profile, now)) {
       conflicts.push(`${pose.id} (${mealReason(profile, now)})`);
       afterMeal = true;
+    }
+    if (wrongWeather(pose, feel)) {
+      conflicts.push(`${pose.id} (${weatherReason(feel!, weather, input)})`);
+      badWeather = true;
     }
     const mins = Math.max(1, Math.round(p.durationMinutes));
     const caution = cautionFor(pose, profile, catalog);
@@ -1636,8 +1678,12 @@ export function buildRitual(
     conflicts.push(`${breath.id} (${mealReason(profile, now)})`);
     afterMeal = true;
   }
+  if (wrongWeather(breath, feel)) {
+    conflicts.push(`${breath.id} (${weatherReason(feel!, weather, input)})`);
+    badWeather = true;
+  }
   if (conflicts.length) {
-    return { error: `Rejected for safety — the user's conditions conflict with: ${conflicts.join('; ')}. Pick alternatives from the catalog.${EXPERIENCE_HINT}${afterMeal ? MEAL_HINT : ''}` };
+    return { error: `Rejected for safety — the user's conditions conflict with: ${conflicts.join('; ')}. Pick alternatives from the catalog.${EXPERIENCE_HINT}${afterMeal ? MEAL_HINT : ''}${badWeather ? WEATHER_HINT : ''}` };
   }
   const repeated = rotationError([...(input.poses ?? []).map((p: any) => p.poseId), breath.id], recent, input);
   if (repeated) return { error: repeated };
@@ -1677,7 +1723,8 @@ export function buildBreathworkCard(
   profile: WellnessProfile,
   catalog: Catalog,
   now: Date = new Date(),
-  recent: ReadonlyMap<string, string> = new Map()
+  recent: ReadonlyMap<string, string> = new Map(),
+  weather: Weather | null = null
 ): { error?: string; card?: any } {
   const breath = catalog.breathworkById.get(input.breathworkId);
   if (!breath) return { error: `Unknown breathworkId "${input.breathworkId}". Choose ids from the catalog.` };
@@ -1690,6 +1737,10 @@ export function buildBreathworkCard(
   }
   if (tooSoonAfterMeal(breath, profile, now)) {
     return { error: `Rejected for safety — ${breath.id} is ${mealReason(profile, now)}. Pick an alternative.${MEAL_HINT}` };
+  }
+  const feel = weatherFeel(input, weather);
+  if (wrongWeather(breath, feel)) {
+    return { error: `Rejected for safety — ${breath.id} is ${weatherReason(feel!, weather, input)}. Pick an alternative.${WEATHER_HINT}` };
   }
   const repeated = rotationError([breath.id], recent, input);
   if (repeated) return { error: repeated };
@@ -1821,7 +1872,8 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
 
     // One catalog and one set of food rules for the whole reply: the prompt
     // and the safety checks must agree.
-    const [catalog, food] = await Promise.all([servedCatalog(), getFoodRules()]);
+    // The weather where they are (G14), looked up alongside; null when unknown.
+    const [catalog, food, weather] = await Promise.all([servedCatalog(), getFoodRules(), weatherFor(req)]);
     const notFood = practiceNames(catalog);
 
     // Signed in: the main practices they completed in the last three days (G6).
@@ -1849,7 +1901,8 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       food,
       moveUp,
       new Date(),
-      recent
+      recent,
+      weather
     );
 
     // The last text sent, so that when a reply resumes after a tool call it
@@ -1993,7 +2046,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
                 'Dosha profile card shown and recorded. The full result now lives in their "Dosha Profile" tab, with balancing guidance — you may mention that. Close with one or two warm sentences; do not restate the card.';
             }
           } else if (block.name === 'create_ritual') {
-            const { error, card } = buildRitual(block.input, profile, catalog, configuredAssetBase(), new Date(), recent);
+            const { error, card } = buildRitual(block.input, profile, catalog, configuredAssetBase(), new Date(), recent, weather);
             if (error) {
               resultText = error;
               isError = true;
@@ -2007,7 +2060,7 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
                 droppedCitationNote(block.input, (card as any).result.principle);
             }
           } else if (block.name === 'suggest_breathwork') {
-            const { error, card } = buildBreathworkCard(block.input, profile, catalog, new Date(), recent);
+            const { error, card } = buildBreathworkCard(block.input, profile, catalog, new Date(), recent, weather);
             if (error) {
               resultText = error;
               isError = true;

@@ -154,6 +154,21 @@ Limits:
 
 The 150-metre match radius and the 2 km accuracy cut-off are constants at the top of `src/hooks/usePlace.ts`; the per-place guidance is `PLACE_GUIDANCE` in `api/index.ts`.
 
+### Weather
+
+Amrita knows roughly what the weather is like where the user is, so practices the Practice Library marks `avoid_weather` are not offered in that weather (G14): Cooling Breath and Hissing Breath in the cold, Sun-Piercing Breath in the heat. It works on the website and both apps, with no permission prompt. It uses free services only:
+
+- **Where:** the approximate location Vercel adds to every request, worked out from the network address (city level). It can be off behind a VPN, or by a town.
+- **Weather:** [Open-Meteo](https://open-meteo.com), which needs no key. Its free tier is for non-commercial use, with attribution ("Weather data by Open-Meteo.com", CC BY 4.0). If PranaVeda becomes commercial, move to its paid plan or another provider (`api/_lib/weather.ts`).
+- **Hot or cold:** a feels-like temperature of 10 °C or below is cold, and 30 °C or above is hot (`COLD_AT_C`, `HOT_AT_C`).
+- **What they say wins.** If the user says their weather is different ("my room is hot"), Amrita passes that on with the card, and it is checked against that instead.
+- One lookup per area every half hour, shared by everyone there. If the lookup fails, or takes more than 1.5 seconds, Amrita is told nothing about weather, and the next try is five minutes later.
+
+Privacy: coordinates are rounded to about 10 km before they are sent to Open-Meteo, and are never stored. Amrita is told the temperature and conditions, not the place.
+
+- **Locally** there are no Vercel headers, so set `WEATHER_TEST_LOCATION="47.6,-122.3"` to test with a fixed place.
+- **Turn it off:** `WEATHER=off`.
+
 ### Rate limits
 
 The routes that cost money per request or fetch for the caller are limited per person, or per network address for guests. Counts are kept in Postgres (`rate_limit_counts`), so every server instance shares them; the day resets at midnight UTC.
