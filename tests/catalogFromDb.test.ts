@@ -167,6 +167,48 @@ describe('catalog from the practices tables', () => {
     expect(catalog.breathwork.map((b) => b.id)).toEqual(['nadi_shodhana']);
   });
 
+  it('never serves an explore-only or hidden practice, even one linked to the app (G3)', () => {
+    const catalog = catalogFromRows(
+      [
+        row({}),
+        row({ id: 'P02', appId: 'handstand', nameEnglish: 'Handstand', whereShown: 'explore_only' }),
+        row({ id: 'P05', appId: 'hidden_pose', whereShown: 'hidden' }),
+        row({ id: 'P06', appId: 'not_placed', whereShown: null }),
+        breathRow(),
+      ],
+      [],
+      builtIn
+    );
+    expect(catalog.poses.map((p) => p.id)).toEqual(['childs_pose']);
+  });
+
+  it('skips a practice missing any tag the engine needs (G4)', () => {
+    const untagged: Partial<Row>[] = [
+      { minExperience: null },
+      { intensity: null },
+      { vata: null },
+      { pitta: null },
+      { kapha: null },
+      { settings: [] },
+      { effects: [] },
+      { bestTimes: [] },
+    ];
+    const catalog = catalogFromRows(
+      [row({}), ...untagged.map((missing, i) => row({ id: `P7${i}`, appId: `untagged_${i}`, ...missing })), breathRow({ effects: [] })],
+      [],
+      builtIn
+    );
+    expect(catalog.poses.map((p) => p.id)).toEqual(['childs_pose']);
+    expect(catalog.breathwork).toEqual([]);
+  });
+
+  it('skips a practice that serves no need, when needs are known (G4)', () => {
+    const rows = [row({}), row({ id: 'P35', appId: 'tadasana' }), breathRow()];
+    const catalog = catalogFromRows(rows, [], builtIn, BUILT_IN_CONDITIONS, [], new Set(['P09', 'B01']));
+    expect(catalog.poses.map((p) => p.id)).toEqual(['childs_pose']);
+    expect(catalog.breathwork.map((b) => b.id)).toEqual(['nadi_shodhana']);
+  });
+
   it('describes best times with the preferred one first', () => {
     expect(describeTimes(['morning'], 'On an empty stomach.')).toBe('Morning. On an empty stomach.');
     expect(describeTimes(['evening', 'any'], null)).toBe('Evening (also any time)');
