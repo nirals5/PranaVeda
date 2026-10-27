@@ -117,19 +117,31 @@ export function describeTimes(times: string[], note: string | null): string {
 }
 
 // The rows the app may serve: linked to the app's catalog by app_id, current,
-// not hidden or merged away, and with what a client needs to show them.
-function servable(p: PracticeRow): boolean {
-  if (!p.appId || p.retiredAt || p.mergedInto || p.whereShown === 'hidden') return false;
+// not merged away, and with what a client needs to show them. G3: only
+// practices shown "right now" are offered — never explore_only ones (a
+// handstand, say) or hidden ones. G4: a practice missing any tag the engine
+// needs (the Practice Library's required tags, needs served included) is
+// skipped. `needsServed` holds the practices that serve at least one need.
+function servable(p: PracticeRow, needsServed?: ReadonlySet<string>): boolean {
+  if (!p.appId || p.retiredAt || p.mergedInto || p.whereShown !== 'right_now') return false;
+  if (!fullyTagged(p) || (needsServed && !needsServed.has(p.id))) return false;
   if (p.type === 'asana') return p.cues.length > 0 && !!p.plainBenefit;
   return p.inhaleSec !== null && p.exhaleSec !== null && p.cycles !== null;
 }
+
+const fullyTagged = (p: PracticeRow) =>
+  !!(p.minExperience && p.intensity && p.vata && p.pitta && p.kapha) &&
+  p.settings.length > 0 &&
+  p.effects.length > 0 &&
+  p.bestTimes.length > 0;
 
 export function catalogFromRows(
   rows: PracticeRow[],
   conditions: ConditionRow[],
   builtIn: BuiltIn,
   conditionList: CatalogCondition[] = builtIn.conditions,
-  principles: CatalogPrinciple[] = []
+  principles: CatalogPrinciple[] = [],
+  needsServed?: ReadonlySet<string>
 ): Catalog {
   const avoid = new Map<string, string[]>();
   const caution = new Map<string, string[]>();
@@ -142,7 +154,11 @@ export function catalogFromRows(
   // Keep the built-in order the clients show today; new practices follow, by id.
   const order = new Map([...builtIn.poses, ...builtIn.breathwork].map((x, i) => [x.id, i]));
   const rank = (r: PracticeRow) => order.get(r.appId!) ?? Number.MAX_SAFE_INTEGER;
-  const sorted = rows.filter(servable).sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
+  const sorted = rows.filter((r) => servable(r, needsServed)).sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
+  // A practice linked to the app but not served is most likely a sheet edit to
+  // look at (made explore_only, or a required tag cleared), so say which.
+  const skipped = rows.filter((r) => r.appId && !r.retiredAt && !r.mergedInto && !servable(r, needsServed)).map((r) => `${r.id} (${r.appId})`);
+  if (skipped.length) console.warn(`[catalog] not served (G3/G4: not right_now, untagged or incomplete): ${skipped.join(', ')}`);
 
   const safety = (r: PracticeRow) => {
     const cautions = caution.get(r.id) ?? [];
@@ -208,7 +224,7 @@ export function catalogFromRows(
 
 async function readCatalog(builtIn: BuiltIn): Promise<Catalog> {
   const db = getDb();
-  const [rows, conditions, conditionList, principleRows] = await Promise.all([
+  const [rows, conditions, conditionList, principleRows, needRows] = await Promise.all([
     db.select().from(schema.practices).where(isNull(schema.practices.retiredAt)),
     db
       .select({
@@ -223,10 +239,12 @@ async function readCatalog(builtIn: BuiltIn): Promise<Catalog> {
       .from(schema.conditions)
       .orderBy(asc(schema.conditions.code)),
     db.select({ id: schema.practicePrinciples.id, statement: schema.practicePrinciples.statement }).from(schema.practicePrinciples),
+    db.selectDistinct({ practiceId: schema.practiceNeeds.practiceId }).from(schema.practiceNeeds),
   ]);
   // PR1, PR2 … PR10, in number order.
   const principles = principleRows.sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }));
-  const catalog = catalogFromRows(rows, conditions, builtIn, conditionList, principles);
+  const needsServed = new Set(needRows.map((n) => n.practiceId));
+  const catalog = catalogFromRows(rows, conditions, builtIn, conditionList, principles, needsServed);
   // An empty result means the tables are not loaded yet, not that the app has no practices.
   if (!catalog.poses.length || !catalog.breathwork.length) throw new Error('the practices tables are empty');
   return catalog;
