@@ -18,7 +18,7 @@ import { getUser } from './_lib/users.js';
 import { DOSHA_GUIDE, DOSHA_GUIDE_NOTE } from './_lib/doshaGuide.js';
 import { catalogOf, conditionConflicts, getCatalog } from './_lib/catalog.js';
 import type { Catalog, CatalogCondition } from './_lib/catalog.js';
-import { weatherFeel, weatherFor } from './_lib/weather.js';
+import { temperatures, weatherFeel, weatherFor } from './_lib/weather.js';
 import type { Weather, WeatherFeel } from './_lib/weather.js';
 import {
   BUILT_IN_FOOD_RULES,
@@ -1574,15 +1574,18 @@ export function wrongWeather(x: { avoidWeather?: WeatherFeel[] }, feel: WeatherF
   return !!feel && !!x.avoidWeather?.includes(feel);
 }
 const weatherReason = (feel: WeatherFeel, weather: Weather | null, input: any) =>
-  `not for ${feel} weather; ${input?.weatherNow === feel || !weather ? 'they said it is' : `it feels like ${weather.feelsLikeC} °C where they are`}`;
+  `not for ${feel} weather; ${input?.weatherNow === feel || !weather ? 'they said it is' : `it feels like ${temperatures(weather.feelsLikeC, weather.unit)} where they are`}`;
 const WEATHER_HINT = ' Choose a practice that suits the weather: warming breath in the cold, cooling breath in the heat.';
 
 function weatherPrompt(weather: Weather): string {
-  const now = `About ${weather.temperatureC} °C${weather.feelsLikeC !== weather.temperatureC ? ` (feels like ${weather.feelsLikeC} °C)` : ''}, ${weather.description}${weather.windy ? ', windy' : ''}.`;
+  const now = `About ${temperatures(weather.temperatureC, weather.unit)}${weather.feelsLikeC !== weather.temperatureC ? ` (feels like ${temperatures(weather.feelsLikeC, weather.unit)})` : ''}, ${weather.description}${weather.windy ? ', windy' : ''}.`;
+  const unit = weather.unit === 'F' ? '°F' : '°C';
+  const other = weather.unit === 'F' ? '°C' : '°F';
+  const units = ` When you mention a temperature, lead with ${unit}, which is what people use there, and give ${other} after it ("${temperatures(weather.temperatureC, weather.unit).replace(' / ', ' (')})"). If they use one unit themselves, lead with theirs instead for the rest of the conversation.`;
   const rule = weather.feel
     ? ` That counts as ${weather.feel} weather: do not offer practices marked "Not in ${weather.feel} weather", and favour ${weather.feel === 'cold' ? 'warming' : 'cooling'} choices.`
     : '';
-  return `\n# Weather where they are\n\nThe current forecast for their approximate area, from their network connection, so it may be off (a VPN, a nearby town). ${now}${rule} Let it shape your choices quietly, mentioning it lightly when it helps. If they say their weather is different, believe them and pass it as weatherNow.\n`;
+  return `\n# Weather where they are\n\nThe current forecast for their approximate area, from their network connection, so it may be off (a VPN, a nearby town). ${now}${rule} Let it shape your choices quietly, mentioning it lightly when it helps.${units} If they say their weather is different, believe them and pass it as weatherNow.\n`;
 }
 
 // G12: a card may cite one principle, but only one that exists in the

@@ -19,6 +19,30 @@ export interface Weather {
   description: string;
   windy: boolean;
   feel: WeatherFeel | null;
+  // The unit people use where they are, which Amrita leads with.
+  unit: TemperatureUnit;
+}
+
+export type TemperatureUnit = 'C' | 'F';
+
+// Where Fahrenheit is the everyday unit: the United States and its
+// territories, Liberia, Myanmar, the Bahamas, the Cayman Islands, Palau,
+// Micronesia and the Marshall Islands.
+const FAHRENHEIT_COUNTRIES = new Set(['US', 'PR', 'GU', 'VI', 'AS', 'MP', 'UM', 'LR', 'MM', 'BS', 'KY', 'PW', 'FM', 'MH']);
+
+// From Vercel's country header for the request; Celsius when it is unknown.
+export function unitFor(req: Pick<Request, 'headers'>): TemperatureUnit {
+  const country = String(first(req.headers['x-vercel-ip-country']) ?? '').trim().toUpperCase();
+  return FAHRENHEIT_COUNTRIES.has(country) ? 'F' : 'C';
+}
+
+export const fahrenheit = (c: number) => Math.round((c * 9) / 5 + 32);
+
+// "59 °F / 15 °C", the local unit first.
+export function temperatures(celsius: number, unit: TemperatureUnit): string {
+  const c = `${celsius} °C`;
+  const f = `${fahrenheit(celsius)} °F`;
+  return unit === 'F' ? `${f} / ${c}` : `${c} / ${f}`;
 }
 
 // Feels-like temperatures at or past these count as cold or hot weather.
@@ -76,6 +100,7 @@ export function weatherFromForecast(body: any): Weather | null {
     description: describeCode(Number(c?.weather_code)),
     windy: Number(c?.wind_speed_10m) >= 30,
     feel: feelOf(feelsLikeC),
+    unit: 'C',
   };
 }
 
@@ -109,7 +134,8 @@ export async function currentWeather(
 
 export async function weatherFor(req: Pick<Request, 'headers'>): Promise<Weather | null> {
   const at = approximateLocation(req);
-  return at ? currentWeather(at) : null;
+  const weather = at ? await currentWeather(at) : null;
+  return weather && { ...weather, unit: unitFor(req) };
 }
 
 export const clearWeatherCache = () => cache.clear();

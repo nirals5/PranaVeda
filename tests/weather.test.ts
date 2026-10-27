@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { catalogFromRows, getCatalog, resetCatalogCache } from '../api/_lib/catalog.js';
 import {
   approximateLocation,
+  temperatures,
+  unitFor,
   clearWeatherCache,
   currentWeather,
   describeCode,
@@ -23,6 +25,7 @@ const weather = (feelsLikeC: number, temperatureC = feelsLikeC): Weather => ({
   description: 'clear',
   windy: false,
   feel: feelOf(feelsLikeC),
+  unit: 'C',
 });
 const COLD = weather(2, 5);
 const HOT = weather(34);
@@ -51,7 +54,7 @@ describe('what counts as hot or cold', () => {
 describe('weather practices', () => {
   it('refuse Cooling Breath in the cold, saying why and what suits instead', () => {
     const { error } = card({ breathworkId: 'sheetali' }, COLD);
-    expect(error).toContain('sheetali is not for cold weather; it feels like 2 °C where they are');
+    expect(error).toContain('sheetali is not for cold weather; it feels like 2 °C / 36 °F where they are');
     expect(error).toContain('warming breath in the cold');
     expect(buildRitual(ritual('sheetali'), {}, BUILT_IN_CATALOG, '', NOW, new Map(), COLD).error).toContain('sheetali (not for cold weather');
   });
@@ -102,14 +105,22 @@ describe('telling Amrita', () => {
   it('gives the weather, and what it rules out', () => {
     const text = prompt(COLD);
     expect(text).toContain('# Weather where they are');
-    expect(text).toContain('About 5 °C (feels like 2 °C), clear.');
+    expect(text).toContain('About 5 °C / 41 °F (feels like 2 °C / 36 °F), clear.');
+    expect(text).toContain('lead with °C, which is what people use there, and give °F after it ("5 °C (41 °F)")');
     expect(text).toContain('That counts as cold weather: do not offer practices marked "Not in cold weather"');
   });
 
   it('gives mild weather without a rule, and says nothing when the weather is unknown', () => {
-    expect(prompt(MILD)).toContain('About 20 °C, clear.');
+    expect(prompt(MILD)).toContain('About 20 °C / 68 °F, clear.');
     expect(prompt(MILD)).not.toContain('That counts as');
     expect(prompt(null)).not.toContain('# Weather where they are');
+  });
+
+  it('leads with °F where people use it, and follows the unit they use', () => {
+    const text = prompt({ ...COLD, unit: 'F' });
+    expect(text).toContain('About 41 °F / 5 °C (feels like 36 °F / 2 °C), clear.');
+    expect(text).toContain('lead with °F, which is what people use there, and give °C after it ("41 °F (5 °C)")');
+    expect(text).toContain('If they use one unit themselves, lead with theirs instead');
   });
 
   it('always asks her to pass on what they say about their weather', () => {
@@ -145,6 +156,18 @@ describe('where they are', () => {
   });
 });
 
+describe('the unit', () => {
+  it('is °F in the United States and the few other places that use it, °C elsewhere or when unknown', () => {
+    const from = (country?: string) => unitFor({ headers: country ? { 'x-vercel-ip-country': country } : {} });
+    expect([from('US'), from('PR'), from('LR'), from('IN'), from('GB'), from()]).toEqual(['F', 'F', 'F', 'C', 'C', 'C']);
+  });
+
+  it('shows both, the local one first', () => {
+    expect(temperatures(15, 'F')).toBe('59 °F / 15 °C');
+    expect(temperatures(-40, 'C')).toBe('-40 °C / -40 °F');
+  });
+});
+
 describe('the forecast', () => {
   beforeEach(() => {
     clearWeatherCache();
@@ -157,7 +180,7 @@ describe('the forecast', () => {
   const T = Date.parse('2026-10-27T13:00:00Z');
 
   it('reads Open-Meteo’s current conditions', () => {
-    expect(weatherFromForecast(forecast)).toEqual({ temperatureC: 5, feelsLikeC: 1, description: 'rain', windy: true, feel: 'cold' });
+    expect(weatherFromForecast(forecast)).toEqual({ temperatureC: 5, feelsLikeC: 1, description: 'rain', windy: true, feel: 'cold', unit: 'C' });
     expect(weatherFromForecast({})).toBeNull();
     expect([describeCode(0), describeCode(3), describeCode(73), describeCode(95)]).toEqual(['clear', 'overcast', 'snow', 'thunderstorms']);
   });
