@@ -18,7 +18,9 @@ import { getUser } from './_lib/users.js';
 import { DOSHA_GUIDE, DOSHA_GUIDE_NOTE } from './_lib/doshaGuide.js';
 import { catalogOf, conditionConflicts, getCatalog } from './_lib/catalog.js';
 import type { Catalog, CatalogCondition } from './_lib/catalog.js';
-import { temperatures, weatherFeel, weatherFor } from './_lib/weather.js';
+import { approximateLocation, temperatures, weatherFeel, weatherFor } from './_lib/weather.js';
+import { hintsNow, localHour, rightNowPrompt, seasonOf } from './_lib/rightNow.js';
+import type { HintId } from './_lib/rightNow.js';
 import type { Weather, WeatherFeel } from './_lib/weather.js';
 import {
   BUILT_IN_FOOD_RULES,
@@ -96,6 +98,8 @@ export interface CatalogPose {
   avoidAfterMeal?: true;
   // Not offered in this weather where they are (G14).
   avoidWeather?: WeatherFeel[];
+  // The needs it serves ("N3 Energize"), which the hints lean toward.
+  needs?: string[];
   dosha: { vata: string; pitta: string; kapha: string };
   bestTime: string;
   counterPoseId?: string;
@@ -123,6 +127,8 @@ export interface CatalogBreathwork {
   avoidAfterMeal?: true;
   // Not offered in this weather where they are (G14).
   avoidWeather?: WeatherFeel[];
+  // The needs it serves ("N3 Energize"), which the hints lean toward.
+  needs?: string[];
   cautions?: string[];
   safetyNote?: string;
   bestTime: string;
@@ -880,16 +886,19 @@ function safetyLine(x: { contraindications: string[]; cautions?: string[]; safet
   return experienced + meal + weather + avoid + adapt;
 }
 
+// " Serves: N1 Ground, N4 Restore." — the needs the hints lean toward.
+const servesLine = (x: { needs?: string[] }) => (x.needs?.length ? ` Serves: ${x.needs.join(', ')}.` : '');
+
 // Compact catalog summaries injected into Amrita's system prompt so she can
 // select by id without seeing every field.
 export function catalogPromptSummary(catalog: Catalog = BUILT_IN_CATALOG): string {
   const poses = catalog.poses.map(
     (p) =>
-      `- ${p.id} (${p.nameEnglish} / ${p.nameSanskrit}) — ${p.bodyFocus}. Vata: ${p.dosha.vata}. Pitta: ${p.dosha.pitta}. Kapha: ${p.dosha.kapha}. Best: ${p.bestTime}.${safetyLine(p)}`
+      `- ${p.id} (${p.nameEnglish} / ${p.nameSanskrit}) — ${p.bodyFocus}. Vata: ${p.dosha.vata}. Pitta: ${p.dosha.pitta}. Kapha: ${p.dosha.kapha}. Best: ${p.bestTime}.${servesLine(p)}${safetyLine(p)}`
   ).join('\n');
   const breaths = catalog.breathwork.map(
     (b) =>
-      `- ${b.id} (${b.name} / ${b.sanskritName}) — ${b.doshaSuitability}. ${b.inhale}-${b.holdActive}-${b.exhale}-${b.holdEmpty} × ${b.cycles}. Best: ${b.bestTime}.${safetyLine(b)}`
+      `- ${b.id} (${b.name} / ${b.sanskritName}) — ${b.doshaSuitability}. ${b.inhale}-${b.holdActive}-${b.exhale}-${b.holdEmpty} × ${b.cycles}. Best: ${b.bestTime}.${servesLine(b)}${safetyLine(b)}`
   ).join('\n');
   const principles = catalog.principles.length
     ? `\n\n## Principles (cite at most one per card, by id, as principleId)\n${catalog.principles.map((p) => `- ${p.id}: ${p.statement}`).join('\n')}`
@@ -1038,7 +1047,8 @@ export function buildSystemPrompt(
   moveUp: MoveUp | null = null,
   now: Date = new Date(),
   recent: ReadonlyMap<string, string> = new Map(),
-  weather: Weather | null = null
+  weather: Weather | null = null,
+  hints: HintId[] = []
 ): string {
   const profileBlock = profile && Object.keys(profile).length
     ? JSON.stringify(profile, null, 1)
@@ -1156,7 +1166,7 @@ ${foodRulesPrompt(food)}
 - You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time${calendar ? ' and when their calendar is busy or free' : ''}${health ? ', and see the wearable readings listed below' : ''}${place ? ', and know the kind of place they are in' : ''}${weather ? ', and know roughly what the weather is like where they are' : ''}.
 - You CANNOT (yet): see the user's camera or posture, ${health ? 'read any wearable data beyond the readings listed below' : 'read wearables/sleep data'}, ${calendar ? 'see what their calendar events are or change their calendar' : 'access their calendar'}, control smart-home devices, or set reminders. If asked, say warmly that this isn't available yet — never pretend.
 
-${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${weatherBlock}${mealBlock}${recentBlock}${moveUp ? moveUpPrompt(moveUp) : ''}${voiceBlock}
+${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${weatherBlock}${rightNowPrompt(hints, catalog.hints)}${mealBlock}${recentBlock}${moveUp ? moveUpPrompt(moveUp) : ''}${voiceBlock}
 # Context
 
 Local time for the user: ${localTime}
@@ -1906,7 +1916,9 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       moveUp,
       new Date(),
       recent,
-      weather
+      weather,
+      // H1–H9: the hour they sent, the season where they are, the weather.
+      hintsNow({ hour: localHour(localTime), season: seasonOf(today, approximateLocation(req)?.lat ?? null), weather })
     );
 
     // The last text sent, so that when a reply resumes after a tool call it
