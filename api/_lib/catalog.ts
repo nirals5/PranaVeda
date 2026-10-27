@@ -1,4 +1,4 @@
-import { asc, isNull } from 'drizzle-orm';
+import { asc, eq, isNull } from 'drizzle-orm';
 import { getDb, schema } from './db.js';
 import type { CatalogBreathwork, CatalogPose } from '../index.js';
 
@@ -32,6 +32,9 @@ export interface Catalog {
   poseById: Map<string, CatalogPose>;
   breathworkById: Map<string, CatalogBreathwork>;
   principleById: Map<string, CatalogPrinciple>;
+  // The Rules tab's hints (H1…), rule id → what to lean toward. Empty with
+  // the built-in catalog; api/_lib/rightNow.ts has its own wording then.
+  hints: ReadonlyMap<string, string>;
   source: 'database' | 'built-in';
 }
 
@@ -62,7 +65,8 @@ export function catalogOf(
   breathwork: CatalogBreathwork[],
   conditions: CatalogCondition[],
   source: Catalog['source'],
-  principles: CatalogPrinciple[] = []
+  principles: CatalogPrinciple[] = [],
+  hints: ReadonlyMap<string, string> = new Map()
 ): Catalog {
   return {
     poses,
@@ -72,6 +76,7 @@ export function catalogOf(
     poseById: new Map(poses.map((p) => [p.id, p])),
     breathworkById: new Map(breathwork.map((b) => [b.id, b])),
     principleById: new Map(principles.map((p) => [p.id, p])),
+    hints,
     source,
   };
 }
@@ -144,7 +149,9 @@ export function catalogFromRows(
   builtIn: BuiltIn,
   conditionList: CatalogCondition[] = builtIn.conditions,
   principles: CatalogPrinciple[] = [],
-  needsServed?: ReadonlySet<string>
+  needsServed?: ReadonlySet<string>,
+  needsOf: ReadonlyMap<string, string[]> = new Map(),
+  hints: ReadonlyMap<string, string> = new Map()
 ): Catalog {
   const avoid = new Map<string, string[]>();
   const caution = new Map<string, string[]>();
@@ -172,6 +179,7 @@ export function catalogFromRows(
       ...(r.minExperience === 'experienced' ? { minExperience: 'experienced' as const } : {}),
       ...(r.avoidAfterMeal ? { avoidAfterMeal: true as const } : {}),
       ...(weathers(r.avoidWeather).length ? { avoidWeather: weathers(r.avoidWeather) } : {}),
+      ...(needsOf.get(r.id)?.length ? { needs: needsOf.get(r.id) } : {}),
     };
   };
 
@@ -223,12 +231,12 @@ export function catalogFromRows(
       bestTime: describeTimes(r.bestTimes, r.timingNote),
     }));
 
-  return catalogOf(poses, breathwork, conditionList, 'database', principles);
+  return catalogOf(poses, breathwork, conditionList, 'database', principles, hints);
 }
 
 async function readCatalog(builtIn: BuiltIn): Promise<Catalog> {
   const db = getDb();
-  const [rows, conditions, conditionList, principleRows, needRows] = await Promise.all([
+  const [rows, conditions, conditionList, principleRows, needRows, hintRows] = await Promise.all([
     db.select().from(schema.practices).where(isNull(schema.practices.retiredAt)),
     db
       .select({
@@ -243,12 +251,24 @@ async function readCatalog(builtIn: BuiltIn): Promise<Catalog> {
       .from(schema.conditions)
       .orderBy(asc(schema.conditions.code)),
     db.select({ id: schema.practicePrinciples.id, statement: schema.practicePrinciples.statement }).from(schema.practicePrinciples),
-    db.selectDistinct({ practiceId: schema.practiceNeeds.practiceId }).from(schema.practiceNeeds),
+    db
+      .select({ practiceId: schema.practiceNeeds.practiceId, id: schema.needs.id, name: schema.needs.name })
+      .from(schema.practiceNeeds)
+      .innerJoin(schema.needs, eq(schema.practiceNeeds.needId, schema.needs.id))
+      .orderBy(asc(schema.needs.id)),
+    db
+      .select({ id: schema.practiceRules.id, thenText: schema.practiceRules.thenText })
+      .from(schema.practiceRules)
+      .where(eq(schema.practiceRules.kind, 'hint')),
   ]);
   // PR1, PR2 … PR10, in number order.
   const principles = principleRows.sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }));
   const needsServed = new Set(needRows.map((n) => n.practiceId));
-  const catalog = catalogFromRows(rows, conditions, builtIn, conditionList, principles, needsServed);
+  // "N3 Energize", the way the hints name a need.
+  const needsOf = new Map<string, string[]>();
+  for (const n of needRows) needsOf.set(n.practiceId, [...(needsOf.get(n.practiceId) ?? []), `${n.id} ${n.name}`]);
+  const hints = new Map(hintRows.map((h) => [h.id, h.thenText]));
+  const catalog = catalogFromRows(rows, conditions, builtIn, conditionList, principles, needsServed, needsOf, hints);
   // An empty result means the tables are not loaded yet, not that the app has no practices.
   if (!catalog.poses.length || !catalog.breathwork.length) throw new Error('the practices tables are empty');
   return catalog;

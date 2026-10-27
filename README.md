@@ -169,6 +169,26 @@ Privacy: coordinates are rounded to about 10 km before they are sent to Open-Met
 - **Locally** there are no Vercel headers, so set `WEATHER_TEST_LOCATION="47.6,-122.3"` to test with a fixed place.
 - **Turn it off:** `WEATHER=off`.
 
+### Time of day, season and weather hints
+
+Hints H1–H9 in the Practice Library's Rules tab gently steer Amrita's choices, in a "Right now" section of her prompt (`api/_lib/rightNow.ts`). They never refuse a card: what the user says, and every safety rule, comes first.
+
+- **Time of day,** from the time the website or app sends:
+  - **H1, 6–10 am:** energise.
+  - **H2, 10 am–2 pm:** cool if irritable or hot.
+  - **H3, 2–6 pm:** ground if scattered or anxious.
+  - **H4, 8 pm–4 am:** wind down.
+- **Season,** from the user's own date:
+  - **H5, Sep 23 – Jan 15:** grounding and warming.
+  - **H6, Jan 16 – Jun 20:** energising.
+  - **H7, Jun 21 – Sep 22:** cooling.
+  - South of the tropics the dates are six months on. Within about 23.5° of the equator no season hint is given. When the location is unknown, northern dates are used.
+- **Weather:**
+  - **H8, cold or windy:** grounding and warming.
+  - **H9, hot:** cooling.
+
+What each hint leans toward is the Rules tab's `then` text, and the windows are in code. Amrita's catalog lists the needs each practice serves ("Serves: N1 Ground, N6 Wind down"), so she can follow them.
+
 ### Rate limits
 
 The routes that cost money per request or fetch for the caller are limited per person, or per network address for guests. Counts are kept in Postgres (`rate_limit_counts`), so every server instance shares them; the day resets at midnight UTC.
