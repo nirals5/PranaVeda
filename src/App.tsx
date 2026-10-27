@@ -549,6 +549,15 @@ export default function App() {
           >
             SNEHA DESAI · YIN AND YANG YOGA
           </a>
+          {' · '}WEATHER DATA BY{' '}
+          <a
+            href="https://open-meteo.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#72618F] underline decoration-[#8A79A5]/50 underline-offset-2 hover:text-[#8A79A5] transition-colors"
+          >
+            OPEN-METEO.COM
+          </a>
         </p>
       </footer>
 

@@ -8,6 +8,7 @@ import {
   POSES,
   buildBreathworkCard,
   buildRitual,
+  buildSystemPrompt,
   catalogPromptSummary,
   citedPrinciple,
   droppedCitationNote,
@@ -91,6 +92,13 @@ describe('telling Amrita', () => {
 
   it('lists none when there are none', () => {
     expect(catalogPromptSummary(BUILT_IN_CATALOG)).not.toContain('## Principles');
+  });
+
+  it('keeps principle ids out of her own words, and refused practices out of her suggestions', () => {
+    const prompt = buildSystemPrompt({}, 'now', 'text', undefined, undefined, undefined, undefined, catalog);
+    expect(prompt).toContain('Never write a principle id (PR1, PR12…) in your own words: the card shows the citation.');
+    expect(prompt).toContain('What a card would refuse, you do not suggest in words either');
+    expect(prompt).toContain('Suggest only practices you could put on a card for them right now.');
   });
 });
 

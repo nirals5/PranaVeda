@@ -32,11 +32,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import com.pranaveda.app.PranaVedaApplication
 import com.pranaveda.app.R
@@ -88,7 +96,24 @@ fun AccountScreen(auth: AuthStore, chat: ChatViewModel? = null, onBegin: () -> U
             PracticeTrendsCard(app.practice, app.health)
             SavedRitualsCard(app.saved, onOpen = { reopening = it })
             reopening?.let { RitualSheet(it) { reopening = null } }
+            Credits()
         }
+    }
+}
+
+/** Who the pose photographs and the weather come from, as at the foot of the website. Open-Meteo's free tier asks for this credit. */
+@Composable
+private fun Credits() {
+    val linkStyle = TextLinkStyles(SpanStyle(color = Pv.lavenderDeep, textDecoration = TextDecoration.Underline))
+    fun credit(lead: String, name: String, url: String) = buildAnnotatedString {
+        append(lead)
+        withLink(LinkAnnotation.Url(url, linkStyle)) { append(name) }
+    }
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(
+            credit("Pose photography by ", "Sneha Desai · Yin and Yang Yoga", "https://yin-yangyoga.com/"),
+            credit("Weather data by ", "Open-Meteo.com", "https://open-meteo.com/"),
+        ).forEach { Text(it, style = Pv.caption, color = Pv.stone500, textAlign = TextAlign.Center) }
     }
 }
 

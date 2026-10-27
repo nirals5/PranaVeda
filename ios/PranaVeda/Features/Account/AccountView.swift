@@ -30,6 +30,7 @@ struct AccountView: View {
                         if let message = auth.problem ?? notice {
                             Text(message).font(Theme.bodySmall).foregroundStyle(Theme.terracotta)
                         }
+                        Credits()
                     }
                     .padding(16)
                 }
@@ -102,6 +103,23 @@ struct AccountView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
+    }
+}
+
+/// Who the pose photographs and the weather come from, as at the foot of the
+/// website. Open-Meteo's free tier asks for this credit.
+private struct Credits: View {
+    var body: some View {
+        VStack(spacing: 6) {
+            Text("Pose photography by [Sneha Desai · Yin and Yang Yoga](https://yin-yangyoga.com/)")
+            Text("Weather data by [Open-Meteo.com](https://open-meteo.com/)")
+        }
+        .font(Theme.caption)
+        .foregroundStyle(Theme.stone500)
+        .tint(Theme.lavenderDeep)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
     }
 }
 
