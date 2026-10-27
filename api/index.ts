@@ -20,7 +20,7 @@ import { catalogOf, conditionConflicts, getCatalog } from './_lib/catalog.js';
 import type { Catalog, CatalogCondition } from './_lib/catalog.js';
 import { approximateLocation, temperatures, weatherFeel, weatherFor } from './_lib/weather.js';
 import { hintsNow, localHour, rightNowPrompt, seasonOf } from './_lib/rightNow.js';
-import type { HintId } from './_lib/rightNow.js';
+import type { RightNow } from './_lib/rightNow.js';
 import type { Weather, WeatherFeel } from './_lib/weather.js';
 import {
   BUILT_IN_FOOD_RULES,
@@ -100,6 +100,11 @@ export interface CatalogPose {
   avoidWeather?: WeatherFeel[];
   // The needs it serves ("N3 Energize"), which the hints lean toward.
   needs?: string[];
+  // How demanding it is (H10), and the doshas it balances or can aggravate
+  // (H12), from the Practice Library's tags.
+  intensity?: 'gentle' | 'moderate' | 'strong';
+  balances?: string[];
+  aggravates?: string[];
   dosha: { vata: string; pitta: string; kapha: string };
   bestTime: string;
   counterPoseId?: string;
@@ -129,6 +134,11 @@ export interface CatalogBreathwork {
   avoidWeather?: WeatherFeel[];
   // The needs it serves ("N3 Energize"), which the hints lean toward.
   needs?: string[];
+  // How demanding it is (H10), and the doshas it balances or can aggravate
+  // (H12), from the Practice Library's tags.
+  intensity?: 'gentle' | 'moderate' | 'strong';
+  balances?: string[];
+  aggravates?: string[];
   cautions?: string[];
   safetyNote?: string;
   bestTime: string;
@@ -887,7 +897,15 @@ function safetyLine(x: { contraindications: string[]; cautions?: string[]; safet
 }
 
 // " Serves: N1 Ground, N4 Restore." — the needs the hints lean toward.
-const servesLine = (x: { needs?: string[] }) => (x.needs?.length ? ` Serves: ${x.needs.join(', ')}.` : '');
+// " Intensity: strong. Balances Vata, Pitta; can aggravate Kapha." when tagged.
+const servesLine = (x: { needs?: string[]; intensity?: string; balances?: string[]; aggravates?: string[] }) => {
+  const serves = x.needs?.length ? ` Serves: ${x.needs.join(', ')}.` : '';
+  const intensity = x.intensity ? ` Intensity: ${x.intensity}.` : '';
+  const doshas = [x.balances?.length ? `Balances ${x.balances.join(', ')}` : '', x.aggravates?.length ? `can aggravate ${x.aggravates.join(', ')}` : '']
+    .filter(Boolean)
+    .join('; ');
+  return serves + intensity + (doshas ? ` ${doshas[0].toUpperCase()}${doshas.slice(1)}.` : '');
+};
 
 // Compact catalog summaries injected into Amrita's system prompt so she can
 // select by id without seeing every field.
@@ -1048,7 +1066,7 @@ export function buildSystemPrompt(
   now: Date = new Date(),
   recent: ReadonlyMap<string, string> = new Map(),
   weather: Weather | null = null,
-  hints: HintId[] = []
+  rightNow: RightNow = { hints: [] }
 ): string {
   const profileBlock = profile && Object.keys(profile).length
     ? JSON.stringify(profile, null, 1)
@@ -1166,7 +1184,7 @@ ${foodRulesPrompt(food)}
 - You CAN: converse over multiple turns, remember via the wellness profile, recommend from the catalog below, and see the user's local time${calendar ? ' and when their calendar is busy or free' : ''}${health ? ', and see the wearable readings listed below' : ''}${place ? ', and know the kind of place they are in' : ''}${weather ? ', and know roughly what the weather is like where they are' : ''}.
 - You CANNOT (yet): see the user's camera or posture, ${health ? 'read any wearable data beyond the readings listed below' : 'read wearables/sleep data'}, ${calendar ? 'see what their calendar events are or change their calendar' : 'access their calendar'}, control smart-home devices, or set reminders. If asked, say warmly that this isn't available yet — never pretend.
 
-${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${weatherBlock}${rightNowPrompt(hints, catalog.hints)}${mealBlock}${recentBlock}${moveUp ? moveUpPrompt(moveUp) : ''}${voiceBlock}
+${previousBlock}${calendarBlock}${healthBlock}${placeBlock}${weatherBlock}${rightNowPrompt(rightNow, catalog.hints)}${mealBlock}${recentBlock}${moveUp ? moveUpPrompt(moveUp) : ''}${voiceBlock}
 # Context
 
 Local time for the user: ${localTime}
@@ -1917,8 +1935,15 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       new Date(),
       recent,
       weather,
-      // H1–H9: the hour they sent, the season where they are, the weather.
-      hintsNow({ hour: localHour(localTime), season: seasonOf(today, approximateLocation(req)?.lat ?? null), weather })
+      // H1–H12: the hour they sent, the season where they are, the weather,
+      // last night's sleep from their wearable, and their dosha.
+      hintsNow({
+        hour: localHour(localTime),
+        season: seasonOf(today, approximateLocation(req)?.lat ?? null),
+        weather,
+        sleep: sanitizeHealthContext(health)?.sleep,
+        profile,
+      })
     );
 
     // The last text sent, so that when a reply resumes after a tool call it
