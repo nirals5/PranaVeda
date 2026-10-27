@@ -1,5 +1,6 @@
 package com.pranaveda.app.net
 
+import com.pranaveda.app.health.HealthSummary
 import com.pranaveda.app.config.AppConfig
 import com.pranaveda.app.model.Catalog
 import com.pranaveda.app.model.ChatCard
@@ -53,6 +54,8 @@ data class ChatRequest(
     val localDate: String,
     val inputMode: String = "text",
     val previousSession: List<ChatMessage>? = null,
+    /** Their sleep and heart readings beside their usual, only when they have let Amrita see them. */
+    val health: HealthSummary? = null,
 )
 
 class ApiClient(

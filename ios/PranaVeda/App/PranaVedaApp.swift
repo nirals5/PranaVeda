@@ -70,7 +70,11 @@ struct PranaVedaApp: App {
             // Listens on the Amrita tab (practice screens hand it their own
             // commands), never in the background or over Amrita's own voice.
             .onChange(of: tab == .amrita && openedRitual == nil, initial: true) { _, showing in heyAmrita.chatShowing = showing }
-            .onChange(of: scenePhase, initial: true) { _, phase in heyAmrita.hold(.background, phase != .active) }
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                heyAmrita.hold(.background, phase != .active)
+                // This morning's readings, ready for the next message to Amrita.
+                if phase == .active { Task { await health.load() } }
+            }
             .onChange(of: voice.isSpeaking) { _, speaking in heyAmrita.hold(.replying, speaking) }
             .onChange(of: router.pending, initial: true) {
                 guard let url = router.pending else { return }
@@ -89,6 +93,7 @@ struct PranaVedaApp: App {
                 chat.auth = auth
                 chat.speakReply = { [voice] in voice.speak($0) }
                 chat.stopSpeaking = { [voice] in voice.stop() }
+                chat.healthForAmrita = { [health] in health.summaryForAmrita() }
                 heyAmrita.onWake = { open(WidgetLink.talk) }
                 practice.auth = auth
                 saved.auth = auth

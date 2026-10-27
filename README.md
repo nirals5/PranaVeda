@@ -190,7 +190,9 @@ Hints H1–H10 and H12 in the Practice Library's Rules tab gently steer Amrita's
 - **Sleep (H10):**
   - **What it does:** after a short night, Amrita avoids strong practices and leans toward N4 Restore or N1 Ground.
   - **What counts:** under 6 hours, or an hour or more below their usual (`SHORT_SLEEP_MINUTES`, `SHORT_OF_USUAL_MINUTES`).
-  - **Where it comes from:** the wearable reading the website sends, else what the user says. The apps don't send sleep yet.
+  - **Where it comes from:** the wearable reading the website sends, else what the user says. The iPhone and Android apps also send their readings, but only when the user turns on "Let Amrita see my sleep and heart readings" under Heart & sleep. It's off by default.
+    - **What's sent:** only a summary: last night's sleep, resting heart rate and HRV, each beside the user's usual, worked out as on the website.
+    - **HRV:** each reading names its kind, SDNN from Apple Health or RMSSD from Health Connect.
 - **Their dosha (H12):**
   - **What it does:** between equally good options, Amrita prefers practices that balance the person's dosha.
   - **Which dosha:** their current imbalance (`vikriti`) when Amrita has recorded one, else their constitution (`prakriti`).

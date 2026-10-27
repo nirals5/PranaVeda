@@ -23,6 +23,10 @@ final class ChatViewModel {
     var speakReply: ((String) -> Void)?
     var stopSpeaking: (() -> Void)?
 
+    /// Their readings for Amrita (HealthStore.summaryForAmrita): nil unless
+    /// they have let her see them.
+    var healthForAmrita: (() -> HealthSummary?)?
+
     private let api: APIClient
     private let defaults: UserDefaults
     private var streamTask: Task<Void, Never>?
@@ -82,7 +86,8 @@ final class ChatViewModel {
             localTime: now.formatted(date: .numeric, time: .standard),
             localDate: Self.localDate(now),
             inputMode: spoken ? "voice" : "text",
-            previousSession: nil
+            previousSession: nil,
+            health: healthForAmrita?()
         )
 
         streamTask = Task { [weak self] in

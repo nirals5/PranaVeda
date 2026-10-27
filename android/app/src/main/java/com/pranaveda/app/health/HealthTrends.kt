@@ -1,13 +1,16 @@
 package com.pranaveda.app.health
 
+import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlin.math.roundToInt
 
 /**
  * One day of heart and sleep readings from Health Connect, for Recovery &
- * Trends. Read on the phone and never sent anywhere. As the iOS app reads
- * Apple Health (HealthTrends.swift).
+ * Trends. Read on the phone; only a short summary is ever sent, and only when
+ * they let Amrita see it ([HealthSummary]). As the iOS app reads Apple Health
+ * (HealthTrends.swift).
  */
 data class HealthDay(
     /** The day the readings belong to (sleep: the morning you woke). */
@@ -65,4 +68,46 @@ object HealthTrends {
 
     /** "7h 20m" */
     fun hours(minutes: Int) = "${minutes / 60}h %02dm".format(minutes % 60)
+
+    /**
+     * What Amrita is told, as the website tells her: each reading's latest
+     * value beside their usual. The latest must be from today or yesterday,
+     * with at least four days of that reading; "usual" is the average of the
+     * days before it. Null when there is nothing to tell.
+     */
+    fun summary(days: List<HealthDay>, today: LocalDate): HealthSummary? {
+        fun latestVsUsual(value: (HealthDay) -> Double?): Pair<Int, Int>? {
+            val recent = days.filter { value(it) != null && !it.date.isAfter(today) }.takeLast(DAYS_SHOWN)
+            val latest = recent.lastOrNull() ?: return null
+            if (recent.size < 4 || latest.date.isBefore(today.minusDays(1))) return null
+            val earlier = recent.dropLast(1).map { value(it)!! }
+            return value(latest)!!.roundToInt() to earlier.average().roundToInt()
+        }
+        val summary = HealthSummary(
+            restingHeartRate = latestVsUsual { it.restingHeartRate }?.let { (latest, usual) -> HealthSummary.Reading(latest, usual) },
+            hrv = latestVsUsual { it.hrv }?.let { (latest, usual) -> HealthSummary.Reading(latest, usual, metric = "rmssd") },
+            sleep = latestVsUsual { it.sleepMinutes?.toDouble() }?.let { (latest, usual) -> HealthSummary.Sleep(latest, usual) },
+        )
+        return summary.takeUnless { it.isEmpty }
+    }
+}
+
+/**
+ * The readings sent with a message when they let Amrita see them, in the shape
+ * the website sends (the server's HealthContext). Health Connect's HRV is
+ * RMSSD, and says so.
+ */
+@Serializable
+data class HealthSummary(
+    val restingHeartRate: Reading? = null,
+    val hrv: Reading? = null,
+    val sleep: Sleep? = null,
+) {
+    @Serializable
+    data class Reading(val latest: Int, val usual: Int, val metric: String? = null)
+
+    @Serializable
+    data class Sleep(val lastNightMinutes: Int, val usualMinutes: Int)
+
+    val isEmpty get() = restingHeartRate == null && hrv == null && sleep == null
 }

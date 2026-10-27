@@ -37,11 +37,15 @@ class HealthPrivacyActivity : ComponentActivity() {
                         style = Pv.body, color = Pv.stone700,
                     )
                     Text(
-                        "It uses them for one thing: the Heart & sleep charts in Recovery & Trends, drawn beside your practice days so you can see how practice and recovery move together.",
+                        "It uses them for the Heart & sleep charts in Recovery & Trends, drawn beside your practice days so you can see how practice and recovery move together.",
                         style = Pv.body, color = Pv.stone700,
                     )
                     Text(
-                        "They are read on this phone and stay on it. PranaVeda does not send them to its server, to Amrita, or to anyone else, and does not write anything to Health Connect.",
+                        "If you turn on \"Let Amrita see my sleep and heart readings\", each message to Amrita also carries a short summary: last night's sleep, resting heart rate and heart-rate variability, each beside your usual. It goes to PranaVeda's server and to Amrita, which runs on Anthropic's Claude, and PranaVeda does not store it. It is off until you turn it on.",
+                        style = Pv.body, color = Pv.stone700,
+                    )
+                    Text(
+                        "Otherwise they are read on this phone and stay on it. PranaVeda never sends your daily readings themselves to anyone, and does not write anything to Health Connect.",
                         style = Pv.body, color = Pv.stone700,
                     )
                     Text(

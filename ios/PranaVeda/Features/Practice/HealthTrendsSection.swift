@@ -17,7 +17,7 @@ struct HealthTrendsSection: View {
             case .unavailable:
                 Text("Apple Health is not available on this device.").font(Theme.bodySmall).foregroundStyle(Theme.stone700)
             case .notConnected, .failed:
-                Text("See your sleep, resting heart rate and heart-rate variability beside your practice. PranaVeda reads them from Apple Health on this phone; they are never sent anywhere.")
+                Text("See your sleep, resting heart rate and heart-rate variability beside your practice. PranaVeda reads them from Apple Health on this phone, and they stay on it unless you choose to let Amrita see them.")
                     .font(Theme.bodySmall).foregroundStyle(Theme.stone700)
                 Button { Task { await health.connect() } } label: {
                     Label("Connect Apple Health", systemImage: "heart.text.square")
@@ -38,9 +38,23 @@ struct HealthTrendsSection: View {
                 } else {
                     charts(days)
                 }
+                shareWithAmrita
             }
         }
         .task { await health.load() }
+    }
+
+    /// The opt-in: off until they turn it on.
+    private var shareWithAmrita: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: Binding(get: { health.sharesWithAmrita }, set: { health.sharesWithAmrita = $0 })) {
+                Text("Let Amrita see my sleep and heart readings").font(Theme.body).foregroundStyle(Theme.ink)
+            }
+            .tint(Theme.lavender)
+            Text("With each message, Amrita gets a short summary: last night's sleep, resting heart rate and heart-rate variability, each beside your usual. It goes to PranaVeda's server and to Amrita, which runs on Anthropic's Claude, and PranaVeda does not store it. Off, your readings stay on this phone.")
+                .font(Theme.caption).foregroundStyle(Theme.stone500)
+        }
+        .padding(.top, 4)
     }
 
     @ViewBuilder
