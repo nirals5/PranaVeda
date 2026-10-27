@@ -129,6 +129,9 @@ function servable(p: PracticeRow, needsServed?: ReadonlySet<string>): boolean {
   return p.inhaleSec !== null && p.exhaleSec !== null && p.cycles !== null;
 }
 
+// The weathers (hot, cold) a practice is not offered in (G14); "any" names none.
+const weathers = (list: string[] | null) => (list ?? []).filter((w): w is 'hot' | 'cold' => w === 'hot' || w === 'cold');
+
 const fullyTagged = (p: PracticeRow) =>
   !!(p.minExperience && p.intensity && p.vata && p.pitta && p.kapha) &&
   p.settings.length > 0 &&
@@ -168,6 +171,7 @@ export function catalogFromRows(
       ...(r.avoidNotes ? { safetyNote: r.avoidNotes } : {}),
       ...(r.minExperience === 'experienced' ? { minExperience: 'experienced' as const } : {}),
       ...(r.avoidAfterMeal ? { avoidAfterMeal: true as const } : {}),
+      ...(weathers(r.avoidWeather).length ? { avoidWeather: weathers(r.avoidWeather) } : {}),
     };
   };
 
