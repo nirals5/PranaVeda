@@ -169,9 +169,9 @@ Privacy: coordinates are rounded to about 10 km before they are sent to Open-Met
 - **Locally** there are no Vercel headers, so set `WEATHER_TEST_LOCATION="47.6,-122.3"` to test with a fixed place.
 - **Turn it off:** `WEATHER=off`.
 
-### Time of day, season and weather hints
+### Time of day, season, weather, sleep and dosha hints
 
-Hints H1–H9 in the Practice Library's Rules tab gently steer Amrita's choices, in a "Right now" section of her prompt (`api/_lib/rightNow.ts`). They never refuse a card: what the user says, and every safety rule, comes first.
+Hints H1–H10 and H12 in the Practice Library's Rules tab gently steer Amrita's choices, in a "Right now" section of her prompt (`api/_lib/rightNow.ts`). They never refuse a card: what the user says, and every safety rule, comes first.
 
 - **Time of day,** from the time the website or app sends:
   - **H1, 6–10 am:** energise.
@@ -187,7 +187,16 @@ Hints H1–H9 in the Practice Library's Rules tab gently steer Amrita's choices,
   - **H8, cold or windy:** grounding and warming.
   - **H9, hot:** cooling.
 
-What each hint leans toward is the Rules tab's `then` text, and the windows are in code. Amrita's catalog lists the needs each practice serves ("Serves: N1 Ground, N6 Wind down"), so she can follow them.
+- **Sleep (H10):**
+  - **What it does:** after a short night, Amrita avoids strong practices and leans toward N4 Restore or N1 Ground.
+  - **What counts:** under 6 hours, or an hour or more below their usual (`SHORT_SLEEP_MINUTES`, `SHORT_OF_USUAL_MINUTES`).
+  - **Where it comes from:** the wearable reading the website sends, else what the user says. The apps don't send sleep yet.
+- **Their dosha (H12):**
+  - **What it does:** between equally good options, Amrita prefers practices that balance the person's dosha.
+  - **Which dosha:** their current imbalance (`vikriti`) when Amrita has recorded one, else their constitution (`prakriti`).
+  - **When it's skipped:** when the constitution was recorded with low confidence.
+
+What each hint leans toward is the Rules tab's `then` text, and the windows are in code. Amrita's catalog shows, for each practice, the needs it serves, its intensity and the doshas it balances or can aggravate. For example: "Serves: N1 Ground, N6 Wind down. Intensity: gentle. Balances Vata". With that she can follow the hints.
 
 ### Rate limits
 

@@ -134,6 +134,15 @@ function servable(p: PracticeRow, needsServed?: ReadonlySet<string>): boolean {
   return p.inhaleSec !== null && p.exhaleSec !== null && p.cycles !== null;
 }
 
+// Which doshas a practice balances and can aggravate, from its tags (H12).
+const DOSHAS = ['vata', 'pitta', 'kapha'] as const;
+const doshaTags = (r: PracticeRow) => {
+  const name = (d: string) => d[0].toUpperCase() + d.slice(1);
+  const balances = DOSHAS.filter((d) => r[d] === 'balances').map(name);
+  const aggravates = DOSHAS.filter((d) => r[d] === 'aggravates').map(name);
+  return { ...(balances.length ? { balances } : {}), ...(aggravates.length ? { aggravates } : {}) };
+};
+
 // The weathers (hot, cold) a practice is not offered in (G14); "any" names none.
 const weathers = (list: string[] | null) => (list ?? []).filter((w): w is 'hot' | 'cold' => w === 'hot' || w === 'cold');
 
@@ -180,6 +189,8 @@ export function catalogFromRows(
       ...(r.avoidAfterMeal ? { avoidAfterMeal: true as const } : {}),
       ...(weathers(r.avoidWeather).length ? { avoidWeather: weathers(r.avoidWeather) } : {}),
       ...(needsOf.get(r.id)?.length ? { needs: needsOf.get(r.id) } : {}),
+      ...(r.intensity ? { intensity: r.intensity } : {}),
+      ...doshaTags(r),
     };
   };
 
