@@ -8,6 +8,10 @@
          asked for once, on the first practice. Promoted: shown as a Live Update on Android 16+. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <!-- Saved places (place/PlaceStore.kt): only while the app is open, and only
+         the kind of place reaches Amrita. Asked for when location is turned on. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Recovery & Trends: read only, on the phone (health/HealthStore.kt). -->
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />

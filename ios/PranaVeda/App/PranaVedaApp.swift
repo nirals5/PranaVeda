@@ -13,6 +13,7 @@ struct PranaVedaApp: App {
     @State private var saved = SavedRitualStore()
     @State private var voice = AmritaVoice()
     @State private var health = HealthStore()
+    @State private var place = PlaceStore()
     @State private var tab = AppTab.amrita
     /// Raised by the widgets' "Talk to Amrita": the chat starts listening.
     @State private var voiceRequest = 0
@@ -55,7 +56,7 @@ struct PranaVedaApp: App {
                 LibraryView(catalog: catalog)
                     .tabItem { Label("Library", systemImage: "figure.mind.and.body") }
                     .tag(AppTab.library)
-                AccountView(auth: auth, practice: practice, saved: saved, health: health, chat: chat) { tab = .amrita }
+                AccountView(auth: auth, practice: practice, saved: saved, health: health, place: place, chat: chat) { tab = .amrita }
                     .tabItem { Label("You", systemImage: "person.crop.circle") }
                     .tag(AppTab.you)
             }
@@ -74,6 +75,8 @@ struct PranaVedaApp: App {
                 heyAmrita.hold(.background, phase != .active)
                 // This morning's readings, ready for the next message to Amrita.
                 if phase == .active { Task { await health.load() } }
+                // Where they are is checked only while the app is on screen.
+                place.setActive(phase == .active)
             }
             .onChange(of: voice.isSpeaking) { _, speaking in heyAmrita.hold(.replying, speaking) }
             .onChange(of: router.pending, initial: true) {
@@ -94,6 +97,7 @@ struct PranaVedaApp: App {
                 chat.speakReply = { [voice] in voice.speak($0) }
                 chat.stopSpeaking = { [voice] in voice.stop() }
                 chat.healthForAmrita = { [health] in health.summaryForAmrita() }
+                chat.locationForAmrita = { [place] in place.contextForAmrita }
                 heyAmrita.onWake = { open(WidgetLink.talk) }
                 practice.auth = auth
                 saved.auth = auth

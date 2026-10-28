@@ -37,6 +37,9 @@ struct APIClient: Sendable {
         /// Their sleep and heart readings beside their usual, only when they
         /// have let Amrita see them.
         var health: HealthSummary? = nil
+        /// The kind of place they are in (home, work, …), only when they have
+        /// turned location on. Never coordinates.
+        var location: LocationContext? = nil
     }
 
     /// Streams Amrita's reply. Signed out, the device sends its profile and

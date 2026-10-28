@@ -8,6 +8,7 @@ struct AccountView: View {
     let practice: PracticeStore
     let saved: SavedRitualStore
     var health: HealthStore? = nil
+    var place: PlaceStore? = nil
     /// Holds the wellness profile, where the experience setting lives.
     var chat: ChatViewModel? = nil
     /// Over to the chat ("Begin with Amrita" on the calendar).
@@ -24,6 +25,7 @@ struct AccountView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         if let user = auth.user { signedIn(user) } else { signedOut }
                         if let chat { ExperienceSetting(chat: chat) }
+                        if let place { LocationSettings(place: place) }
                         PracticeCalendarView(practice: practice, onBegin: onBegin)
                         PracticeTrendsView(practice: practice, health: health)
                         SavedRitualsView(saved: saved)

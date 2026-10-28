@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.pranaveda.app.PranaVedaApplication
 import com.pranaveda.app.R
 import com.pranaveda.app.model.RecommendationResult
+import com.pranaveda.app.place.LocationCard
 import com.pranaveda.app.practice.PracticeCalendarCard
 import com.pranaveda.app.practice.PracticeTrendsCard
 import com.pranaveda.app.practice.SavedRitualsCard
@@ -91,6 +92,7 @@ fun AccountScreen(auth: AuthStore, chat: ChatViewModel? = null, onBegin: () -> U
             (auth.problem ?: notice)?.let { Text(it, style = Pv.bodySmall, color = Pv.terracotta) }
             chat?.let { ExperienceSetting(it) }
             val app = LocalContext.current.applicationContext as PranaVedaApplication
+            LocationCard(app.place)
             var reopening by remember { mutableStateOf<RecommendationResult?>(null) }
             PracticeCalendarCard(app.practice, onOpenRitual = { reopening = it }, onBegin = onBegin)
             PracticeTrendsCard(app.practice, app.health)

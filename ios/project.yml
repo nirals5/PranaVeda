@@ -89,6 +89,9 @@ targets:
         # Recovery & Trends reads sleep, resting heart rate and HRV from Apple
         # Health, on the phone only (Models/HealthStore.swift).
         NSHealthShareUsageDescription: PranaVeda shows your sleep, resting heart rate and heart-rate variability beside your practice. They are read on this phone, and a short summary goes to Amrita only if you turn that on.
+        # Saved places (Models/PlaceStore.swift): only while the app is open,
+        # and only the kind of place reaches Amrita.
+        NSLocationWhenInUseUsageDescription: PranaVeda checks where you are against places you save, such as home or work, while the app is open. Amrita is told only the kind of place; your location stays on this phone.
         NSLocalNetworkUsageDescription: PranaVeda connects to the PranaVeda server running on your Mac while the app is in development.
   # Home-screen and lock-screen widgets. They read the snapshot the app
   # writes into the shared App Group, and never call the server.

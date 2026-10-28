@@ -1,6 +1,7 @@
 package com.pranaveda.app
 
 import com.pranaveda.app.health.HealthStore
+import com.pranaveda.app.place.PlaceStore
 import android.app.Application
 import com.pranaveda.app.auth.AccountApi
 import com.pranaveda.app.auth.AuthStore
@@ -42,6 +43,9 @@ class PranaVedaApplication : Application() {
 
     /** Heart and sleep readings from Health Connect, for Recovery & Trends. */
     val health: HealthStore by lazy { HealthStore(this) }
+
+    /** Saved places (home, work, …), matched while the app is open. */
+    val place: PlaceStore by lazy { PlaceStore(this) }
 
     /** Amrita's spoken replies, shared so a new message or screen can stop them. */
     val voice: AmritaVoice by lazy { AmritaVoice(this, appScope) }
