@@ -7,6 +7,7 @@ import com.pranaveda.app.model.ChatCard
 import com.pranaveda.app.model.DailyInsight
 import com.pranaveda.app.model.DoshaGuide
 import com.pranaveda.app.model.PvJson
+import com.pranaveda.app.place.LocationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -56,6 +57,8 @@ data class ChatRequest(
     val previousSession: List<ChatMessage>? = null,
     /** Their sleep and heart readings beside their usual, only when they have let Amrita see them. */
     val health: HealthSummary? = null,
+    /** The kind of place they are in (home, work, …), only when they have turned location on. Never coordinates. */
+    val location: LocationContext? = null,
 )
 
 class ApiClient(

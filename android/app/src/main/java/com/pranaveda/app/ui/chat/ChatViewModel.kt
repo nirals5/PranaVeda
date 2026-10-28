@@ -53,6 +53,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val accounts = AccountApi(api)
     private val auth: AuthStore = (application as PranaVedaApplication).auth
     private val health = (application as PranaVedaApplication).health
+    private val place = (application as PranaVedaApplication).place
     private val prefs = application.getSharedPreferences("pranaveda", Context.MODE_PRIVATE)
     private var streamJob: Job? = null
 
@@ -130,6 +131,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             localDate = localDate(LocalDate.now()),
             inputMode = if (spoken) "voice" else "text",
             health = health.summaryForAmrita(),
+            location = place.contextForAmrita(),
         )
 
         streamJob = viewModelScope.launch {

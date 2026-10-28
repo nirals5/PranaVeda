@@ -154,6 +154,15 @@ Limits:
 
 The 150-metre match radius and the 2 km accuracy cut-off are constants at the top of `src/hooks/usePlace.ts`; the per-place guidance is `PLACE_GUIDANCE` in `api/index.ts`.
 
+In the iPhone and Android apps:
+
+- **Where to turn it on:** a Location card on the You tab. It has the same places, the same rules and the same promise.
+- **Permission:** the phones ask for location "while using the app" only. iPhone uses Core Location; Android uses its built-in fused provider, with no Google Play services library.
+- **Approximate location:** if someone allows only an approximate location, the card says it is too vague to tell places apart, and asks them to allow precise location.
+- **Not shared between devices:** saved spots stay on the phone. They are not synced to the website or the account.
+- **Code:** `ios/PranaVeda/Models/PlaceStore.swift` and `android/.../place/PlaceStore.kt`.
+- **Not in the apps yet:** the home-screen suggestion chip. The apps' home screen has no suggestion chips.
+
 ### Weather
 
 Amrita knows roughly what the weather is like where the user is, so practices the Practice Library marks `avoid_weather` are not offered in that weather (G14): Cooling Breath and Hissing Breath in the cold, Sun-Piercing Breath in the heat. It works on the website and both apps, with no permission prompt. It uses free services only:
