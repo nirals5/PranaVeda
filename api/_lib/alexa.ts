@@ -39,21 +39,26 @@ export function parseChain(pem: string): X509Certificate[] {
   return blocks.map((b) => new X509Certificate(b));
 }
 
-// The signing certificate is current, names echo-api.amazon.com, and each
-// certificate is signed by the next, the last by a root this server trusts.
+// The signing certificate names echo-api.amazon.com, and each certificate is
+// signed by the next until one is signed by a root this server trusts. Amazon's
+// chain runs on past that (Amazon Root CA 1, cross-signed by Starfield, then
+// cross-signed again by a Starfield authority that trust stores have since
+// dropped), so the chain is trusted at the first certificate a root vouches
+// for; what follows it is not needed. Every certificate up to there must be
+// current.
 export function validChain(chain: X509Certificate[], now: Date, roots: readonly string[] = rootCertificates): boolean {
   if (!chain.length) return false;
   const current = (c: X509Certificate) => new Date(c.validFrom) <= now && now <= new Date(c.validTo);
-  if (!chain.every(current)) return false;
   if (!chain[0].checkHost('echo-api.amazon.com', { subject: 'never' })) return false;
-  for (let i = 0; i + 1 < chain.length; i++) {
-    if (!chain[i].checkIssued(chain[i + 1]) || !chain[i].verify(chain[i + 1].publicKey)) return false;
+  const anchors = roots.map((pem) => new X509Certificate(pem)).filter(current);
+  for (let i = 0; i < chain.length; i++) {
+    const cert = chain[i];
+    if (!current(cert)) return false;
+    if (anchors.some((root) => cert.checkIssued(root) && cert.verify(root.publicKey))) return true;
+    const next = chain[i + 1];
+    if (!next || !cert.checkIssued(next) || !cert.verify(next.publicKey)) return false;
   }
-  const last = chain[chain.length - 1];
-  return roots.some((pem) => {
-    const root = new X509Certificate(pem);
-    return current(root) && last.checkIssued(root) && last.verify(root.publicKey);
-  });
+  return false;
 }
 
 export type VerifyInput = {
