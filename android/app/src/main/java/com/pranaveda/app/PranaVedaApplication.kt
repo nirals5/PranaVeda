@@ -1,5 +1,6 @@
 package com.pranaveda.app
 
+import com.pranaveda.app.calendar.CalendarStore
 import com.pranaveda.app.health.HealthStore
 import com.pranaveda.app.place.PlaceStore
 import android.app.Application
@@ -47,6 +48,9 @@ class PranaVedaApplication : Application() {
     /** Saved places (home, work, …), matched while the app is open. */
     val place: PlaceStore by lazy { PlaceStore(this) }
 
+    /** The phone's calendar, read for busy and free time, and free-time reminders. */
+    val calendar: CalendarStore by lazy { CalendarStore(this) }
+
     /** Amrita's spoken replies, shared so a new message or screen can stop them. */
     val voice: AmritaVoice by lazy { AmritaVoice(this, appScope) }
 
@@ -60,6 +64,8 @@ class PranaVedaApplication : Application() {
         super.onCreate()
         // The home-screen widgets show what the app knows; keep them in step.
         WidgetBridge.start(this)
+        // Free-time reminders keep running once turned on.
+        calendar.resume()
     }
 
     val auth: AuthStore by lazy {

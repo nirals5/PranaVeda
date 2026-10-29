@@ -1,5 +1,6 @@
 package com.pranaveda.app.net
 
+import com.pranaveda.app.calendar.CalendarContext
 import com.pranaveda.app.health.HealthSummary
 import com.pranaveda.app.config.AppConfig
 import com.pranaveda.app.model.Catalog
@@ -59,6 +60,8 @@ data class ChatRequest(
     val health: HealthSummary? = null,
     /** The kind of place they are in (home, work, …), only when they have turned location on. Never coordinates. */
     val location: LocationContext? = null,
+    /** When they are busy and free today and tomorrow, only when they have turned the calendar on. Never what the commitments are. */
+    val calendar: CalendarContext? = null,
 )
 
 class ApiClient(

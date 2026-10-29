@@ -8,6 +8,8 @@ struct ChatView: View {
     var voice: AmritaVoice? = nil
     /// Where they are, for the first suggestion (nil: location is not offered).
     var place: PlaceStore? = nil
+    /// Their free time, for the bar on the welcome screen.
+    var calendar: CalendarStore? = nil
     /// Goes up each time a widget asks to talk to Amrita: start listening.
     var voiceRequest = 0
     @State private var handledVoiceRequest = 0
@@ -140,6 +142,7 @@ struct ChatView: View {
                 onSelect: { model.send($0) }
             )
             .padding(.top, 6)
+            if let calendar { FreeTimeBar(calendar: calendar, onPractice: { model.send($0) }).padding(.top, 8) }
             if let insight {
                 DailyInsightCard(state: insight.state)
                     .padding(.top, 14)

@@ -101,6 +101,8 @@ class MainActivity : ComponentActivity() {
                             voiceRequestedAt = SystemClock.elapsedRealtime()
                         }
                         "you" -> tab = 3
+                        // A free-time reminder: the welcome shows the opening.
+                        "amrita" -> tab = 0
                         "practice" -> {
                             openedRitual = null
                             val newest = (application as PranaVedaApplication).saved.rituals.firstOrNull()
@@ -132,6 +134,8 @@ class MainActivity : ComponentActivity() {
                 // Where they are is checked only while the app is on screen.
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { app.place.setActive(true) }
                 LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { app.place.setActive(false) }
+                LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { app.calendar.setActive(true) }
+                LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { app.calendar.setActive(false) }
                 LifecycleEventEffect(Lifecycle.Event.ON_STOP) { heyAmrita.hold(HeyAmrita.Hold.Background, true) }
 
                 openedRitual?.let { RitualSheet(it) { openedRitual = null } }

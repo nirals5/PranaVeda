@@ -98,6 +98,21 @@ Limits of browser notifications:
 
 Pacing values are constants: the 15-minute and 3-hour rules at the top of `src/hooks/useNudgeNotifications.ts`, and the 10-minute, waking-hours, and rest-after-practice rules beside `findOpenSlot` in `src/hooks/useExternalCalendar.ts`.
 
+### Calendar and free-time reminders in the apps
+
+The iPhone and Android apps read the phone's own calendar instead of a link or a Google sign-in. That covers any Google, Outlook or iCloud calendar already synced to the phone. It is off until turned on from the Calendar card on the You tab.
+
+- **What Amrita gets:** the same busy/free summary the website sends (`CalendarContext`): free now or busy until when, and busy times today and tomorrow. Titles, places and people never leave the phone.
+- **What counts as busy:** the website's rules. All-day events, events marked "free", and cancelled or declined events don't count.
+- **Permission:** iPhone asks for full calendar access, since iOS has no "busy times only" permission. Android asks to read the calendar.
+- **Welcome screen:** the website's free-time bar ("You have 40 open minutes, until 9:35 PM") with Practice now. Dismissing it hides it for that opening.
+- **Reminders:** a separate switch under the Calendar card, asking for notification permission. They follow the website's pacing: 7 AM–10 PM only, gaps of 10 minutes or more, not within 2 hours of a practice, one per opening, at least 3 hours apart, never while the app is on screen, and only after it has been off screen for 15 minutes. Tapping one opens the Amrita tab.
+  - **Android:** WorkManager runs a check every 15 minutes that reads the calendar as it is then (`calendar/CalendarStore.kt`).
+  - **iPhone:** iOS allows no regular check, so the app plans the day's reminders as local notifications when it leaves the screen, and again when iOS gives it background time (`Models/CalendarStore.swift`). A meeting added while the app is closed can catch a planned reminder until the app next opens or refreshes.
+- **No server, no paid account:** reminders are the phone's own notifications. A free Apple ID install still expires after 7 days, and its reminders stop with it.
+- **Fail closed:** if calendar access is withdrawn, there is no bar and no reminder.
+- **Rules in code:** `FreeTime.swift` and `FreeTime.kt`, with the same constants as the website.
+
 ### Wearables
 
 Readings are wellness signals, not medical measurements.

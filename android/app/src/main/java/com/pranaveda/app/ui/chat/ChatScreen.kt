@@ -1,5 +1,6 @@
 package com.pranaveda.app.ui.chat
 
+import com.pranaveda.app.calendar.FreeTimeBar
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.heading
 import com.pranaveda.app.ui.theme.rememberReduceMotion
@@ -280,6 +281,10 @@ fun ChatScreen(
                 item {
                     val place = (LocalContext.current.applicationContext as PranaVedaApplication).place
                     SuggestionChips(Suggestions.list(place.current, model.knowsConstitution), onSelect = { model.send(it) })
+                }
+                item {
+                    val app = LocalContext.current.applicationContext as PranaVedaApplication
+                    FreeTimeBar(app.calendar, app.practice.entries.lastOrNull()?.completedInstant, onPractice = { model.send(it) })
                 }
                 if (insight != null) {
                     item {

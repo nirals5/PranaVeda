@@ -12,6 +12,8 @@
          the kind of place reaches Amrita. Asked for when location is turned on. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Free time (calendar/CalendarStore.kt): busy times only reach Amrita. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
     <!-- Recovery & Trends: read only, on the phone (health/HealthStore.kt). -->
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
