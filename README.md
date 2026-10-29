@@ -124,6 +124,34 @@ Practices marked `where_shown = explore_only` in the Practice Library (Headstand
 - **Amrita:** her prompt names these poses as explore-only. If asked for one, she points to Library → Explore in the apps and offers a catalog pose that prepares for it. She never puts one in a card.
 - **Website:** has no Library, so no Explore yet.
 
+### Alexa skill
+
+"Alexa, open Prana Veda" gives a short reflection for this part of the day, then offers a guided breath or a daily reminder. This is Phase 1.5a: there is no account linking, so the skill never knows who is listening and never says anything personal.
+
+- **What it does:**
+  - **Open:** a one- or two-sentence reflection for the morning, afternoon or evening where the Echo is, then "a short breathing practice, or a daily reminder?".
+  - **"Ask Prana Veda for a breathing practice":** about a minute of calm breathing (in for 4, out for 6, six times), spoken from fixed text with timed pauses. No AI runs while it plays.
+  - **"Ask Prana Veda to remind me every evening at seven":** a daily Alexa reminder through Amazon's Reminders API. The first time, Alexa asks for permission by voice.
+  - **Help and stop** as Amazon requires.
+- **Endpoint:** `POST /api/alexa` in `api/index.ts`, with the logic in `api/_lib/alexa.ts`. It refuses with 400 anything not signed by Amazon: the certificate address, the certificate chain to a trusted root and `echo-api.amazon.com`, the SHA-256 signature over the exact body, a timestamp within 150 seconds, and, when `ALEXA_SKILL_ID` is set, the skill ID.
+- **Within Alexa's 8-second limit:** the reflection is made by Haiku once per date and part of the day, per server instance, and cached. A new one gets 3.5 seconds; after that a fixed line is spoken instead.
+- **Safe for a shared room:** the reflection prompt knows nothing about the listener, and a check rejects health, medical and condition words. The food rules apply as for the daily insight.
+- **Skill definition:** `alexa/skill-package/` has the manifest (`skill.json`) and the phrases (`interactionModels/custom/en-US.json`). The invocation name is "prana veda".
+
+**Setting it up (free):**
+
+1. Sign in at [developer.amazon.com](https://developer.amazon.com) with the same Amazon account as the Echo, and accept the developer agreement.
+2. In the Alexa developer console, create a skill: name "PranaVeda", English (US), **Custom** model, **Provision your own** hosting, "Start from scratch".
+3. **Build → Interaction Model → JSON Editor:** paste `alexa/skill-package/interactionModels/custom/en-US.json`, then **Save** and **Build skill**.
+4. **Build → Endpoint:** HTTPS, default region `https://v0-pranaveda.vercel.app/api/alexa`, certificate option "My development endpoint is a sub-domain of a domain that has a wildcard certificate from a certificate authority".
+5. **Build → Permissions:** turn on **Reminders**.
+6. Copy the skill ID (shown under the skill's name) into Vercel as `ALEXA_SKILL_ID`, then redeploy.
+7. **Test:** set "Skill testing is enabled in" to **Development**. Try it in the console's simulator, then on any Echo signed in to the same Amazon account. Up to 500 more people can be invited as beta testers. Publishing to everyone needs Amazon's certification.
+
+The ASK CLI can deploy the same `alexa/skill-package/` folder instead of pasting.
+
+**Not yet (Phase 1.5b):** account linking, so the skill can speak a person's own nudges.
+
 ### Wearables
 
 Readings are wellness signals, not medical measurements.

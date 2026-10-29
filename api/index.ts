@@ -19,6 +19,8 @@ export { EXPERIENCE_LEVELS };
 import { getUser } from './_lib/users.js';
 import { DOSHA_GUIDE, DOSHA_GUIDE_NOTE } from './_lib/doshaGuide.js';
 import { catalogOf, conditionConflicts, getCatalog } from './_lib/catalog.js';
+import { fallbackReflection, handleAlexa, say, speak, speakerSafe, verifyAlexaRequest } from './_lib/alexa.js';
+import type { AlexaDeps, PartOfDay } from './_lib/alexa.js';
 import type { Catalog, CatalogCondition } from './_lib/catalog.js';
 import { approximateLocation, temperatures, weatherFeel, weatherFor } from './_lib/weather.js';
 import { hintsNow, localHour, rightNowPrompt, seasonOf } from './_lib/rightNow.js';
@@ -2176,7 +2178,9 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
 // ============================== App + endpoints ===============================
 
 const app = express();
-app.use(express.json());
+// /api/alexa reads its body raw: Amazon signs the exact bytes it sent.
+const json = express.json();
+app.use((req, res, next) => (req.path === '/api/alexa' ? next() : json(req, res, next)));
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
 const client = new Anthropic({ apiKey });
@@ -2446,6 +2450,106 @@ app.get('/api/catalog', async (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.json(publicCatalog(configuredAssetBase() || requestOrigin(req), await servedCatalog()));
 });
+// ================================ Alexa skill =================================
+//
+// Phase 1.5a: no account linking, nothing personal (api/_lib/alexa.ts). Alexa
+// cuts a skill off after about 8 seconds, so nothing here waits long on Claude.
+
+const alexaCerts = new Map<string, { pem: string; until: number }>();
+async function fetchAlexaChain(url: string): Promise<string> {
+  const hit = alexaCerts.get(url);
+  if (hit && Date.now() < hit.until) return hit.pem;
+  const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
+  if (!res.ok) throw new Error(`certificate fetch ${res.status}`);
+  const pem = await res.text();
+  alexaCerts.set(url, { pem, until: Date.now() + 60 * 60 * 1000 });
+  return pem;
+}
+
+const reflectionSchema = {
+  type: 'object',
+  properties: { reflection: { type: 'string', description: 'One or two calm sentences, at most 30 words, to be spoken aloud.' } },
+  required: ['reflection'],
+  additionalProperties: false,
+};
+
+// One reflection per date and part of the day, per server instance. A fresh
+// one gets REFLECTION_WAIT_MS; after that a fixed line is spoken and the
+// generation, if it finishes, serves the next request.
+const REFLECTION_WAIT_MS = 3500;
+const reflections = new Map<string, string>();
+const reflecting = new Map<string, Promise<string | undefined>>();
+async function alexaReflection({ date, part }: { date: string; part?: PartOfDay }): Promise<string> {
+  const key = `${date}|${part ?? ''}`;
+  const ready = reflections.get(key);
+  if (ready) return ready;
+  if (!apiKey) return fallbackReflection(date);
+  let pending = reflecting.get(key);
+  if (!pending) {
+    pending = (async () => {
+      const [catalog, food] = await Promise.all([servedCatalog(), getFoodRules()]);
+      const result = await callClaude({
+        system: `You are Amrita, a calm Ayurvedic mentor, speaking through a smart speaker in a shared room. You know nothing about the listener. Never mention health conditions, symptoms, medication, treatment or the body's problems; offer a gentle, general reflection only.\n\n${foodRulesPrompt(food)}`,
+        prompt: `Give a short spoken reflection for this ${part ?? 'day'} (${date}, northern-hemisphere season). Plain words, no lists, no breathing instructions.`,
+        schema: reflectionSchema,
+        fallbackData: { reflection: '' },
+        check: (data) =>
+          speakerSafe(String(data?.reflection ?? '')) ? foodRejection(foodHitsIn(data, food, practiceNames(catalog))) : 'Keep it general and under 30 words, with no health or medical words.',
+        model: 'claude-haiku-4-5-20251001',
+      });
+      const text = typeof result?.reflection === 'string' && !result._isFallback ? result.reflection.trim() : '';
+      if (text) reflections.set(key, text);
+      return text || undefined;
+    })().finally(() => reflecting.delete(key));
+    reflecting.set(key, pending);
+  }
+  const timeout = new Promise<undefined>((r) => setTimeout(() => r(undefined), REFLECTION_WAIT_MS));
+  return (await Promise.race([pending.catch(() => undefined), timeout])) ?? fallbackReflection(date);
+}
+
+const alexaDeps: AlexaDeps = {
+  reflection: alexaReflection,
+  timeZone: async (apiEndpoint, deviceId, token) => {
+    if (!apiEndpoint || !deviceId || !token) return undefined;
+    const res = await fetch(`${apiEndpoint}/v2/devices/${encodeURIComponent(deviceId)}/settings/System.timeZone`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(800),
+    });
+    return res.ok ? String(await res.json()) : undefined;
+  },
+  createReminder: async (apiEndpoint, token, body) => {
+    const res = await fetch(`${apiEndpoint}/v1/alerts/reminders`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(2500),
+    });
+    return res.status;
+  },
+};
+
+// Only Amazon, only for this skill (ALEXA_SKILL_ID), only fresh requests.
+app.post('/api/alexa', express.raw({ type: '*/*', limit: '256kb' }), async (req, res) => {
+  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from('');
+  const refused = await verifyAlexaRequest({
+    rawBody,
+    certUrl: req.get('SignatureCertChainUrl'),
+    signature: req.get('Signature-256'),
+    fetchChain: fetchAlexaChain,
+    skillId: process.env.ALEXA_SKILL_ID || undefined,
+  });
+  if (refused) {
+    console.warn(`[alexa] refused: ${refused}`);
+    return res.status(400).json({ error: 'invalid_request' });
+  }
+  try {
+    res.json(await handleAlexa(JSON.parse(rawBody.toString('utf8')), alexaDeps));
+  } catch (err: any) {
+    console.error('[alexa] failed:', err?.message || err);
+    res.json(speak(say("Sorry, I couldn't do that just now. Please try again in a moment.")));
+  }
+});
+
 // The balancing reference behind the Dosha Profile screen, for the native
 // apps (the website imports the same file). Public: it is general guidance,
 // nothing about the person.
