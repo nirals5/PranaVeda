@@ -14,6 +14,7 @@ struct PranaVedaApp: App {
     @State private var voice = AmritaVoice()
     @State private var health = HealthStore()
     @State private var place = PlaceStore()
+    @State private var calendar = CalendarStore.shared
     @State private var tab = AppTab.amrita
     /// Raised by the widgets' "Talk to Amrita": the chat starts listening.
     @State private var voiceRequest = 0
@@ -38,12 +39,14 @@ struct PranaVedaApp: App {
         let bar = UINavigationBar.appearance()
         if let large = playfair(34, .largeTitle) { bar.largeTitleTextAttributes = [.font: large] }
         if let inline = playfair(19, .headline) { bar.titleTextAttributes = [.font: inline] }
+        // Must be registered before launch finishes.
+        CalendarStore.registerBackgroundRefresh()
     }
 
     var body: some Scene {
         WindowGroup {
             TabView(selection: $tab) {
-                ChatView(model: chat, auth: auth, insight: insight, saved: saved, voice: voice, place: place, voiceRequest: voiceRequest)
+                ChatView(model: chat, auth: auth, insight: insight, saved: saved, voice: voice, place: place, calendar: calendar, voiceRequest: voiceRequest)
                     .tabItem { Label("Ask Amrita", systemImage: "sparkles") }
                     .tag(AppTab.amrita)
                 DoshaProfileView(profile: chat.profile, guide: doshaGuide) { message in
@@ -56,7 +59,7 @@ struct PranaVedaApp: App {
                 LibraryView(catalog: catalog)
                     .tabItem { Label("Library", systemImage: "figure.mind.and.body") }
                     .tag(AppTab.library)
-                AccountView(auth: auth, practice: practice, saved: saved, health: health, place: place, chat: chat) { tab = .amrita }
+                AccountView(auth: auth, practice: practice, saved: saved, health: health, place: place, calendar: calendar, chat: chat) { tab = .amrita }
                     .tabItem { Label("You", systemImage: "person.crop.circle") }
                     .tag(AppTab.you)
             }
@@ -77,6 +80,8 @@ struct PranaVedaApp: App {
                 if phase == .active { Task { await health.load() } }
                 // Where they are is checked only while the app is on screen.
                 place.setActive(phase == .active)
+                // Free time is read on screen; reminders are planned on leaving.
+                if phase != .inactive { calendar.setActive(phase == .active) }
             }
             .onChange(of: voice.isSpeaking) { _, speaking in heyAmrita.hold(.replying, speaking) }
             .onChange(of: router.pending, initial: true) {
@@ -98,6 +103,9 @@ struct PranaVedaApp: App {
                 chat.stopSpeaking = { [voice] in voice.stop() }
                 chat.healthForAmrita = { [health] in health.summaryForAmrita() }
                 chat.locationForAmrita = { [place] in place.contextForAmrita }
+                chat.calendarForAmrita = { [calendar] in calendar.contextForAmrita }
+                calendar.lastPracticeAt = { [practice] in practice.entries.last?.completedDate }
+                calendar.onOpenReminder = { tab = .amrita }
                 heyAmrita.onWake = { open(WidgetLink.talk) }
                 practice.auth = auth
                 saved.auth = auth

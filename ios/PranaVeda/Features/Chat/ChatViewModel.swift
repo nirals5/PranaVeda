@@ -29,6 +29,9 @@ final class ChatViewModel {
     /// The kind of place they are in (PlaceStore.contextForAmrita): nil
     /// unless they have turned location on.
     var locationForAmrita: (() -> LocationContext?)?
+    /// Their busy and free time (CalendarStore.contextForAmrita): nil unless
+    /// they have turned the calendar on.
+    var calendarForAmrita: (() -> CalendarContext?)?
 
     private let api: APIClient
     private let defaults: UserDefaults
@@ -91,7 +94,8 @@ final class ChatViewModel {
             inputMode: spoken ? "voice" : "text",
             previousSession: nil,
             health: healthForAmrita?(),
-            location: locationForAmrita?()
+            location: locationForAmrita?(),
+            calendar: calendarForAmrita?()
         )
 
         streamTask = Task { [weak self] in

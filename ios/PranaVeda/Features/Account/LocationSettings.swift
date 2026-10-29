@@ -72,7 +72,7 @@ struct LocationSettings: View {
 }
 
 /// The website's small rounded action buttons.
-private struct PillButton: ButtonStyle {
+struct PillButton: ButtonStyle {
     let primary: Bool
     @Environment(\.isEnabled) private var isEnabled
 

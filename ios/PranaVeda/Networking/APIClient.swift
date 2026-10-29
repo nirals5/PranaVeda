@@ -40,6 +40,9 @@ struct APIClient: Sendable {
         /// The kind of place they are in (home, work, …), only when they have
         /// turned location on. Never coordinates.
         var location: LocationContext? = nil
+        /// When they are busy and free today and tomorrow, only when they have
+        /// turned the calendar on. Never what the commitments are.
+        var calendar: CalendarContext? = nil
     }
 
     /// Streams Amrita's reply. Signed out, the device sends its profile and

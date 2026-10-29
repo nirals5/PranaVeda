@@ -78,6 +78,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    // Free-time reminders: a check every 15 minutes, with no server.
+    implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)

@@ -9,6 +9,7 @@ struct AccountView: View {
     let saved: SavedRitualStore
     var health: HealthStore? = nil
     var place: PlaceStore? = nil
+    var calendar: CalendarStore? = nil
     /// Holds the wellness profile, where the experience setting lives.
     var chat: ChatViewModel? = nil
     /// Over to the chat ("Begin with Amrita" on the calendar).
@@ -26,6 +27,7 @@ struct AccountView: View {
                         if let user = auth.user { signedIn(user) } else { signedOut }
                         if let chat { ExperienceSetting(chat: chat) }
                         if let place { LocationSettings(place: place) }
+                        if let calendar { CalendarSettings(calendar: calendar) }
                         PracticeCalendarView(practice: practice, onBegin: onBegin)
                         PracticeTrendsView(practice: practice, health: health)
                         SavedRitualsView(saved: saved)

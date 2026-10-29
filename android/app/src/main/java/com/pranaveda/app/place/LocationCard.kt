@@ -117,7 +117,7 @@ private fun PlaceRow(place: PlaceStore, kind: PlaceKind) {
 
 /** The website's small rounded action buttons. */
 @Composable
-private fun Pill(text: String, primary: Boolean, enabled: Boolean = true, description: String? = null, onClick: () -> Unit) {
+internal fun Pill(text: String, primary: Boolean, enabled: Boolean = true, description: String? = null, onClick: () -> Unit) {
     val modifier = if (description != null) Modifier.semantics { contentDescription = description } else Modifier
     val padding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
     if (primary) {

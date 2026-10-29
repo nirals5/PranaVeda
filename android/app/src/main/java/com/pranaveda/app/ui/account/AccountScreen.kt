@@ -1,5 +1,6 @@
 package com.pranaveda.app.ui.account
 
+import com.pranaveda.app.calendar.CalendarCard
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -93,6 +94,7 @@ fun AccountScreen(auth: AuthStore, chat: ChatViewModel? = null, onBegin: () -> U
             chat?.let { ExperienceSetting(it) }
             val app = LocalContext.current.applicationContext as PranaVedaApplication
             LocationCard(app.place)
+            CalendarCard(app.calendar)
             var reopening by remember { mutableStateOf<RecommendationResult?>(null) }
             PracticeCalendarCard(app.practice, onOpenRitual = { reopening = it }, onBegin = onBegin)
             PracticeTrendsCard(app.practice, app.health)
