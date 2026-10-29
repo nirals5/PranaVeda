@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { PracticeLogEntry } from '../types';
+import { Feeling, PracticeLogEntry } from '../types';
 
 const LOG_KEY = 'pranaveda_practice_log';
 const MAX_ENTRIES = 500;
@@ -41,8 +41,9 @@ function trimLog(entries: PracticeLogEntry[]): PracticeLogEntry[] {
   return kept.map((e, i) => (i < snapshotFrom && e.result ? { ...e, result: undefined } : e));
 }
 
-// Adds entries from elsewhere (another device, via the account). Entries are
-// never edited, so an id seen twice is the same practice and is kept once.
+// Adds entries from elsewhere (another device, via the account). An id seen
+// twice is the same practice and is kept once; the copy here wins, since the
+// only later change (how it left them) is made on the device that ran it.
 export function mergeLogs(local: PracticeLogEntry[], incoming: PracticeLogEntry[]): PracticeLogEntry[] {
   const known = new Set(local.map((e) => e.id));
   const added = incoming.filter((e) => !known.has(e.id));
@@ -72,25 +73,33 @@ export function usePracticeLog() {
     } catch {}
   }, [entries]);
 
-  const logPractice = useCallback((entry: NewPracticeLogEntry) => {
+  // Returns the new entry's id, so how it left them can be added later.
+  const logPractice = useCallback((entry: NewPracticeLogEntry): string => {
     const now = new Date();
+    const id = `p_${now.getTime()}_${Math.random().toString(36).slice(2, 7)}`;
     setEntries((prev) =>
       trimLog([
         ...prev,
         {
           ...entry,
-          id: `p_${now.getTime()}_${Math.random().toString(36).slice(2, 7)}`,
+          id,
           completedAt: now.toISOString(),
           localDate: localDateKey(now),
         },
       ])
     );
+    return id;
   }, []);
+
+  const rateFeeling = useCallback(
+    (id: string, feeling: Feeling) => setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, feeling } : e))),
+    []
+  );
 
   const merge = useCallback((incoming: PracticeLogEntry[]) => setEntries((prev) => mergeLogs(prev, incoming)), []);
   const retainOnly = useCallback((keep: (entry: PracticeLogEntry) => boolean) => setEntries((prev) => prev.filter(keep)), []);
 
   const streak = useMemo(() => currentStreak(entries), [entries]);
 
-  return { entries, streak, logPractice, merge, retainOnly };
+  return { entries, streak, logPractice, rateFeeling, merge, retainOnly };
 }

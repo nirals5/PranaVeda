@@ -13,10 +13,13 @@ import { fetchPracticesAfter, uploadPractices } from '../lib/auth';
 //   SYNCED_KEY — ids the account is known to have. Anything else is waiting
 //                to upload, so a practice finished offline is sent later.
 //   CURSOR_KEY — how far through the account's log this device has read.
+//   FEELINGS_KEY — id → the feeling the account has for it, so a practice
+//                rated after it was sent goes again with its rating (H11).
 const OWNER_KEY = 'pranaveda_practice_owner';
 const OWN_KEY = 'pranaveda_practice_own_ids';
 const SYNCED_KEY = 'pranaveda_practice_synced_ids';
 const CURSOR_KEY = 'pranaveda_practice_cursor';
+const FEELINGS_KEY = 'pranaveda_practice_sent_feelings';
 
 const BATCH = 25; // the server's per-request limit
 
@@ -34,6 +37,11 @@ function write(key: string, value: unknown) {
     if (value === undefined) localStorage.removeItem(key);
     else localStorage.setItem(key, JSON.stringify(value));
   } catch {}
+}
+
+// What the account is missing: new practices, and ratings it has not had.
+export function pendingUploads(entries: PracticeLogEntry[], synced: ReadonlySet<string>, sentFeelings: Readonly<Record<string, string>>) {
+  return entries.filter((e) => !synced.has(e.id) || (e.feeling !== undefined && sentFeelings[e.id] !== e.feeling));
 }
 
 export function usePracticeSync(
@@ -59,12 +67,17 @@ export function usePracticeSync(
       do {
         again.current = false;
         const synced = new Set(read<string[]>(SYNCED_KEY, []));
-        const pending = latest.current.filter((e) => !synced.has(e.id));
+        const sentFeelings = read<Record<string, string>>(FEELINGS_KEY, {});
+        const pending = pendingUploads(latest.current, synced, sentFeelings);
         for (let i = 0; i < pending.length; i += BATCH) {
           const batch = pending.slice(i, i + BATCH);
           if (!(await uploadPractices(batch))) return; // offline or refused: retry on the next change or visit
-          batch.forEach((e) => synced.add(e.id));
+          batch.forEach((e) => {
+            synced.add(e.id);
+            if (e.feeling) sentFeelings[e.id] = e.feeling;
+          });
           write(SYNCED_KEY, [...synced]);
+          write(FEELINGS_KEY, sentFeelings);
         }
 
         let cursor = read<number>(CURSOR_KEY, 0);
@@ -73,8 +86,12 @@ export function usePracticeSync(
           if (!page) return;
           if (page.entries.length) {
             merge(page.entries);
-            page.entries.forEach((e) => synced.add(e.id));
+            page.entries.forEach((e) => {
+              synced.add(e.id);
+              if (e.feeling && !sentFeelings[e.id]) sentFeelings[e.id] = e.feeling;
+            });
             write(SYNCED_KEY, [...synced]);
+            write(FEELINGS_KEY, sentFeelings);
           }
           cursor = page.cursor;
           write(CURSOR_KEY, cursor);
@@ -97,16 +114,18 @@ export function usePracticeSync(
       write(OWN_KEY, latest.current.map((e) => e.id));
       write(SYNCED_KEY, []);
       write(CURSOR_KEY, 0);
+      write(FEELINGS_KEY, {});
       write(OWNER_KEY, userId);
     }
     sync();
   }, [userId, sync]);
 
-  // A practice finished while signed in: send it.
+  // A practice finished or rated while signed in: send it.
   const newest = entries.length ? entries[entries.length - 1].id : null;
+  const recentFeelings = entries.slice(-20).map((e) => e.feeling ?? '-').join('');
   useEffect(() => {
     if (userId && newest) sync();
-  }, [userId, newest, sync]);
+  }, [userId, newest, recentFeelings, sync]);
 
   // Signed out by any route: keep this device's own practices, drop the ones
   // that came from the account. A practice that never reached the account is
@@ -116,6 +135,6 @@ export function usePracticeSync(
     const own = new Set(read<string[]>(OWN_KEY, []));
     const synced = new Set(read<string[]>(SYNCED_KEY, []));
     retainOnly((e) => own.has(e.id) || !synced.has(e.id));
-    [OWNER_KEY, OWN_KEY, SYNCED_KEY, CURSOR_KEY].forEach((key) => write(key, undefined));
+    [OWNER_KEY, OWN_KEY, SYNCED_KEY, CURSOR_KEY, FEELINGS_KEY].forEach((key) => write(key, undefined));
   }, [auth.status, retainOnly]);
 }

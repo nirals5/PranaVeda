@@ -73,6 +73,8 @@ import com.pranaveda.app.voice.HeyAmrita
 import com.pranaveda.app.voice.WakePhrase
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import com.pranaveda.app.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -157,6 +159,8 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
     var version by remember { mutableIntStateOf(0) }
     var running by remember { mutableStateOf(true) }
     var finished by remember { mutableStateOf(false) }
+    // The log entry made on finishing, for "How do you feel now?".
+    var loggedId by remember { mutableStateOf<String?>(null) }
     val notice = rememberPracticeNotice()
 
     fun showNotice() {
@@ -174,12 +178,12 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
             PoseSequence.Event.Finished -> {
                 running = false
                 notice.cancel()
-                practice.log(
+                loggedId = practice.log(
                     PracticeLogEntry.Kind.Ritual,
                     result.yogaPractice.title,
                     result.yogaPractice.durationMinutes ?: (sequence.durations.sum() / 60),
                     result,
-                )
+                ).id
                 guide.speak(Guidance.RITUAL_COMPLETE)
                 finished = true
             }
@@ -217,6 +221,7 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
                 detail = "${result.yogaPractice.title} is saved to your practice.",
                 breathwork = result.breathwork,
                 result = result,
+                entryId = loggedId,
                 onDone = onClose,
             )
             poses.isEmpty() -> Text("This ritual has no postures to guide.", style = Pv.body, color = Pv.stone700, modifier = Modifier.padding(24.dp))
@@ -270,6 +275,8 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
     var started by remember { mutableStateOf(false) }
     var running by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
+    // The log entry made on finishing, for "How do you feel now?".
+    var loggedId by remember { mutableStateOf<String?>(null) }
     val notice = rememberPracticeNotice()
 
     fun showNotice() {
@@ -288,7 +295,7 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
             BreathPacer.Event.Finished -> {
                 running = false
                 notice.cancel()
-                practice.log(PracticeLogEntry.Kind.Breathwork, pattern.name, pacer.totalMinutes, result)
+                loggedId = practice.log(PracticeLogEntry.Kind.Breathwork, pattern.name, pacer.totalMinutes, result).id
                 guide.speak(Guidance.breathworkComplete(pattern.name))
                 finished = true
             }
@@ -323,7 +330,7 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
 
     PracticeDialog(onClose) {
         if (finished) {
-            PracticeComplete(detail = "${pattern.name} is saved to your practice.", breathwork = null, result = null, onDone = onClose)
+            PracticeComplete(detail = "${pattern.name} is saved to your practice.", breathwork = null, result = null, entryId = loggedId, onDone = onClose)
             return@PracticeDialog
         }
         version // read so the screen follows the timer
@@ -443,7 +450,7 @@ private fun PracticeControls(running: Boolean, canGoBack: Boolean, onBack: () ->
 
 /** "Namaste": the practice is done and saved. After a ritual, its breathwork is offered next. */
 @Composable
-private fun PracticeComplete(detail: String, breathwork: BreathworkPattern?, result: RecommendationResult?, onDone: () -> Unit) {
+private fun PracticeComplete(detail: String, breathwork: BreathworkPattern?, result: RecommendationResult?, entryId: String?, onDone: () -> Unit) {
     var showingBreathwork by rememberSaveable { mutableStateOf(false) }
     Column(
         Modifier.fillMaxSize().padding(24.dp),
@@ -454,6 +461,7 @@ private fun PracticeComplete(detail: String, breathwork: BreathworkPattern?, res
         Text("✓", fontSize = 48.sp, color = Pv.lavender)
         Text("Namaste", style = Pv.display, color = Pv.ink)
         Text(detail, style = Pv.body, color = Pv.stone700, textAlign = TextAlign.Center)
+        entryId?.let { FeelingCheck(it) }
         Spacer(Modifier.weight(1f))
         breathwork?.let {
             Button(
@@ -470,6 +478,42 @@ private fun PracticeComplete(detail: String, breathwork: BreathworkPattern?, res
         BreathworkPacerScreen(breathwork, result) {
             showingBreathwork = false
             onDone()
+        }
+    }
+}
+
+/**
+ * "How do you feel now?": one optional tap after a practice (H11). Amrita
+ * leans away from practices that leave them less settled, and toward ones
+ * that settle them.
+ */
+@Composable
+private fun FeelingCheck(entryId: String) {
+    val practice = practiceStore()
+    val chosen = practice.entries.lastOrNull { it.id == entryId }?.feeling
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            if (chosen == null) "How do you feel now?" else "Thank you. Amrita will keep this in mind.",
+            style = Pv.body,
+            color = Pv.stone700,
+            textAlign = TextAlign.Center,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PracticeLogEntry.Feeling.entries.forEach { feeling ->
+                val selected = chosen == feeling
+                Text(
+                    feeling.label,
+                    style = Pv.body.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                    color = if (selected) Color.White else Pv.ink,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(if (selected) Pv.lavender else Color.White.copy(alpha = 0.8f))
+                        .border(1.dp, if (selected) Pv.lavender else Pv.stone700.copy(alpha = 0.25f), CircleShape)
+                        .selectable(selected = selected, role = Role.RadioButton) { practice.rate(entryId, feeling) }
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                )
+            }
         }
     }
 }

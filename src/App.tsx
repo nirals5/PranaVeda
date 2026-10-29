@@ -57,7 +57,7 @@ export default function App() {
     () => (calendar.connected ? describeCalendar(calendar.busy, calendar.now) : null),
     [calendar.connected, calendar.busy, calendar.now]
   );
-  const { entries: practiceLog, streak, logPractice, merge: mergePractices, retainOnly: retainPractices } = usePracticeLog();
+  const { entries: practiceLog, streak, logPractice, rateFeeling, merge: mergePractices, retainOnly: retainPractices } = usePracticeLog();
   const heart = useHeartRateMonitor();
   const health = useWearableHealth();
   const healthContext = useMemo(
@@ -374,6 +374,7 @@ export default function App() {
                 onToggleSave={handleToggleSave}
                 showNotification={showToast}
                 onPracticeComplete={logPractice}
+                onRateFeeling={rateFeeling}
                 heart={heart}
               />
             </motion.div>

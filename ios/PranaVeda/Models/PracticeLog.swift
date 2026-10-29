@@ -5,6 +5,20 @@ import Foundation
 struct PracticeLogEntry: Codable, Hashable, Sendable, Identifiable {
     enum Kind: String, Codable, Sendable { case ritual, breathwork }
 
+    /// "How do you feel now?" after the practice (H11). Amrita leans away
+    /// from practices that leave them less settled.
+    enum Feeling: String, Codable, Sendable, CaseIterable {
+        case more, same, less
+
+        var label: String {
+            switch self {
+            case .more: "More settled"
+            case .same: "About the same"
+            case .less: "Less settled"
+            }
+        }
+    }
+
     let id: String
     let kind: Kind
     let title: String
@@ -16,8 +30,10 @@ struct PracticeLogEntry: Codable, Hashable, Sendable, Identifiable {
     /// The ritual as it was shown, so the day can reopen it. Only the newest
     /// entries keep theirs.
     var result: RecommendationResult?
+    /// How it left them, if they said.
+    var feeling: Feeling?
 
-    init(id: String, kind: Kind, title: String, completedAt: String, localDate: String, durationMinutes: Int, result: RecommendationResult?) {
+    init(id: String, kind: Kind, title: String, completedAt: String, localDate: String, durationMinutes: Int, result: RecommendationResult?, feeling: Feeling? = nil) {
         self.id = id
         self.kind = kind
         self.title = title
@@ -25,9 +41,10 @@ struct PracticeLogEntry: Codable, Hashable, Sendable, Identifiable {
         self.localDate = localDate
         self.durationMinutes = durationMinutes
         self.result = result
+        self.feeling = feeling
     }
 
-    private enum Keys: String, CodingKey { case id, kind, title, completedAt, localDate, durationMinutes, result }
+    private enum Keys: String, CodingKey { case id, kind, title, completedAt, localDate, durationMinutes, result, feeling }
 
     // Entries from other devices may carry fields or ritual shapes this app
     // does not know; an unreadable ritual is dropped rather than the entry.
@@ -40,6 +57,7 @@ struct PracticeLogEntry: Codable, Hashable, Sendable, Identifiable {
         localDate = try c.decode(String.self, forKey: .localDate)
         durationMinutes = try c.decode(Int.self, forKey: .durationMinutes)
         result = try? c.decodeIfPresent(RecommendationResult.self, forKey: .result)
+        feeling = try? c.decodeIfPresent(Feeling.self, forKey: .feeling)
     }
 
     var completedDate: Date? { PracticeLog.isoFormatter.date(from: completedAt) ?? PracticeLog.isoFormatterNoFraction.date(from: completedAt) }
@@ -86,8 +104,9 @@ enum PracticeLog {
         }
     }
 
-    /// Adds entries from elsewhere. Entries are never edited, so an id seen
-    /// twice is the same practice and is kept once.
+    /// Adds entries from elsewhere. An id seen twice is the same practice and
+    /// is kept once; the copy here wins, since the only later change (how it
+    /// left them) is made on the device that ran it.
     static func merged(_ local: [PracticeLogEntry], with incoming: [PracticeLogEntry]) -> [PracticeLogEntry] {
         let known = Set(local.map(\.id))
         let added = incoming.filter { !known.contains($0.id) }
@@ -112,6 +131,13 @@ enum PracticeLog {
             cursor = calendar.date(byAdding: .day, value: -1, to: cursor)!
         }
         return streak
+    }
+}
+
+extension PracticeLog {
+    /// What the account is missing: new practices, and ratings it has not had.
+    static func pendingUploads(_ entries: [PracticeLogEntry], synced: Set<String>, sentFeelings: [String: String]) -> [PracticeLogEntry] {
+        entries.filter { !synced.contains($0.id) || ($0.feeling != nil && sentFeelings[$0.id] != $0.feeling?.rawValue) }
     }
 }
 

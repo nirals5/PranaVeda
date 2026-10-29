@@ -65,6 +65,24 @@ struct PracticeLogTests {
         #expect(entries[1].completedDate != nil) // without fractional seconds too
     }
 
+    @Test func aRatingIsSentWhenTheAccountDoesNotHaveIt() {
+        var rated = entry("b", "2026-10-02")
+        rated.feeling = .less
+        var kept = entry("c", "2026-10-03")
+        kept.feeling = .more
+        let pending = PracticeLog.pendingUploads([entry("a", "2026-10-01"), rated, kept, entry("d", "2026-10-04")],
+                                                 synced: ["a", "b", "c"], sentFeelings: ["c": "more"])
+        #expect(pending.map(\.id) == ["b", "d"])
+    }
+
+    @Test func readsAndWritesTheRating() throws {
+        let json = #"[{"id":"p_1","kind":"breathwork","title":"Box","completedAt":"2026-10-14T16:00:00Z","localDate":"2026-10-14","durationMinutes":2,"feeling":"less"},{"id":"p_2","kind":"breathwork","title":"Box","completedAt":"2026-10-14T16:00:00Z","localDate":"2026-10-14","durationMinutes":2,"feeling":"odd"}]"#
+        let entries = try JSONDecoder().decode([PracticeLogEntry].self, from: Data(json.utf8))
+        #expect(entries.map(\.feeling) == [.less, nil])
+        let written = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(entries[0])) as? [String: Any])
+        #expect(written["feeling"] as? String == "less")
+    }
+
     @Test func laysOutTheMonthUnderItsWeekdays() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = pacific
@@ -153,6 +171,31 @@ struct PracticeStoreTests {
         await store.sync()
         #expect(StubURLProtocol.requests(to: "/api/sync/practice-log").filter { $0.method == "POST" }.count == 1)
         #expect(StubURLProtocol.requests(to: "/api/sync/practice-log").last?.query == "after=7")
+    }
+
+    @Test func sendsAPracticeAgainOnceItIsRated() async throws {
+        StubURLProtocol.reset { request in
+            switch (request.method, request.path) {
+            case ("POST", "/api/auth/refresh"): (200, session("access-1", "refresh-2"))
+            case ("POST", "/api/sync/practice-log"): (200, #"{"stored":0}"#)
+            default: (200, #"{"entries":[],"cursor":0,"hasMore":false}"#)
+            }
+        }
+        let auth = AuthStore(api: stubAPI(), storage: InMemorySessionStorage(refreshToken: "refresh-1", user: user), google: FakeGoogle(), apple: FakeApple())
+        let (store, defaults, file) = freshStore()
+        let mine = store.log(kind: .breathwork, title: "Bellows Breath", durationMinutes: 3, result: nil)
+        store.auth = auth
+        await store.adoptAccount(user)
+
+        store.rate(mine.id, .less)
+        await store.sync()
+        let posts = { StubURLProtocol.requests(to: "/api/sync/practice-log").filter { $0.method == "POST" } }
+        let rated = try #require(posts().last?.body?["entries"] as? [[String: Any]])
+        #expect(rated.map { $0["feeling"] as? String } == ["less"])
+        let count = posts().count
+        await store.sync()
+        #expect(posts().count == count) // already has it
+        #expect(PracticeStore(api: stubAPI(), defaults: defaults, fileURL: file).entries.first?.feeling == .less)
     }
 
     @Test func uploadsInBatchesOfTheServersLimit() async {

@@ -29,6 +29,8 @@ import java.io.File
  *   SYNCED_KEY — ids the account is known to have. Anything else is waiting to
  *                upload, so a practice finished offline is sent later.
  *   CURSOR_KEY — how far through the account's log this phone has read.
+ *   FEELINGS_KEY — "id=feeling" for each rating the account has, so a practice
+ *                rated after it was sent goes again with its rating (H11).
  */
 class PracticeStore(
     private val api: AccountApi,
@@ -57,6 +59,13 @@ class PracticeStore(
         return entry
     }
 
+    /** How a practice left them, from the finish screen; sent when signed in. */
+    fun rate(id: String, feeling: PracticeLogEntry.Feeling) {
+        if (entries.none { it.id == id }) return
+        storeEntries(entries.map { if (it.id == id) it.copy(feeling = feeling) else it })
+        if (auth?.isSignedIn == true) scope.launch { sync() }
+    }
+
     /**
      * After sign-in (and once per launch for a restored session): the first
      * time for this account, this phone's practices are remembered as its own;
@@ -68,6 +77,7 @@ class PracticeStore(
                 .putStringSet(OWN_KEY, entries.map { it.id }.toSet())
                 .putStringSet(SYNCED_KEY, emptySet())
                 .putLong(CURSOR_KEY, 0)
+                .remove(FEELINGS_KEY)
                 .putString(OWNER_KEY, user.id)
                 .apply()
         }
@@ -84,7 +94,7 @@ class PracticeStore(
         val own = prefs.getStringSet(OWN_KEY, emptySet()).orEmpty()
         val synced = prefs.getStringSet(SYNCED_KEY, emptySet()).orEmpty()
         storeEntries(entries.filter { it.id in own || it.id !in synced })
-        prefs.edit().remove(OWNER_KEY).remove(OWN_KEY).remove(SYNCED_KEY).remove(CURSOR_KEY).apply()
+        prefs.edit().remove(OWNER_KEY).remove(OWN_KEY).remove(SYNCED_KEY).remove(CURSOR_KEY).remove(FEELINGS_KEY).apply()
     }
 
     /**
@@ -107,11 +117,17 @@ class PracticeStore(
 
     private suspend fun syncOnce(): Boolean {
         val synced = prefs.getStringSet(SYNCED_KEY, emptySet()).orEmpty().toMutableSet()
-        val pending = entries.filter { it.id !in synced }
+        val sentFeelings = prefs.getStringSet(FEELINGS_KEY, emptySet()).orEmpty()
+            .mapNotNull { it.split('=', limit = 2).takeIf { p -> p.size == 2 }?.let { (id, f) -> id to f } }
+            .toMap().toMutableMap()
+        fun saveFeelings() = prefs.edit().putStringSet(FEELINGS_KEY, sentFeelings.map { (id, f) -> "$id=$f" }.toSet()).apply()
+        val pending = PracticeLog.pendingUploads(entries, synced, sentFeelings)
         for (batch in pending.chunked(BATCH_SIZE)) {
             withToken { api.uploadPractices(batch, it) } ?: return false
             synced += batch.map { it.id }
+            batch.forEach { e -> e.feeling?.let { sentFeelings[e.id] = it.wire } }
             prefs.edit().putStringSet(SYNCED_KEY, synced.toSet()).apply()
+            saveFeelings()
         }
 
         var cursor = prefs.getLong(CURSOR_KEY, 0)
@@ -121,7 +137,9 @@ class PracticeStore(
             if (page.entries.isNotEmpty()) {
                 storeEntries(PracticeLog.merged(entries, page.entries))
                 synced += page.entries.map { it.id }
+                page.entries.forEach { e -> e.feeling?.let { sentFeelings.putIfAbsent(e.id, it.wire) } }
                 prefs.edit().putStringSet(SYNCED_KEY, synced.toSet()).apply()
+                saveFeelings()
             }
             cursor = page.cursor
             prefs.edit().putLong(CURSOR_KEY, cursor).apply()
@@ -168,5 +186,6 @@ class PracticeStore(
         private const val OWN_KEY = "pranaveda_practice_own_ids"
         private const val SYNCED_KEY = "pranaveda_practice_synced_ids"
         private const val CURSOR_KEY = "pranaveda_practice_cursor"
+        private const val FEELINGS_KEY = "pranaveda_practice_sent_feelings"
     }
 }

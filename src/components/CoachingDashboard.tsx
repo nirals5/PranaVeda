@@ -5,11 +5,12 @@ import {
   Droplet, Compass, Play, Pause, RotateCcw, ChevronRight, CheckCircle2, 
   Clock, Coffee, BookOpen, Volume2, HelpCircle 
 } from 'lucide-react';
-import { RecommendationResult, SavedPractice } from '../types';
+import { Feeling, RecommendationResult, SavedPractice } from '../types';
 import { NewPracticeLogEntry } from '../hooks/usePracticeLog';
 import { HeartRateMonitor } from '../hooks/useHeartRateMonitor';
 import { useSpeech } from '../hooks/useSpeech';
 import CautionNote, { cautionSpeech } from './CautionNote';
+import FeelingCheck from './FeelingCheck';
 
 const getFallbackPoseImage = (pose: { nameEnglish: string; nameSanskrit?: string }) => {
   const name = (pose.nameEnglish || '').toLowerCase();
@@ -69,7 +70,9 @@ interface CoachingDashboardProps {
   isSaved: boolean;
   onToggleSave: () => void;
   showNotification?: (message: string, type: 'info' | 'success' | 'warn') => void;
-  onPracticeComplete?: (entry: NewPracticeLogEntry) => void;
+  // Returns the logged entry's id, for rating how it left them.
+  onPracticeComplete?: (entry: NewPracticeLogEntry) => string | void;
+  onRateFeeling?: (id: string, feeling: Feeling) => void;
   // A connected Bluetooth heart-rate device, if any: shown live and saved with the practice.
   heart?: HeartRateMonitor;
 }
@@ -104,10 +107,30 @@ export default function CoachingDashboard({
   onToggleSave,
   showNotification,
   onPracticeComplete,
+  onRateFeeling,
   heart,
 }: CoachingDashboardProps) {
   const [activeTab, setActiveTab] = useState<TabType>('Overview');
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+
+  // The practice just finished, asking how it left them (H11).
+  const [justDone, setJustDone] = useState<{ id: string; kind: 'ritual' | 'breathwork'; feeling?: Feeling } | null>(null);
+  const finished = (entry: NewPracticeLogEntry) => {
+    const id = onPracticeComplete?.(entry);
+    setJustDone(id && onRateFeeling ? { id, kind: entry.kind } : null);
+  };
+  const feelingCheck = (kind: 'ritual' | 'breathwork', dark = false) =>
+    justDone?.kind === kind ? (
+      <FeelingCheck
+        dark={dark}
+        chosen={justDone.feeling}
+        onChoose={(feeling) => {
+          onRateFeeling?.(justDone.id, feeling);
+          setJustDone({ ...justDone, feeling });
+        }}
+        onDismiss={() => setJustDone(null)}
+      />
+    ) : null;
 
   // Yoga Flow Wizard State
   const [isYogaWizardActive, setIsYogaWizardActive] = useState(false);
@@ -183,7 +206,7 @@ export default function CoachingDashboard({
         phaseAudioRef.current.player?.pause();
         stopSpeech();
         const heartSummary = heart?.endSession() ?? undefined;
-        onPracticeComplete?.({
+        finished({
           kind: 'breathwork',
           title: b.name,
           durationMinutes: Math.max(1, Math.round(((b.inhale + b.holdActive + b.exhale + b.holdEmpty) * b.cycles) / 60)),
@@ -420,7 +443,7 @@ export default function CoachingDashboard({
       if (!yogaLoggedRef.current) {
         yogaLoggedRef.current = true;
         heartSummary = heart?.endSession() ?? null;
-        onPracticeComplete?.({
+        finished({
           kind: 'ritual',
           title: result.yogaPractice.title,
           durationMinutes: result.yogaPractice.durationMinutes,
@@ -858,6 +881,7 @@ export default function CoachingDashboard({
                   </div>
                 ) : (
                   <div className="bg-white/55 backdrop-blur-md rounded-2xl p-6 border border-white/70 shadow-sm space-y-6">
+                    {feelingCheck('ritual')}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-100">
                       <div>
                         <h3 className="text-base sm:text-lg font-mono uppercase tracking-widest text-[#8A79A5] font-bold">
@@ -1100,6 +1124,7 @@ export default function CoachingDashboard({
                       </button>
                     </div>
 
+                    {feelingCheck('breathwork')}
                   </div>
 
                   {/* Breath specifications & advice */}

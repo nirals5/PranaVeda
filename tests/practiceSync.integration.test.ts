@@ -6,6 +6,7 @@ import syncApp from '../api/sync.js';
 import authApp from '../api/auth.js';
 import { getDb, schema } from '../api/_lib/db.js';
 import { MAX_UPLOAD, entriesAfter, storeEntries, useSettleWindow } from '../api/_lib/practiceLog.js';
+import { practiceFeedback } from '../api/_lib/feedback.js';
 import { signAccessToken } from '../api/_lib/tokens.js';
 import { SECRET_A, useSecrets } from './helpers.js';
 
@@ -78,6 +79,24 @@ describe.skipIf(!hasDb)('practice-log sync', () => {
     expect((await upload(user.auth, [p])).body).toEqual({ stored: 0 });
     expect((await upload(user.auth, [p, practice()])).body).toEqual({ stored: 1 });
     expect((await readAfter(user.auth)).body.entries).toHaveLength(2);
+  });
+
+  it('takes a rating sent later, and nothing else that changed (H11)', async () => {
+    const user = await newUser();
+    const today = new Date().toISOString().slice(0, 10);
+    const p = practice({ title: 'Bellows Breath', localDate: today });
+    await upload(user.auth, [p]);
+    expect((await upload(user.auth, [{ ...p, title: 'Changed', feeling: 'less' }])).body).toEqual({ stored: 0 });
+    expect((await upload(user.auth, [{ ...p, feeling: 'nope' }])).body.error).toBe('invalid_entries');
+    expect((await readAfter(user.auth)).body.entries).toEqual([{ ...p, feeling: 'less' }]);
+    // A changed answer replaces the first; an upload without one keeps it.
+    await upload(user.auth, [{ ...p, feeling: 'more' }]);
+    await upload(user.auth, [p]);
+    expect((await readAfter(user.auth)).body.entries).toEqual([{ ...p, feeling: 'more' }]);
+
+    const second = practice({ title: 'Bellows Breath', localDate: today, feeling: 'more' });
+    expect((await upload(user.auth, [second])).body).toEqual({ stored: 1 });
+    expect(await practiceFeedback(user.id, today, new Map([['bellows breath', 'bhastrika']]))).toEqual({ less: [], more: ['bhastrika'] });
   });
 
   it('returns only what is new since the cursor, a page at a time', async () => {
