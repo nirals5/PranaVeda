@@ -1,0 +1,55 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "prana veda",
+      "intents": [
+        {
+          "name": "BreathIntent",
+          "slots": [],
+          "samples": [
+            "a breathing practice",
+            "for a breathing practice",
+            "breathing practice",
+            "breathe with me",
+            "guide my breathing",
+            "guide me through a breath",
+            "help me breathe",
+            "help me calm down",
+            "a calming breath",
+            "a short practice",
+            "breathing"
+          ]
+        },
+        {
+          "name": "ReminderIntent",
+          "slots": [{ "name": "time", "type": "AMAZON.TIME" }],
+          "samples": [
+            "remind me every day at {time}",
+            "remind me every evening at {time}",
+            "remind me every morning at {time}",
+            "remind me at {time}",
+            "remind me to practise at {time}",
+            "remind me to practice at {time}",
+            "set a daily reminder at {time}",
+            "set a daily reminder for {time}",
+            "a daily reminder at {time}",
+            "a daily reminder",
+            "a reminder",
+            "set a reminder",
+            "remind me every day",
+            "at {time}",
+            "{time}"
+          ]
+        },
+        { "name": "AMAZON.YesIntent", "samples": [] },
+        { "name": "AMAZON.NoIntent", "samples": [] },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.NavigateHomeIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] }
+      ],
+      "types": []
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "manifest": {
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "name": "PranaVeda",
+          "summary": "A calm moment with Amrita: a daily reflection, a guided breath, and a daily reminder to practise.",
+          "description": "PranaVeda brings Amrita, a gentle Ayurvedic mentor, to your Echo. Open it for a short reflection for this part of the day. Ask for a breathing practice and Amrita guides one minute of calm breathing. Ask for a daily reminder and Alexa reminds you to take a moment for practice. PranaVeda offers general wellness guidance, not medical advice.",
+          "examplePhrases": [
+            "Alexa, open Prana Veda",
+            "Alexa, ask Prana Veda for a breathing practice",
+            "Alexa, ask Prana Veda to remind me every evening at seven"
+          ],
+          "keywords": ["yoga", "ayurveda", "breathing", "wellness", "calm"]
+        }
+      },
+      "isAvailableWorldwide": false,
+      "distributionCountries": ["US"],
+      "testingInstructions": "No account linking. Say: open Prana Veda; ask Prana Veda for a breathing practice; ask Prana Veda to remind me every evening at seven (asks for reminder permission the first time).",
+      "category": "HEALTH_AND_FITNESS"
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "https://v0-pranaveda.vercel.app/api/alexa",
+          "sslCertificateType": "Wildcard"
+        }
+      }
+    },
+    "permissions": [{ "name": "alexa::alerts:reminders:skill:readwrite" }],
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": false,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false
+    }
+  },
+  "manifestVersion": "1.0"
+}
