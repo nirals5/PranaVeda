@@ -56,7 +56,7 @@ struct PranaVedaApp: App {
                 }
                     .tabItem { Label("Dosha", systemImage: "wind") }
                     .tag(AppTab.dosha)
-                LibraryView(catalog: catalog)
+                LibraryView(catalog: catalog, conditions: chat.profileConditions)
                     .tabItem { Label("Library", systemImage: "figure.mind.and.body") }
                     .tag(AppTab.library)
                 AccountView(auth: auth, practice: practice, saved: saved, health: health, place: place, calendar: calendar, chat: chat) { tab = .amrita }

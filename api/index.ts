@@ -885,6 +885,7 @@ export function publicCatalog(base: string, catalog: Catalog = BUILT_IN_CATALOG)
       sceneImageUrl: assetUrl(sceneImagePath(pose.id), base),
     })),
     breathwork: catalog.breathwork,
+    explore: catalog.explore,
   };
 }
 
@@ -923,7 +924,10 @@ export function catalogPromptSummary(catalog: Catalog = BUILT_IN_CATALOG): strin
   const principles = catalog.principles.length
     ? `\n\n## Principles (cite at most one per card, by id, as principleId)\n${catalog.principles.map((p) => `- ${p.id}: ${p.statement}`).join('\n')}`
     : '';
-  return `## Pose catalog (recommend ONLY these, by id)\n${poses}\n\n## Breathwork catalog (recommend ONLY these, by id)\n${breaths}${principles}`;
+  const explore = catalog.explore.length
+    ? `\n\n## Explore only (G3: NEVER recommend, guide or put in a card)\n${catalog.explore.map((p) => p.nameEnglish).join(', ')}. These advanced poses are only in the PranaVeda iOS and Android apps, under Library → Explore, with an at-your-own-risk note. If asked for one, say so in a sentence (best learned with a teacher), never give step-by-step instructions, and offer a catalog pose that prepares for it.`
+    : '';
+  return `## Pose catalog (recommend ONLY these, by id)\n${poses}\n\n## Breathwork catalog (recommend ONLY these, by id)\n${breaths}${principles}${explore}`;
 }
 
 // ============================ Amrita system prompt ============================

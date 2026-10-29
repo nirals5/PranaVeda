@@ -19,7 +19,7 @@ vi.mock('../api/_lib/db.js', async (importOriginal) => {
 });
 
 const { catalogFromRows, describeTimes, getCatalog, resetCatalogCache } = await import('../api/_lib/catalog.js');
-const { BUILT_IN_CATALOG, BUILT_IN_CONDITIONS, POSES, BREATHWORK } = await import('../api/index.js');
+const { BUILT_IN_CATALOG, BUILT_IN_CONDITIONS, POSES, BREATHWORK, catalogPromptSummary, publicCatalog } = await import('../api/index.js');
 
 const configured = { url: process.env.DATABASE_URL, pooled: process.env.DATABASE_URL_POOLED };
 const hasDb = !!(configured.url || configured.pooled);
@@ -182,6 +182,57 @@ describe('catalog from the practices tables', () => {
     expect(catalog.poses.map((p) => p.id)).toEqual(['childs_pose']);
   });
 
+  it('lists explore-only poses for the apps\' Explore, with what to avoid them with (G3)', () => {
+    const headstand = row({
+      id: 'P33',
+      appId: null,
+      nameSanskrit: 'Sirsasana',
+      nameEnglish: 'Headstand',
+      sourceBodyArea: 'Full-Body / Inversion / Core',
+      whereShown: 'explore_only',
+      minExperience: 'experienced',
+      intensity: 'strong',
+      counterPoseId: 'P09',
+      avoidAfterMeal: true,
+      plainBenefit: 'A full inversion that builds focus.',
+      cues: ['Learn it with a teacher'],
+      sourceCaution: 'Demanding.',
+    });
+    const catalog = catalogFromRows(
+      [
+        row({}),
+        headstand,
+        row({ id: 'P38', appId: null, nameEnglish: 'Camel Pose', whereShown: 'explore_only', cues: [] }), // nothing to show yet
+        row({ id: 'P16', appId: null, nameEnglish: 'Plow Pose', whereShown: 'explore_only', retiredAt: new Date() }),
+        breathRow(),
+      ],
+      [{ practiceId: 'P33', conditionCode: 'neck_injury', level: 'avoid' }, { practiceId: 'P33', conditionCode: 'glaucoma', level: 'caution' }],
+      builtIn,
+      [{ code: 'neck_injury', label: 'Neck injury', userWords: ['stiff neck'] }]
+    );
+    expect(catalog.poses.map((p) => p.id)).toEqual(['childs_pose']);
+    expect(catalog.explore).toEqual([
+      {
+        id: 'P33',
+        nameSanskrit: 'Sirsasana',
+        nameEnglish: 'Headstand',
+        bodyFocus: 'Full-Body / Inversion / Core',
+        benefits: 'A full inversion that builds focus.',
+        cues: ['Learn it with a teacher'],
+        commonMistakes: ['Forcing'],
+        modifications: 'Use a cushion.',
+        avoidWith: [{ code: 'neck_injury', label: 'Neck injury', words: ['stiff neck'] }],
+        sourceCaution: 'Demanding.',
+        followWith: "Child's Pose",
+        avoidAfterMeal: true,
+      },
+    ]);
+    expect(catalogPromptSummary(catalog)).toContain('## Explore only (G3: NEVER recommend, guide or put in a card)\nHeadstand.');
+    expect(publicCatalog('https://x', catalog).explore).toHaveLength(1);
+    expect(BUILT_IN_CATALOG.explore).toEqual([]);
+    expect(catalogPromptSummary(BUILT_IN_CATALOG)).not.toContain('Explore only');
+  });
+
   it('skips a practice missing any tag the engine needs (G4)', () => {
     const untagged: Partial<Row>[] = [
       { minExperience: null },
@@ -286,6 +337,18 @@ describe.skipIf(!hasDb)('catalog from the configured database', () => {
       }
     }
     expect(becameCautions.sort()).toEqual(NOW_CAUTIONS);
+  });
+
+  it('lists the explore-only poses, none of which Amrita can offer (G3)', async () => {
+    resetCatalogCache();
+    dbMock.fail = false;
+    const catalog = await getCatalog(builtIn);
+    expect(catalog.explore.map((p) => p.nameEnglish)).toContain('Headstand');
+    const offered = new Set(catalog.poses.map((p) => p.nameEnglish));
+    for (const p of catalog.explore) {
+      expect(offered.has(p.nameEnglish), p.nameEnglish).toBe(false);
+      expect(p.cues.length, p.nameEnglish).toBeGreaterThan(0);
+    }
   });
 
   it('carries the Conditions tab, so everyday words reach the right code', async () => {

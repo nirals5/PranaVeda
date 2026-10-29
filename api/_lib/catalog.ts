@@ -24,8 +24,31 @@ export interface CatalogPrinciple {
   statement: string;
 }
 
+// An advanced pose that is never offered (G3: where_shown = explore_only), for
+// the apps' Library → Explore, shown with an at-your-own-risk caveat. Amrita
+// only knows the names, so she can point to it; she never puts one in a card.
+export interface ExplorePose {
+  id: string;
+  nameSanskrit: string;
+  nameEnglish: string;
+  bodyFocus: string;
+  benefits: string;
+  cues: string[];
+  commonMistakes: string[];
+  modifications: string;
+  // The conditions it must be avoided with, with the everyday words a profile
+  // may use for them, so an app can say "Not for you: you've said …".
+  avoidWith: { code: string; label: string; words: string[] }[];
+  // Who the source warns, in its own words.
+  sourceCaution?: string;
+  // The pose to follow it with, by name.
+  followWith?: string;
+  avoidAfterMeal?: true;
+}
+
 export interface Catalog {
   poses: CatalogPose[];
+  explore: ExplorePose[];
   breathwork: CatalogBreathwork[];
   conditions: CatalogCondition[];
   principles: CatalogPrinciple[];
@@ -66,10 +89,12 @@ export function catalogOf(
   conditions: CatalogCondition[],
   source: Catalog['source'],
   principles: CatalogPrinciple[] = [],
-  hints: ReadonlyMap<string, string> = new Map()
+  hints: ReadonlyMap<string, string> = new Map(),
+  explore: ExplorePose[] = []
 ): Catalog {
   return {
     poses,
+    explore,
     breathwork,
     conditions,
     principles,
@@ -242,7 +267,42 @@ export function catalogFromRows(
       bestTime: describeTimes(r.bestTimes, r.timingNote),
     }));
 
-  return catalogOf(poses, breathwork, conditionList, 'database', principles, hints);
+  const explore = exploreFromRows(rows, avoid, conditionList);
+  return catalogOf(poses, breathwork, conditionList, 'database', principles, hints, explore);
+}
+
+// G3: the explore_only poses, by name. One without cues or a benefit has
+// nothing to show yet, so it is left out and named in the log.
+function exploreFromRows(rows: PracticeRow[], avoid: ReadonlyMap<string, string[]>, conditionList: CatalogCondition[]): ExplorePose[] {
+  const live = rows.filter((r) => r.whereShown === 'explore_only' && !r.retiredAt && !r.mergedInto && r.type === 'asana');
+  const ready = live.filter((r) => r.cues.length > 0 && !!r.plainBenefit);
+  const unready = live.filter((r) => !ready.includes(r)).map((r) => r.id);
+  if (unready.length) console.warn(`[catalog] not in Explore (G3: no cues or benefit yet): ${unready.join(', ')}`);
+  const nameOf = new Map(rows.map((r) => [r.id, r.nameEnglish]));
+  const condition = new Map(conditionList.map((c) => [c.code, c]));
+  return ready
+    .sort((a, b) => a.nameEnglish.localeCompare(b.nameEnglish))
+    .map((r) => {
+      const follow = r.counterPoseId ? nameOf.get(r.counterPoseId) : undefined;
+      return {
+        id: r.id,
+        nameSanskrit: r.nameSanskrit,
+        nameEnglish: r.nameEnglish,
+        bodyFocus: r.sourceBodyArea ?? '',
+        benefits: r.plainBenefit ?? '',
+        cues: r.cues,
+        commonMistakes: r.commonMistakes,
+        modifications: r.modifications ?? '',
+        avoidWith: (avoid.get(r.id) ?? []).map((code) => ({
+          code,
+          label: condition.get(code)?.label ?? code.replace(/_/g, ' '),
+          words: condition.get(code)?.userWords ?? [],
+        })),
+        ...(r.sourceCaution ? { sourceCaution: r.sourceCaution } : {}),
+        ...(follow ? { followWith: follow } : {}),
+        ...(r.avoidAfterMeal ? { avoidAfterMeal: true as const } : {}),
+      };
+    });
 }
 
 async function readCatalog(builtIn: BuiltIn): Promise<Catalog> {
