@@ -83,6 +83,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val profileName: String?
         get() = runCatching { profile["name"]?.jsonPrimitive?.contentOrNull }.getOrNull()?.takeIf { it.isNotBlank() }
 
+    /** Whether Amrita has recorded their constitution (prakriti). */
+    val knowsConstitution: Boolean
+        get() = runCatching { profile["prakriti"]?.jsonPrimitive?.contentOrNull }.getOrNull()?.isNotBlank() == true
+
     /** "beginner", "regular" or "experienced"; null when not set (G2). */
     val experience: String?
         get() = runCatching { profile["experience"]?.jsonPrimitive?.contentOrNull }.getOrNull()

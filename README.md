@@ -162,7 +162,7 @@ In the iPhone and Android apps:
 - **Approximate location:** if someone allows only an approximate location, the card says it is too vague to tell places apart, and asks them to allow precise location.
 - **Not shared between devices:** saved spots stay on the phone. They are not synced to the website or the account.
 - **Code:** `ios/PranaVeda/Models/PlaceStore.swift` and `android/.../place/PlaceStore.kt`.
-- **Not in the apps yet:** the home-screen suggestion chip. The apps' home screen has no suggestion chips.
+- **Suggestion chips:** the apps' welcome shows the website's home-screen suggestions, with the place chip first when the phone knows where it is. Tapping one sends it to Amrita. `tests/appSuggestions.test.ts` checks the apps use the website's words.
 
 ### Weather
 

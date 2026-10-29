@@ -43,7 +43,7 @@ struct PranaVedaApp: App {
     var body: some Scene {
         WindowGroup {
             TabView(selection: $tab) {
-                ChatView(model: chat, auth: auth, insight: insight, saved: saved, voice: voice, voiceRequest: voiceRequest)
+                ChatView(model: chat, auth: auth, insight: insight, saved: saved, voice: voice, place: place, voiceRequest: voiceRequest)
                     .tabItem { Label("Ask Amrita", systemImage: "sparkles") }
                     .tag(AppTab.amrita)
                 DoshaProfileView(profile: chat.profile, guide: doshaGuide) { message in
