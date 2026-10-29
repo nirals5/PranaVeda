@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.time.LocalDate
@@ -83,6 +84,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     val profileName: String?
         get() = runCatching { profile["name"]?.jsonPrimitive?.contentOrNull }.getOrNull()?.takeIf { it.isNotBlank() }
+
+    /** The conditions they have told Amrita about ("bad knee", "high BP"). */
+    val profileConditions: List<String>
+        get() = runCatching { profile["conditions"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } }.getOrNull().orEmpty()
 
     /** Whether Amrita has recorded their constitution (prakriti). */
     val knowsConstitution: Boolean

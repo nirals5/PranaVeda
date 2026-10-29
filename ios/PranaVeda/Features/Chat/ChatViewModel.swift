@@ -56,6 +56,11 @@ final class ChatViewModel {
     }
 
     var profileName: String? { profile["name"]?.stringValue }
+    /// The conditions they have told Amrita about ("bad knee", "high BP").
+    var profileConditions: [String] {
+        guard case .array(let items) = profile["conditions"] else { return [] }
+        return items.compactMap(\.stringValue)
+    }
     /// "beginner", "regular" or "experienced"; nil when not set (G2).
     var experience: String? { profile["experience"]?.stringValue }
 
