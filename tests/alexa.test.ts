@@ -129,6 +129,15 @@ describe('verifying a request from Amazon', () => {
     expect(await verifyWith(raw, { signature: sign(raw, pki.wrongHostKey), fetchChain: async () => pki.wrongHostPem })).toBe('certificate chain');
   });
 
+  it('trusts the chain at the first certificate a root vouches for, as Amazon\'s cross-signed chain needs', async () => {
+    // Amazon's chain ends in a cross-signature from an authority trust stores
+    // have dropped; an untrusted certificate after the trusted link is ignored.
+    const raw = fresh();
+    expect(await verifyWith(raw, { fetchChain: async () => pki.leafPem + pki.rootPem + pki.wrongHostPem })).toBeUndefined();
+    // …but every link before it must hold.
+    expect(await verifyWith(raw, { fetchChain: async () => pki.leafPem + pki.wrongHostPem + pki.rootPem, roots: [pki.wrongHostPem] })).toBe('certificate chain');
+  });
+
   it('refuses a certificate not issued by a trusted root', async () => {
     expect(await verifyWith(fresh(), { roots: [] })).toBe('certificate chain');
   });
