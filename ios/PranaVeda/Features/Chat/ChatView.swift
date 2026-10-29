@@ -6,6 +6,8 @@ struct ChatView: View {
     var insight: DailyInsightStore? = nil
     var saved: SavedRitualStore? = nil
     var voice: AmritaVoice? = nil
+    /// Where they are, for the first suggestion (nil: location is not offered).
+    var place: PlaceStore? = nil
     /// Goes up each time a widget asks to talk to Amrita: start listening.
     var voiceRequest = 0
     @State private var handledVoiceRequest = 0
@@ -133,6 +135,11 @@ struct ChatView: View {
             Text("Tell me how you feel, and I'll suggest a practice that fits your body, energy, and goals.")
                 .font(Theme.body)
                 .foregroundStyle(Theme.stone700)
+            SuggestionChips(
+                suggestions: Suggestions.list(place: place?.current, knowsConstitution: model.profile["prakriti"]?.stringValue?.isEmpty == false),
+                onSelect: { model.send($0) }
+            )
+            .padding(.top, 6)
             if let insight {
                 DailyInsightCard(state: insight.state)
                     .padding(.top, 14)

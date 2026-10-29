@@ -277,6 +277,10 @@ fun ChatScreen(
         ) {
             if (model.items.isEmpty()) {
                 item { Welcome(model.greetingName) }
+                item {
+                    val place = (LocalContext.current.applicationContext as PranaVedaApplication).place
+                    SuggestionChips(Suggestions.list(place.current, model.knowsConstitution), onSelect = { model.send(it) })
+                }
                 if (insight != null) {
                     item {
                         LaunchedEffect(Unit) { insight.loadIfNeeded(model.profile) }
