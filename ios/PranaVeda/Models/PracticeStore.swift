@@ -11,6 +11,8 @@ import Observation
 ///   syncedKey — ids the account is known to have. Anything else is waiting to
 ///               upload, so a practice finished offline is sent later.
 ///   cursorKey — how far through the account's log this phone has read.
+///   feelingsKey — id → the feeling the account has for it, so a practice
+///               rated after it was sent goes again with its rating (H11).
 @MainActor
 @Observable
 final class PracticeStore {
@@ -31,6 +33,7 @@ final class PracticeStore {
     private static let ownKey = "pranaveda_practice_own_ids"
     private static let syncedKey = "pranaveda_practice_synced_ids"
     private static let cursorKey = "pranaveda_practice_cursor"
+    private static let feelingsKey = "pranaveda_practice_sent_feelings"
     /// The server's per-request limit.
     static let batchSize = 25
 
@@ -55,6 +58,15 @@ final class PracticeStore {
         return entry
     }
 
+    /// How a practice left them, from the finish screen; sent when signed in.
+    func rate(_ id: String, _ feeling: PracticeLogEntry.Feeling) {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+        var updated = entries
+        updated[index].feeling = feeling
+        setEntries(updated)
+        if auth?.isSignedIn == true { Task { await sync() } }
+    }
+
     // MARK: The account
 
     /// After sign-in (and once per launch for a restored session): the first
@@ -65,6 +77,7 @@ final class PracticeStore {
             defaults.set(entries.map(\.id), forKey: Self.ownKey)
             defaults.set([String](), forKey: Self.syncedKey)
             defaults.set(0, forKey: Self.cursorKey)
+            defaults.removeObject(forKey: Self.feelingsKey)
             defaults.set(user.id, forKey: Self.ownerKey)
         }
         await sync()
@@ -78,7 +91,7 @@ final class PracticeStore {
         let own = Set(defaults.stringArray(forKey: Self.ownKey) ?? [])
         let synced = Set(defaults.stringArray(forKey: Self.syncedKey) ?? [])
         setEntries(entries.filter { own.contains($0.id) || !synced.contains($0.id) })
-        for key in [Self.ownerKey, Self.ownKey, Self.syncedKey, Self.cursorKey] { defaults.removeObject(forKey: key) }
+        for key in [Self.ownerKey, Self.ownKey, Self.syncedKey, Self.cursorKey, Self.feelingsKey] { defaults.removeObject(forKey: key) }
     }
 
     /// Uploads whatever the account does not have yet, then reads whatever is
@@ -99,12 +112,17 @@ final class PracticeStore {
 
     private func syncOnce() async -> Bool {
         var synced = Set(defaults.stringArray(forKey: Self.syncedKey) ?? [])
-        let pending = entries.filter { !synced.contains($0.id) }
+        var sentFeelings = defaults.dictionary(forKey: Self.feelingsKey) as? [String: String] ?? [:]
+        let pending = PracticeLog.pendingUploads(entries, synced: synced, sentFeelings: sentFeelings)
         for start in stride(from: 0, to: pending.count, by: Self.batchSize) {
             let batch = Array(pending[start..<min(start + Self.batchSize, pending.count)])
             guard await withToken({ [api] token in try await api.uploadPractices(batch, accessToken: token) }) != nil else { return false }
-            batch.forEach { synced.insert($0.id) }
+            for entry in batch {
+                synced.insert(entry.id)
+                if let feeling = entry.feeling { sentFeelings[entry.id] = feeling.rawValue }
+            }
             defaults.set(Array(synced), forKey: Self.syncedKey)
+            defaults.set(sentFeelings, forKey: Self.feelingsKey)
         }
 
         var cursor = defaults.integer(forKey: Self.cursorKey)
@@ -113,8 +131,12 @@ final class PracticeStore {
             guard let page = await withToken({ [api] token in try await api.practices(after: after, accessToken: token) }) else { return false }
             if !page.entries.isEmpty {
                 setEntries(PracticeLog.merged(entries, with: page.entries))
-                page.entries.forEach { synced.insert($0.id) }
+                for entry in page.entries {
+                    synced.insert(entry.id)
+                    if let feeling = entry.feeling, sentFeelings[entry.id] == nil { sentFeelings[entry.id] = feeling.rawValue }
+                }
                 defaults.set(Array(synced), forKey: Self.syncedKey)
+                defaults.set(sentFeelings, forKey: Self.feelingsKey)
             }
             cursor = page.cursor
             defaults.set(cursor, forKey: Self.cursorKey)

@@ -1,22 +1,23 @@
 import type { Weather } from './weather.js';
 
-// Hints H1–H10 and H12 from the Practice Library's Rules tab: gentle leanings
-// for the time of day, the season, the weather, last night's sleep and the
-// person's dosha. Unlike the guardrails (G…), a hint
-// never refuses a card; it only tells Amrita which way to lean between
+// Hints H1–H12 from the Practice Library's Rules tab: gentle leanings
+// for the time of day, the season, the weather, last night's sleep, the
+// person's dosha and how past practices left them (H11, api/_lib/feedback.ts).
+// Unlike the guardrails (G…), a hint never refuses a card; it only tells Amrita which way to lean between
 // practices that are already safe and suitable. The windows below are the
 // Rules tab's "when"; what to lean toward is its "then", read with the catalog
 // (the wording here is the fallback for the built-in catalog).
 
-export type HintId = 'H1' | 'H2' | 'H3' | 'H4' | 'H5' | 'H6' | 'H7' | 'H8' | 'H9' | 'H10' | 'H12';
+export type HintId = 'H1' | 'H2' | 'H3' | 'H4' | 'H5' | 'H6' | 'H7' | 'H8' | 'H9' | 'H10' | 'H11' | 'H12';
 export type Season = 'autumn_winter' | 'spring' | 'summer';
 export type Sleep = { lastNightMinutes: number; usualMinutes: number };
 export type Dosha = 'Vata' | 'Pitta' | 'Kapha';
 
-// The hints that apply now, with what H10 and H12 need to be worded.
+// The hints that apply now, with what H10, H11 and H12 need to be worded.
 export interface RightNow {
   hints: HintId[];
   sleep?: Sleep; // a short night, from their wearable (H10)
+  feedback?: { less: string[]; more: string[] }; // practice names, from their ratings (H11)
   dosha?: { dosha: Dosha; from: 'imbalance' | 'constitution' }; // H12
 }
 
@@ -31,6 +32,7 @@ const WHEN: Record<HintId, string> = {
   H8: 'Cold or windy weather',
   H9: 'Hot weather',
   H10: 'If they say they slept badly or too little',
+  H11: "A practice that left them 'less settled' twice",
   H12: 'Their dosha',
 };
 
@@ -45,6 +47,7 @@ const BUILT_IN_THEN: Record<HintId, string> = {
   H8: 'Bias toward grounding and warming',
   H9: 'Bias toward cooling; avoid heating breaths',
   H10: "Avoid strong practices; favour N4 Restore or N1 Ground",
+  H11: 'Lower its weight for that user',
   H12: "When choosing between equally good options, prefer ones that balance the user's dominant dosha",
 };
 
@@ -109,6 +112,7 @@ export function hintsNow(now: {
   weather: Weather | null;
   sleep?: Sleep;
   profile?: Parameters<typeof leadingDosha>[0];
+  feedback?: RightNow['feedback'];
 }): RightNow {
   const hints: HintId[] = [];
   const { hour, season, weather } = now;
@@ -126,21 +130,36 @@ export function hintsNow(now: {
   // H10 always applies: from a short night on their wearable, else from what they say.
   hints.push('H10');
   const sleep = now.sleep && shortSleep(now.sleep) ? now.sleep : undefined;
+  const feedback = now.feedback?.less.length || now.feedback?.more.length ? now.feedback : undefined;
+  if (feedback) hints.push('H11');
   const dosha = leadingDosha(now.profile);
   if (dosha) hints.push('H12');
-  return { hints, ...(sleep ? { sleep } : {}), ...(dosha ? { dosha } : {}) };
+  return { hints, ...(sleep ? { sleep } : {}), ...(feedback ? { feedback } : {}), ...(dosha ? { dosha } : {}) };
 }
 
 const hm = (minutes: number) => `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
 
 function when(id: HintId, now: RightNow): string {
   if (id === 'H10' && now.sleep) return `Short sleep last night (${hm(now.sleep.lastNightMinutes)}; their usual ${hm(now.sleep.usualMinutes)})`;
+  if (id === 'H11' && now.feedback) {
+    const { less, more } = now.feedback;
+    return less.length
+      ? `These left them less settled more than once lately: ${less.join(', ')}`
+      : `These left them more settled more than once lately: ${more.join(', ')}`;
+  }
   if (id === 'H12' && now.dosha) return `Their ${now.dosha.from === 'imbalance' ? 'current imbalance' : 'constitution'} is mainly ${now.dosha.dosha}`;
   return WHEN[id];
 }
 
 function then(id: HintId, now: RightNow, texts: ReadonlyMap<string, string>): string {
   const text = (texts.get(id) ?? BUILT_IN_THEN[id]).trim().replace(/\.?$/, '');
+  if (id === 'H11' && now.feedback) {
+    const { less, more } = now.feedback;
+    const lean = 'when one suits the moment, lean toward it.';
+    if (!less.length) return `${lean[0].toUpperCase()}${lean.slice(1)}`;
+    const lower = `${text}: choose others that serve the same need, unless they ask for one by name.`;
+    return more.length ? `${lower} These left them more settled more than once: ${more.join(', ')}; ${lean}` : lower;
+  }
   return id === 'H12' && now.dosha
     ? `${text}: here, practices that balance ${now.dosha.dosha}, not ones that can aggravate it.`
     : `${text}.`;

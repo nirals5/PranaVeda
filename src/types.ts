@@ -78,7 +78,12 @@ export interface PracticeLogEntry {
   durationMinutes: number;
   result?: RecommendationResult; // snapshot so the day can reopen its ritual
   heart?: HeartSummary; // present when a heart-rate device was connected
+  feeling?: Feeling; // how they felt afterwards, if they said (H11)
 }
+
+// "How do you feel now?" after a practice: more settled, about the same, or
+// less settled. Amrita leans away from practices that leave them less settled.
+export type Feeling = 'more' | 'same' | 'less';
 
 // Heart rate across one practice, from a connected Bluetooth device.
 export interface HeartSummary {

@@ -136,7 +136,9 @@ describe.skipIf(!hasDb)('rotation in a signed-in chat', () => {
   });
 
   it('tells Amrita in a signed-in chat', async () => {
-    const id = await userWith([ritualEntry('2026-10-25', ['cobra'])]);
+    // The server trusts a date only within a day of now, so this uses today's.
+    const today = new Date().toISOString().slice(0, 10);
+    const id = await userWith([ritualEntry(today, ['cobra'])]);
     const token = await signAccessToken({ userId: id, sessionId: 'test', scope: [] }, 'app');
     let system = '';
     const fake = {
@@ -150,8 +152,8 @@ describe.skipIf(!hasDb)('rotation in a signed-in chat', () => {
     const app = express();
     app.use(express.json());
     registerChatRoute(app, fake, 'test-key');
-    await request(app).post('/api/chat').set('Authorization', `Bearer ${token}`).send({ messages: [{ role: 'user', content: 'Hi' }], localDate: TODAY });
+    await request(app).post('/api/chat').set('Authorization', `Bearer ${token}`).send({ messages: [{ role: 'user', content: 'Hi' }], localDate: today });
     expect(system).toContain('# Recently practised');
-    expect(system).toContain('(cobra, 2026-10-25)');
+    expect(system).toContain(`(cobra, ${today})`);
   });
 });

@@ -180,6 +180,21 @@ class PracticeLogTest {
         assertTrue(entries[1].completedInstant != null)
     }
 
+    @Test fun aRatingIsSentWhenTheAccountDoesNotHaveIt() {
+        val rated = entry("b", "2026-10-02").copy(feeling = PracticeLogEntry.Feeling.Less)
+        val kept = entry("c", "2026-10-03").copy(feeling = PracticeLogEntry.Feeling.More)
+        val pending = PracticeLog.pendingUploads(listOf(entry("a", "2026-10-01"), rated, kept, entry("d", "2026-10-04")), setOf("a", "b", "c"), mapOf("c" to "more"))
+        assertEquals(listOf("b", "d"), pending.map { it.id })
+    }
+
+    @Test fun readsAndWritesTheRating() {
+        val json = """{"id":"p_1","kind":"breathwork","title":"Box","completedAt":"2026-10-14T16:00:00Z","localDate":"2026-10-14","durationMinutes":2,"feeling":"less"}"""
+        val read = PvJson.decodeFromString(PracticeLogEntry.serializer(), json)
+        assertEquals(PracticeLogEntry.Feeling.Less, read.feeling)
+        assertEquals("less", PvJson.parseToJsonElement(PvJson.encodeToString(PracticeLogEntry.serializer(), read)).jsonObject["feeling"]!!.jsonPrimitive.content)
+        assertNull(PvJson.parseToJsonElement(PvJson.encodeToString(PracticeLogEntry.serializer(), entry("x", "2026-10-14"))).jsonObject["feeling"])
+    }
+
     @Test fun laysOutTheMonthUnderItsWeekdays() {
         val october = YearMonth.of(2026, 10)
         val sundayFirst = PracticeCalendar(Locale.US, DayOfWeek.SUNDAY)
@@ -310,6 +325,25 @@ class PracticeStoreTest {
         store.sync()
         assertEquals(1, requests.count { path(it) == "POST /api/sync/practice-log" })
         assertEquals("7", requests.last { path(it) == "GET /api/sync/practice-log" }.url.queryParameter("after"))
+    }
+
+    @Test fun sendsAPracticeAgainOnceItIsRated() = runTest {
+        routes["POST /api/sync/practice-log"] = { json(200, """{"stored":0}""") }
+        routes["GET /api/sync/practice-log"] = { json(200, """{"entries":[],"cursor":0,"hasMore":false}""") }
+        val store = store()
+        val mine = store.log(PracticeLogEntry.Kind.Breathwork, "Bellows Breath", 3, null)
+        store.auth = auth()
+        store.adoptAccount(user)
+
+        store.rate(mine.id, PracticeLogEntry.Feeling.Less)
+        store.sync()
+        val posts = { requests.filter { path(it) == "POST /api/sync/practice-log" } }
+        val last = PvJson.parseToJsonElement(posts().last().body!!.utf8()).jsonObject["entries"]!!.jsonArray
+        assertEquals(listOf("less"), last.map { it.jsonObject["feeling"]!!.jsonPrimitive.content })
+        val count = posts().size
+        store.sync()
+        assertEquals(count, posts().size) // already has it
+        assertEquals(PracticeLogEntry.Feeling.Less, store().entries.first().feeling)
     }
 
     @Test fun uploadsInBatchesOfTheServersLimit() = runTest {

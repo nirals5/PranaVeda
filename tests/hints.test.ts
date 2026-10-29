@@ -174,6 +174,6 @@ describe.skipIf(!hasDb)('needs and hints in the database', () => {
       expect(x.needs?.length, x.id).toBeGreaterThan(0);
       expect(x.intensity, x.id).toBeTruthy();
     }
-    for (const id of ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H9', 'H10', 'H12']) expect(catalog.hints.get(id), id).toBeTruthy();
+    for (const id of ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H9', 'H10', 'H11', 'H12']) expect(catalog.hints.get(id), id).toBeTruthy();
   });
 });

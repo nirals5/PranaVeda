@@ -41,6 +41,7 @@ New connectors are one entry each in the `CONNECTORS` array in `src/components/P
 ### Practice log and calendar
 
 - **What is logged:** a practice is saved when the guided yoga flow reaches its end, or when the breathwork timer finishes its cycles. Each entry holds a timestamp, the user's local calendar date, kind, title, duration, and a snapshot of the ritual.
+- **How do you feel now?** When a practice finishes, the website, iPhone and Android apps ask one optional question: More settled, About the same or Less settled. The answer is saved on that log entry as `feeling` and used by H11 below. It can be changed with another tap, or skipped.
 - **Calendar view:** a month grid with a day panel. Rituals show as a filled dot and breathwork as a hollow ring. "Open ritual" reopens the full practice. Arrow keys move between days, including across months.
 - **Streak:** consecutive days with at least one practice. It stays alive through today until the day ends. The same number appears in Recovery & Trends.
 
@@ -178,9 +179,9 @@ Privacy: coordinates are rounded to about 10 km before they are sent to Open-Met
 - **Locally** there are no Vercel headers, so set `WEATHER_TEST_LOCATION="47.6,-122.3"` to test with a fixed place.
 - **Turn it off:** `WEATHER=off`.
 
-### Time of day, season, weather, sleep and dosha hints
+### Time of day, season, weather, sleep, feedback and dosha hints
 
-Hints H1–H10 and H12 in the Practice Library's Rules tab gently steer Amrita's choices, in a "Right now" section of her prompt (`api/_lib/rightNow.ts`). They never refuse a card: what the user says, and every safety rule, comes first.
+Hints H1–H12 in the Practice Library's Rules tab gently steer Amrita's choices, in a "Right now" section of her prompt (`api/_lib/rightNow.ts`). They never refuse a card: what the user says, and every safety rule, comes first.
 
 - **Time of day,** from the time the website or app sends:
   - **H1, 6–10 am:** energise.
@@ -202,6 +203,11 @@ Hints H1–H10 and H12 in the Practice Library's Rules tab gently steer Amrita's
   - **Where it comes from:** the wearable reading the website sends, else what the user says. The iPhone and Android apps also send their readings, but only when the user turns on "Let Amrita see my sleep and heart readings" under Heart & sleep. It's off by default.
     - **What's sent:** only a summary: last night's sleep, resting heart rate and HRV, each beside the user's usual, worked out as on the website.
     - **HRV:** each reading names its kind, SDNN from Apple Health or RMSSD from Health Connect.
+- **Learning from feedback (H11):**
+  - **What it does:** a practice that left them less settled at least twice weighs less: Amrita chooses others that serve the same need, unless they ask for it by name. A practice that left them more settled at least twice weighs more.
+  - **What counts:** ratings in the last 90 days (`FEEDBACK_DAYS`, `FEEDBACK_TIMES` in `api/_lib/feedback.ts`). A rating covers every main practice in that session, each pose and the breath; anchors such as Child's Pose are left out. A practice is listed only when one side outnumbers the other, so a later good session can cancel a bad one.
+  - **Who it covers:** signed-in users, from the account's practice log, like rotation. A guest's ratings stay on their device.
+  - **Syncing a later rating:** log entries are otherwise never changed. A rating given after the entry was sent goes up again with the entry, and the server takes only its `feeling`. Other devices keep the copy they already have.
 - **Their dosha (H12):**
   - **What it does:** between equally good options, Amrita prefers practices that balance the person's dosha.
   - **Which dosha:** their current imbalance (`vikriti`) when Amrita has recorded one, else their constitution (`prakriti`).

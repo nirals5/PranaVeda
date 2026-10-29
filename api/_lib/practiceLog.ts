@@ -4,7 +4,9 @@ import { getDb, schema } from './db.js';
 
 // The practice log of signed-in users. Entries are made on the device and
 // only ever added, so storing is "insert unless already there", and reading
-// is "everything after the last one this device has seen".
+// is "everything after the last one this device has seen". The one change
+// allowed later is how the practice left them (feeling, H11): a device sends
+// the entry again with it, and only that field is taken.
 
 const { practiceLogEntries } = schema;
 
@@ -34,6 +36,8 @@ const entrySchema = z.looseObject({
   heart: z
     .looseObject({ startBpm: finite, endBpm: finite, avgBpm: finite, minBpm: finite, maxBpm: finite, rmssd: finite.optional() })
     .optional(),
+  // How they felt afterwards (api/_lib/feedback.ts).
+  feeling: z.enum(['more', 'same', 'less']).optional(),
   // The ritual as it was shown, so the day can reopen it. Kept as given.
   result: z.unknown().optional(),
 });
@@ -56,7 +60,7 @@ export function parseEntries(value: unknown): { entries: PracticeEntry[] } | { i
 
 // Returns how many were new.
 export async function storeEntries(userId: string, entries: PracticeEntry[]): Promise<number> {
-  const inserted = await getDb()
+  const stored = await getDb()
     .insert(practiceLogEntries)
     .values(
       entries.map((e) => ({
@@ -68,9 +72,14 @@ export async function storeEntries(userId: string, entries: PracticeEntry[]): Pr
         data: e,
       }))
     )
-    .onConflictDoNothing()
-    .returning({ seq: practiceLogEntries.seq });
-  return inserted.length;
+    .onConflictDoUpdate({
+      target: [practiceLogEntries.userId, practiceLogEntries.entryId],
+      set: { data: sql`jsonb_set(${practiceLogEntries.data}, '{feeling}', excluded.data -> 'feeling')` },
+      setWhere: sql`excluded.data -> 'feeling' is not null and ${practiceLogEntries.data} -> 'feeling' is distinct from excluded.data -> 'feeling'`,
+    })
+    // xmax is 0 on a row this statement inserted, not one it updated.
+    .returning({ inserted: sql<boolean>`xmax = 0` });
+  return stored.filter((r) => r.inserted).length;
 }
 
 export async function entriesAfter(

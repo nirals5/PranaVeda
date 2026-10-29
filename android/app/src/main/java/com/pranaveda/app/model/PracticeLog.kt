@@ -35,7 +35,22 @@ data class PracticeLogEntry(
      */
     @Serializable(with = LenientRitualSerializer::class)
     val result: RecommendationResult? = null,
+    /** How it left them, if they said (H11). */
+    val feeling: Feeling? = null,
 ) {
+    /** "How do you feel now?" after the practice. Amrita leans away from practices that leave them less settled. */
+    @Serializable
+    enum class Feeling(val label: String) {
+        @kotlinx.serialization.SerialName("more")
+        More("More settled"),
+
+        @kotlinx.serialization.SerialName("same")
+        Same("About the same"),
+
+        @kotlinx.serialization.SerialName("less")
+        Less("Less settled"),
+    }
+
     @Serializable
     enum class Kind {
         @kotlinx.serialization.SerialName("ritual")
@@ -101,13 +116,21 @@ object PracticeLog {
         return kept.mapIndexed { index, entry -> if (index < snapshotFrom && entry.result != null) entry.copy(result = null) else entry }
     }
 
-    /** Adds entries from elsewhere. Entries are never edited, so an id seen twice is the same practice and is kept once. */
+    /**
+     * Adds entries from elsewhere. An id seen twice is the same practice and is
+     * kept once; the copy here wins, since the only later change (how it left
+     * them) is made on the device that ran it.
+     */
     fun merged(local: List<PracticeLogEntry>, incoming: List<PracticeLogEntry>): List<PracticeLogEntry> {
         val known = local.map { it.id }.toSet()
         val added = incoming.filter { it.id !in known }
         if (added.isEmpty()) return local
         return trimmed((local + added).sortedBy { it.completedInstant ?: Instant.EPOCH })
     }
+
+    /** What the account is missing: new practices, and ratings it has not had. */
+    fun pendingUploads(entries: List<PracticeLogEntry>, synced: Set<String>, sentFeelings: Map<String, String>): List<PracticeLogEntry> =
+        entries.filter { it.id !in synced || (it.feeling != null && sentFeelings[it.id] != it.feeling.wire) }
 
     /**
      * Consecutive days with at least one practice. The streak stays alive
@@ -130,3 +153,6 @@ object PracticeLog {
 /** A page of the account's practice log. */
 @Serializable
 data class PracticePage(val entries: List<PracticeLogEntry>, val cursor: Long, val hasMore: Boolean)
+
+/** The server's word for a feeling. */
+val PracticeLogEntry.Feeling.wire: String get() = name.lowercase()

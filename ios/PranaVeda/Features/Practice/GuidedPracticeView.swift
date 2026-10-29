@@ -11,6 +11,8 @@ struct GuidedPracticeView: View {
     @State private var isRunning = true
     @State private var guide = SpeechGuide()
     @State private var finished = false
+    /// The log entry made on finishing, for "How do you feel now?".
+    @State private var loggedId: String?
     /// The practice on the lock screen and in the Dynamic Island.
     @State private var liveActivity = PracticeLiveActivity()
     @State private var heyAmrita = HeyAmrita.shared
@@ -31,6 +33,7 @@ struct GuidedPracticeView: View {
                     detail: "\(result.yogaPractice.title) is saved to your practice.",
                     breathwork: result.breathwork,
                     result: result,
+                    entryId: loggedId,
                     onDone: { dismiss() }
                 )
             } else if poses.isEmpty {
@@ -133,9 +136,9 @@ struct GuidedPracticeView: View {
                 showLiveActivity()
             case .finished:
                 isRunning = false
-                practice.log(kind: .ritual, title: result.yogaPractice.title,
-                             durationMinutes: result.yogaPractice.durationMinutes ?? sequence.durations.reduce(0, +) / 60,
-                             result: result)
+                loggedId = practice.log(kind: .ritual, title: result.yogaPractice.title,
+                                        durationMinutes: result.yogaPractice.durationMinutes ?? sequence.durations.reduce(0, +) / 60,
+                                        result: result).id
                 guide.speak(Guidance.ritualComplete)
                 liveActivity.end()
                 withAnimation { finished = true }
@@ -158,6 +161,7 @@ struct BreathworkPacerView: View {
     @State private var liveActivity = PracticeLiveActivity()
     @State private var guide = SpeechGuide()
     @State private var finished = false
+    @State private var loggedId: String?
     @State private var heyAmrita = HeyAmrita.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -176,6 +180,7 @@ struct BreathworkPacerView: View {
                     detail: "\(pattern.name) is saved to your practice.",
                     breathwork: nil,
                     result: nil,
+                    entryId: loggedId,
                     onDone: { dismiss() }
                 )
             } else {
@@ -314,7 +319,7 @@ struct BreathworkPacerView: View {
                 showLiveActivity()
             case .finished:
                 isRunning = false
-                practice.log(kind: .breathwork, title: pattern.name, durationMinutes: pacer.totalMinutes, result: result)
+                loggedId = practice.log(kind: .breathwork, title: pattern.name, durationMinutes: pacer.totalMinutes, result: result).id
                 guide.speak(Guidance.breathworkComplete(pattern.name))
                 liveActivity.end()
                 withAnimation { finished = true }
@@ -417,6 +422,8 @@ private struct PracticeComplete: View {
     let detail: String
     let breathwork: BreathworkPattern?
     let result: RecommendationResult?
+    /// The entry just logged, to rate (H11).
+    let entryId: String?
     let onDone: () -> Void
     @State private var showingBreathwork = false
 
@@ -426,6 +433,7 @@ private struct PracticeComplete: View {
             Image(systemName: "checkmark.circle").font(.system(size: 56, weight: .light)).foregroundStyle(Theme.lavender)
             Text("Namaste").font(Theme.display).foregroundStyle(Theme.ink)
             Text(detail).font(Theme.body).foregroundStyle(Theme.stone700).multilineTextAlignment(.center)
+            if let entryId { FeelingCheck(entryId: entryId).padding(.top, 8) }
             Spacer()
             if let breathwork {
                 Button { showingBreathwork = true } label: {
@@ -442,5 +450,39 @@ private struct PracticeComplete: View {
         .fullScreenCover(isPresented: $showingBreathwork, onDismiss: onDone) {
             if let breathwork { BreathworkPacerView(pattern: breathwork, result: result) }
         }
+    }
+}
+
+/// "How do you feel now?": one optional tap after a practice (H11). Amrita
+/// leans away from practices that leave them less settled, and toward ones
+/// that settle them.
+private struct FeelingCheck: View {
+    let entryId: String
+    @Environment(PracticeStore.self) private var practice
+
+    private var chosen: PracticeLogEntry.Feeling? { practice.entries.last { $0.id == entryId }?.feeling }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(chosen == nil ? "How do you feel now?" : "Thank you. Amrita will keep this in mind.")
+                .font(Theme.body).foregroundStyle(Theme.stone700)
+            HStack(spacing: 8) {
+                ForEach(PracticeLogEntry.Feeling.allCases, id: \.self) { feeling in
+                    let selected = chosen == feeling
+                    Button { practice.rate(entryId, feeling) } label: {
+                        Text(feeling.label)
+                            .font(.caption.weight(.medium))
+                            .lineLimit(1).minimumScaleFactor(0.8)
+                            .foregroundStyle(selected ? .white : Theme.ink)
+                            .padding(.horizontal, 12).padding(.vertical, 9)
+                            .background(selected ? Theme.lavender : Color.white.opacity(0.8), in: Capsule())
+                            .overlay(Capsule().stroke(selected ? Theme.lavender : Theme.stone700.opacity(0.25)))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
     }
 }

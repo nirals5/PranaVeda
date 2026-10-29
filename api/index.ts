@@ -10,6 +10,8 @@ import { moveUpFor, moveUpPrompt, recentPracticeDates } from './_lib/moveUp.js';
 import type { MoveUp } from './_lib/moveUp.js';
 import { limitMessage, limitRequest, rateLimited } from './_lib/rateLimit.js';
 import { ANCHORS, ROTATION_DAYS, recentMainPractices } from './_lib/rotation.js';
+import { practiceFeedback } from './_lib/feedback.js';
+import type { Feedback } from './_lib/feedback.js';
 import type { VersionedProfile } from './_lib/profiles.js';
 import { EXPERIENCE_LEVELS } from './_lib/profileSchema.js';
 import type { Experience } from './_lib/profileSchema.js';
@@ -1911,16 +1913,24 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
     const [catalog, food, weather] = await Promise.all([servedCatalog(), getFoodRules(), weatherFor(req)]);
     const notFood = practiceNames(catalog);
 
-    // Signed in: the main practices they completed in the last three days (G6).
+    // Signed in: the main practices they completed in the last three days
+    // (G6), and how their rated practices left them (H11).
     let recent = new Map<string, string>();
+    let feedback: Feedback = { less: [], more: [] };
     if (account) {
+      const breathIdByName = new Map(catalog.breathwork.map((b) => [b.name.toLowerCase(), b.id]));
       try {
-        const breathIdByName = new Map(catalog.breathwork.map((b) => [b.name.toLowerCase(), b.id]));
         recent = await recentMainPractices(account.userId, today, breathIdByName);
       } catch (err: any) {
         console.error('[chat] recent practices failed:', err?.message || err);
       }
+      try {
+        feedback = await practiceFeedback(account.userId, today, breathIdByName);
+      } catch (err: any) {
+        console.error('[chat] practice feedback failed:', err?.message || err);
+      }
     }
+    const nameOf = (id: string) => catalog.poseById.get(id)?.nameEnglish ?? catalog.breathworkById.get(id)?.name ?? id;
 
     const system = buildSystemPrompt(
       profile,
@@ -1939,13 +1949,14 @@ export function registerChatRoute(app: import('express').Express, client: Anthro
       recent,
       weather,
       // H1–H12: the hour they sent, the season where they are, the weather,
-      // last night's sleep from their wearable, and their dosha.
+      // last night's sleep from their wearable, their ratings, and their dosha.
       hintsNow({
         hour: localHour(localTime),
         season: seasonOf(today, approximateLocation(req)?.lat ?? null),
         weather,
         sleep: sanitizeHealthContext(health)?.sleep,
         profile,
+        feedback: { less: feedback.less.map(nameOf), more: feedback.more.map(nameOf) },
       })
     );
 

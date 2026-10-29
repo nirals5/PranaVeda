@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mergeLogs } from '../src/hooks/usePracticeLog';
+import { pendingUploads } from '../src/hooks/usePracticeSync';
 import type { PracticeLogEntry } from '../src/types';
 
 const entry = (id: string, completedAt: string, extra: Partial<PracticeLogEntry> = {}): PracticeLogEntry => ({
@@ -41,5 +42,17 @@ describe('mergeLogs', () => {
     expect(merged).toHaveLength(500);
     expect(merged.at(-1)!.id).toBe('p599'); // the newest are the ones kept
     expect(merged.filter((e) => e.result).length).toBe(40); // snapshots only on the most recent
+  });
+});
+
+describe('what goes to the account', () => {
+  it('sends new practices, and a rating the account has not had (H11)', () => {
+    const a = entry('a', '2026-10-01T08:00:00Z');
+    const b = entry('b', '2026-10-02T08:00:00Z', { feeling: 'less' });
+    const c = entry('c', '2026-10-03T08:00:00Z', { feeling: 'more' });
+    const d = entry('d', '2026-10-04T08:00:00Z');
+    const pending = pendingUploads([a, b, c, d], new Set(['a', 'b', 'c']), { c: 'more' });
+    expect(pending.map((e) => e.id)).toEqual(['b', 'd']);
+    expect(pendingUploads([c], new Set(['c']), { c: 'less' }).map((e) => e.id)).toEqual(['c']);
   });
 });
