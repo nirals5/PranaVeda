@@ -167,6 +167,13 @@ final class PlaceStore: NSObject {
         persist()
     }
 
+    /// The account's places, when they are kept there (ConnectionsSync).
+    func replace(_ value: [SavedPlace]) {
+        guard value != places else { return }
+        places = value
+        persist()
+    }
+
     func remove(_ kind: PlaceKind) {
         places.removeAll { $0.kind == kind }
         persist()

@@ -12,7 +12,7 @@ struct LocationSettings: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Location").sectionLabel().accessibilityAddTraits(.isHeader)
             Text("A practice that fits where you are").font(Theme.heading()).foregroundStyle(Theme.ink)
-            Text("While PranaVeda is open, it checks where you are against spots you save here. Amrita is told only the kind of place, such as home or work. Your coordinates stay on this phone and no history is kept.")
+            Text("While PranaVeda is open, it checks where you are against spots you save here. Amrita is told only the kind of place, such as home or work. No history is kept, and your saved spots stay on this phone unless you keep them on your account (above).")
                 .font(Theme.bodySmall).foregroundStyle(Theme.stone700)
             HStack(alignment: .center, spacing: 12) {
                 Text(status).font(Theme.quote.italic()).foregroundStyle(Theme.stone700)

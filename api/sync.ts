@@ -5,6 +5,15 @@ import { EXPERIENCE_LEVELS, parseProfile } from './_lib/profileSchema.js';
 import { applyProfileChanges, loadAccountProfile, saveProfile } from './_lib/profiles.js';
 import { MAX_UPLOAD, entriesAfter, parseEntries, storeEntries } from './_lib/practiceLog.js';
 import { MAX_REMOVES, MAX_SAVES, applyChanges, listSaved, parseChanges } from './_lib/savedRituals.js';
+import {
+  ConnectionsUnavailable,
+  type Connections,
+  forgetConnections,
+  loadConnections,
+  parseCalendarLink,
+  parsePlaces,
+  saveConnections,
+} from './_lib/connections.js';
 
 // Keeping a signed-in user's data the same on every device: /api/sync/*.
 // Signed-in only; a guest's data never leaves their device.
@@ -20,7 +29,8 @@ const route = (handler: Handler) => async (req: Request, res: Response) => {
     await handler(req, res);
   } catch (err: any) {
     console.error(`[sync] ${req.method} ${req.path} failed:`, err?.message || err);
-    if (!res.headersSent) res.status(503).json({ error: 'sync_unavailable' });
+    if (res.headersSent) return;
+    res.status(503).json({ error: err instanceof ConnectionsUnavailable ? 'connections_unavailable' : 'sync_unavailable' });
   }
 };
 
@@ -129,6 +139,63 @@ app.get(
     const user = await requireUser(req, res);
     if (!user) return;
     res.json({ rituals: await listSaved(user.id) });
+  })
+);
+
+// Places and the calendar link kept on the account, or { kept: false } when
+// the user hasn't turned that on (then they stay on each device).
+app.get(
+  '/api/sync/connections',
+  route(async (req, res) => {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const stored = await loadConnections(user.id);
+    res.json(stored ? { kept: true, ...stored } : { kept: false, connections: { places: [] }, version: 0 });
+  })
+);
+
+// Keeps them on the account (baseVersion 0 turns it on) or changes them.
+// What is left out stays as stored, so the apps, which have no calendar link,
+// can send places alone; calendarLink null removes the link. A stale
+// baseVersion gets 409 with what is stored now.
+app.put(
+  '/api/sync/connections',
+  route(async (req, res) => {
+    if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const { baseVersion, places: rawPlaces, calendarLink: rawLink } = req.body ?? {};
+    if (!Number.isInteger(baseVersion) || baseVersion < 0) return res.status(400).json({ error: 'base_version_required' });
+    const places = rawPlaces === undefined ? undefined : parsePlaces(rawPlaces);
+    if (places === null) return res.status(400).json({ error: 'invalid_places' });
+    const link = rawLink === undefined || rawLink === null ? rawLink : parseCalendarLink(rawLink);
+    if (link === null && rawLink !== null) return res.status(400).json({ error: 'invalid_calendar_link' });
+
+    const current = baseVersion === 0 ? { connections: { places: [] } as Connections, version: 0 } : await loadConnections(user.id);
+    const conflict = (now: Awaited<ReturnType<typeof loadConnections>>) =>
+      res.status(409).json({ error: 'version_conflict', kept: !!now, ...(now ?? { connections: { places: [] }, version: 0 }) });
+    if (!current || current.version !== baseVersion) return conflict(current);
+    const { calendarLink: oldLink, ...rest } = current.connections;
+    const next: Connections = {
+      ...rest,
+      places: places ?? current.connections.places,
+      ...(link === undefined ? (oldLink ? { calendarLink: oldLink } : {}) : link === null ? {} : { calendarLink: link }),
+    };
+    const result = await saveConnections(user.id, next, baseVersion);
+    if ('current' in result) return conflict(result.current);
+    res.json({ kept: true, connections: next, version: result.version });
+  })
+);
+
+// Turns it off: nothing stays on the account. Each device keeps its own copy.
+app.delete(
+  '/api/sync/connections',
+  route(async (req, res) => {
+    if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
+    const user = await requireUser(req, res);
+    if (!user) return;
+    await forgetConnections(user.id);
+    res.json({ kept: false, connections: { places: [] }, version: 0 });
   })
 );
 

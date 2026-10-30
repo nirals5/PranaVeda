@@ -14,6 +14,7 @@ import { HeartRateMonitor } from '../hooks/useHeartRateMonitor';
 import { WearableHealth } from '../hooks/useWearableHealth';
 import { ExternalCalendar } from '../hooks/useExternalCalendar';
 import { NudgeNotifications } from '../hooks/useNudgeNotifications';
+import { ConnectionsSync } from '../hooks/useConnectionsSync';
 
 interface ProfileViewProps {
   profile: WellnessProfile;
@@ -25,6 +26,7 @@ interface ProfileViewProps {
   heart: HeartRateMonitor;
   health: WearableHealth;
   place: Place;
+  connectionsSync: ConnectionsSync;
   onOpenRitual: (result: RecommendationResult) => void;
   onStartPractice: () => void;
   // Resolves false when it could not be saved (signed in and offline, say).
@@ -79,7 +81,7 @@ const CONNECTORS: {
   },
 ];
 
-export default function ProfileView({ profile, auth, practiceLog, streak, calendar, notifications, heart, health, place, onOpenRitual, onStartPractice, onExperienceChange }: ProfileViewProps) {
+export default function ProfileView({ profile, auth, practiceLog, streak, calendar, notifications, heart, health, place, connectionsSync, onOpenRitual, onStartPractice, onExperienceChange }: ProfileViewProps) {
   const [section, setSection] = useState<'connectors' | 'calendar' | 'wearables' | 'location'>('connectors');
   const [savingExperience, setSavingExperience] = useState(false);
   const [experienceNotice, setExperienceNotice] = useState<string | null>(null);
@@ -186,6 +188,36 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
         </div>
         {/* On a phone the button sits below, so it does not squeeze the name. */}
         {auth.status === 'user' && <div className="sm:hidden">{signOutButton}</div>}
+
+        {auth.status === 'user' && (
+          <div className="pt-4 border-t border-stone-200/50 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div className="flex-1 min-w-0 space-y-1">
+              <p className="text-[17px] font-serif text-[#2D3436] leading-snug">Places and calendar link</p>
+              <p aria-live="polite" className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
+                {connectionsSync.failed
+                  ? 'That didn’t work just now. Please try again.'
+                  : connectionsSync.kept
+                    ? 'Kept on your account, encrypted, so your other devices use the same saved places and calendar link. Turning this off removes them from the account; this device keeps its own.'
+                    : 'Keep your saved places and private calendar link on your account, encrypted, so your other devices use them too. Off, they stay on each device.'}
+              </p>
+            </div>
+            {connectionsSync.kept !== null && (
+              <button
+                type="button"
+                onClick={connectionsSync.kept ? connectionsSync.turnOff : connectionsSync.turnOn}
+                disabled={connectionsSync.pending}
+                aria-pressed={connectionsSync.kept}
+                className={`flex-shrink-0 self-start sm:self-center py-2 px-4 rounded-full text-[11px] font-mono uppercase tracking-wider font-bold transition-all cursor-pointer disabled:opacity-60 ${
+                  connectionsSync.kept
+                    ? 'text-stone-600 hover:text-stone-900 bg-white/50 hover:bg-white/80 border border-white/70'
+                    : 'bg-[#8A79A5] hover:bg-[#72618F] text-white'
+                }`}
+              >
+                {connectionsSync.pending ? 'One moment…' : connectionsSync.kept ? 'Turn off' : 'Turn on'}
+              </button>
+            )}
+          </div>
+        )}
 
         {auth.status === 'user' && (
           <div className="pt-4 border-t border-stone-200/50">

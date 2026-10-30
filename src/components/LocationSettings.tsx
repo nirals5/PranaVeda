@@ -38,7 +38,8 @@ export default function LocationSettings({ place }: { place: Place }) {
       <h2 className="text-2xl font-serif text-[#2D3436] mt-2">A practice that fits where you are</h2>
       <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed mt-2 max-w-2xl">
         While PranaVeda is open, it checks where you are against spots you save here. Amrita is told only the kind of
-        place, such as home or work. Your coordinates stay on this device and no history is kept.
+        place, such as home or work. No history is kept, and your saved spots stay on this device unless you keep
+        them on your account (on your profile page).
       </p>
 
       <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">

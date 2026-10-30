@@ -5,6 +5,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
 import com.pranaveda.app.model.SavedRitual
+import com.pranaveda.app.place.AccountConnections
+import com.pranaveda.app.place.SavedPlace
 import com.pranaveda.app.model.PracticeLogEntry
 import com.pranaveda.app.model.PracticePage
 import com.pranaveda.app.model.PvJson
@@ -181,6 +183,27 @@ class AccountApi(private val api: ApiClient = ApiClient()) {
         val list = PvJson.parseToJsonElement(reply.body).jsonObject["rituals"]?.jsonArray.orEmpty()
         return list.mapNotNull { runCatching { PvJson.decodeFromJsonElement(SavedRitual.serializer(), it) }.getOrNull() }
     }
+
+    /** Places kept on the account (opt-in), or that it keeps none. */
+    suspend fun connections(accessToken: String): AccountConnections = connectionsReply(send("GET", "api/sync/connections", bearer = accessToken))
+
+    /** Places only: the account's calendar link (from the website) is left as it is. */
+    suspend fun saveConnections(places: List<SavedPlace>, baseVersion: Int, accessToken: String): AccountConnections {
+        val body = PvJson.encodeToString(ConnectionsBody.serializer(), ConnectionsBody(places, baseVersion))
+        return connectionsReply(send("PUT", "api/sync/connections", bearer = accessToken, body = body))
+    }
+
+    suspend fun forgetConnections(accessToken: String): AccountConnections =
+        connectionsReply(send("DELETE", "api/sync/connections", bearer = accessToken))
+
+    /** 409: the write was based on an older version; the reply is what is stored now. */
+    private fun connectionsReply(reply: Reply): AccountConnections {
+        if (reply.status != 200 && reply.status != 409) throw HttpStatusException(reply.status)
+        return PvJson.decodeFromString(AccountConnections.serializer(), reply.body).copy(conflict = reply.status == 409)
+    }
+
+    @Serializable
+    private data class ConnectionsBody(val places: List<SavedPlace>, val baseVersion: Int)
 
     private companion object {
         const val CLIENT = "android"

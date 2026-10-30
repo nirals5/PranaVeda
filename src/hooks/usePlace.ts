@@ -151,6 +151,9 @@ export function usePlace() {
     setPlaces((prev) => prev.filter((p) => p.kind !== kind));
   }, []);
 
+  // The account's places, when they are kept there (useConnectionsSync).
+  const replacePlaces = useCallback((next: SavedPlace[]) => setPlaces(next), []);
+
   const current = useMemo(() => (enabled ? matchPlace(position, places) : null), [enabled, position, places]);
 
   return {
@@ -166,6 +169,7 @@ export function usePlace() {
     disable,
     savePlace,
     removePlace,
+    replacePlaces,
   };
 }
 

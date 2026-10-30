@@ -59,7 +59,7 @@ fun LocationCard(place: PlaceStore, arrival: ArrivalStore) {
         SectionLabel("Location", heading = true)
         Text("A practice that fits where you are", style = Pv.heading, color = Pv.ink)
         Text(
-            "While PranaVeda is open, it checks where you are against spots you save here. Amrita is told only the kind of place, such as home or work. Your coordinates stay on this phone and no history is kept.",
+            "While PranaVeda is open, it checks where you are against spots you save here. Amrita is told only the kind of place, such as home or work. No history is kept, and your saved spots stay on this phone unless you keep them on your account (above).",
             style = Pv.bodySmall,
             color = Pv.stone700,
         )
