@@ -8,6 +8,7 @@ import WellnessInsight from './components/WellnessInsight';
 import CoachingDashboard from './components/CoachingDashboard';
 import AmritaChat from './components/AmritaChat';
 import DoshaProfileView from './components/DoshaProfileView';
+import ExploreView from './components/ExploreView';
 import { useAmritaChat } from './hooks/useAmritaChat';
 import { Experience, RecommendationResult, SavedPractice, WellnessProfile } from './types';
 import { saveAccountExperience } from './lib/auth';
@@ -28,7 +29,7 @@ import { usePlace, PLACE_SUGGESTION } from './hooks/usePlace';
 
 export default function App() {
   const prefersReducedMotion = useReducedMotion();
-  const [currentView, setCurrentView] = useState<'coach' | 'dosha' | 'recovery' | 'profile'>('coach');
+  const [currentView, setCurrentView] = useState<'coach' | 'dosha' | 'recovery' | 'explore' | 'profile'>('coach');
   const [showAmritaHint, setShowAmritaHint] = useState(true);
   const hoverTimerRef = useRef<number | null>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -272,6 +273,17 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setCurrentView('explore')}
+            className={`flex-1 sm:flex-none py-2 px-1.5 sm:px-5 rounded-xl text-[11px] sm:text-[14px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              currentView === 'explore'
+                ? 'bg-[#8A79A5]/90 text-white shadow-sm'
+                : 'text-stone-550 hover:text-stone-900'
+            }`}
+          >
+            Explore
+          </button>
+
+          <button
             onClick={() => setCurrentView('profile')}
             aria-label="Profile and connectors"
             title="Profile and connectors"
@@ -325,6 +337,19 @@ export default function App() {
             </motion.div>
           )}
  
+          {/* EXPLORE SCREEN (advanced poses Amrita never suggests) */}
+          {currentView === 'explore' && (
+            <motion.div
+              key="explore"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="w-full"
+            >
+              <ExploreView conditions={profile.conditions} />
+            </motion.div>
+          )}
+
           {/* PROFILE & CONNECTORS SCREEN (practice calendar lives here) */}
           {currentView === 'profile' && (
             <motion.div

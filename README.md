@@ -113,16 +113,16 @@ The iPhone and Android apps read the phone's own calendar instead of a link or a
 - **Fail closed:** if calendar access is withdrawn, there is no bar and no reminder.
 - **Rules in code:** `FreeTime.swift` and `FreeTime.kt`, with the same constants as the website.
 
-### Explore in the apps (G3)
+### Explore (G3)
 
-Practices marked `where_shown = explore_only` in the Practice Library (Headstand, Handstand, Shoulder Stand, Plow, Camel and Crow) are advanced poses Amrita never offers. The iPhone and Android apps show them in an **Explore** section at the end of the Library tab.
+Practices marked `where_shown = explore_only` in the Practice Library (Headstand, Handstand, Shoulder Stand, Plow, Camel and Crow) are advanced poses Amrita never offers. The iPhone and Android apps show them in an **Explore** section at the end of the Library tab, and the website in its **Explore** tab.
 
 - **Served:** `/api/catalog` lists them under `explore`, with cues, common mistakes, how to build up to them, the pose to follow with, and the conditions to avoid them with. A row with no cues or benefit is left out and named in the log.
 - **The caveat first:** each pose page opens with "At your own risk": Amrita won't suggest it, it is best learned with a teacher, and it is for experienced practitioners only.
-- **Not for you:** when a condition on the profile matches one to avoid (by the server's code, label and everyday-word matching), the tile and page say so.
+- **Not for you:** when a condition on the profile matches one to avoid (by code, label and everyday words, as the server matches), the tile and page say so. The website's check is `exploreNotFor` in `api/_lib/explore.ts`; the apps carry the same rule in Swift and Kotlin.
 - **Never practised in the app:** no guided practice, voice or logging. There are no photographs yet, so a placeholder shows.
-- **Amrita:** her prompt names these poses as explore-only. If asked for one, she points to Library → Explore in the apps and offers a catalog pose that prepares for it. She never puts one in a card.
-- **Website:** has no Library, so no Explore yet.
+- **Amrita:** her prompt names these poses as explore-only. If asked for one, she points to the website's Explore tab or Library → Explore in the apps and offers a catalog pose that prepares for it. She never puts one in a card.
+- **Website:** an Explore tab in the header. Each card opens in place; nothing is fetched beyond `/api/catalog`.
 
 ### Alexa skill
 

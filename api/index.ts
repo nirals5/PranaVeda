@@ -927,7 +927,7 @@ export function catalogPromptSummary(catalog: Catalog = BUILT_IN_CATALOG): strin
     ? `\n\n## Principles (cite at most one per card, by id, as principleId)\n${catalog.principles.map((p) => `- ${p.id}: ${p.statement}`).join('\n')}`
     : '';
   const explore = catalog.explore.length
-    ? `\n\n## Explore only (G3: NEVER recommend, guide or put in a card)\n${catalog.explore.map((p) => p.nameEnglish).join(', ')}. These advanced poses are only in the PranaVeda iOS and Android apps, under Library → Explore, with an at-your-own-risk note. If asked for one, say so in a sentence (best learned with a teacher), never give step-by-step instructions, and offer a catalog pose that prepares for it.`
+    ? `\n\n## Explore only (G3: NEVER recommend, guide or put in a card)\n${catalog.explore.map((p) => p.nameEnglish).join(', ')}. These advanced poses are only on the PranaVeda website's Explore tab and in the iOS and Android apps under Library → Explore, with an at-your-own-risk note. If asked for one, say so in a sentence (best learned with a teacher), never give step-by-step instructions, and offer a catalog pose that prepares for it.`
     : '';
   return `## Pose catalog (recommend ONLY these, by id)\n${poses}\n\n## Breathwork catalog (recommend ONLY these, by id)\n${breaths}${principles}${explore}`;
 }

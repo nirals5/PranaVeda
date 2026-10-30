@@ -1,6 +1,9 @@
 import { asc, eq, isNull } from 'drizzle-orm';
 import { getDb, schema } from './db.js';
 import type { CatalogBreathwork, CatalogPose } from '../index.js';
+import { words, type ExplorePose } from './explore.js';
+
+export type { ExplorePose };
 
 // The practice catalog, read from the practices tables (imported from the
 // Practice Library sheet), in the same shape and with the same ids as the
@@ -22,28 +25,6 @@ export interface CatalogCondition {
 export interface CatalogPrinciple {
   id: string;
   statement: string;
-}
-
-// An advanced pose that is never offered (G3: where_shown = explore_only), for
-// the apps' Library → Explore, shown with an at-your-own-risk caveat. Amrita
-// only knows the names, so she can point to it; she never puts one in a card.
-export interface ExplorePose {
-  id: string;
-  nameSanskrit: string;
-  nameEnglish: string;
-  bodyFocus: string;
-  benefits: string;
-  cues: string[];
-  commonMistakes: string[];
-  modifications: string;
-  // The conditions it must be avoided with, with the everyday words a profile
-  // may use for them, so an app can say "Not for you: you've said …".
-  avoidWith: { code: string; label: string; words: string[] }[];
-  // Who the source warns, in its own words.
-  sourceCaution?: string;
-  // The pose to follow it with, by name.
-  followWith?: string;
-  avoidAfterMeal?: true;
 }
 
 export interface Catalog {
@@ -105,10 +86,6 @@ export function catalogOf(
     source,
   };
 }
-
-// "Bad Knee!" → " bad knee " (spaces at both ends, so a phrase matches only as
-// whole words: "knee" is found in "bad knee", "knee" is not found in "kneel").
-const words = (s: string) => ` ${s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
 
 // The condition codes a user's profile conditions refer to, by code, label or
 // any of the condition's everyday words: "bad knee" → knee_injury, "high BP" →
