@@ -212,10 +212,15 @@ The 150-metre match radius and the 2 km accuracy cut-off are constants at the to
 In the iPhone and Android apps:
 
 - **Where to turn it on:** a Location card on the You tab. It has the same places, the same rules and the same promise.
-- **Permission:** the phones ask for location "while using the app" only. iPhone uses Core Location; Android uses its built-in fused provider, with no Google Play services library.
+- **Permission:** saved places need location "while using the app" only. iPhone uses Core Location; Android uses its built-in fused provider.
 - **Approximate location:** if someone allows only an approximate location, the card says it is too vague to tell places apart, and asks them to allow precise location.
 - **Not shared between devices:** saved spots stay on the phone. They are not synced to the website or the account.
 - **Code:** `ios/PranaVeda/Models/PlaceStore.swift` and `android/.../place/PlaceStore.kt`.
+- **Arrival reminders (apps only, opt-in):** a switch on the Location card, shown once Home, Studio or Outdoor spot is saved. When they arrive at one and stay 5 minutes, the phone shows a note such as "You're home. A few minutes of slow breathing to settle in?". Tapping it opens Ask Amrita, where the first suggestion fits the place. Work is left out on purpose.
+  - **Pacing:** as the free-time reminders: 7 AM to 10 PM, not within 2 hours of a practice, at least 3 hours after any PranaVeda reminder (free-time and arrival reminders share the gap), never while the app is open, never during a busy calendar event, and at most once a day per place.
+  - **How:** the phone watches a 150 m circle around each place, with the app closed and after a restart. iPhone uses Core Location's `CLMonitor` plus a local notification that waits out the stay (leaving first cancels it); Android uses Google Play services geofences (`play-services-location`) with a 5-minute dwell. No server, and coordinates still never leave the phone.
+  - **Permission:** location "Always" (iPhone) or "Allow all the time" with precise location (Android), asked for when the switch is turned on. Without it the card says how to allow it in Settings; saved places keep working either way. Publishing to Google Play will need its background-location declaration and a short video.
+  - **Code:** `ios/PranaVeda/Models/Arrival.swift` and `android/.../place/Arrival.kt`, with `ArrivalTests` on both.
 - **Suggestion chips:** the apps' welcome shows the website's home-screen suggestions, with the place chip first when the phone knows where it is. Tapping one sends it to Amrita. `tests/appSuggestions.test.ts` checks the apps use the website's words.
 
 ### Weather

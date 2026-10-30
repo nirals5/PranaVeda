@@ -2,6 +2,7 @@ package com.pranaveda.app
 
 import com.pranaveda.app.calendar.CalendarStore
 import com.pranaveda.app.health.HealthStore
+import com.pranaveda.app.place.ArrivalStore
 import com.pranaveda.app.place.PlaceStore
 import android.app.Application
 import com.pranaveda.app.auth.AccountApi
@@ -46,7 +47,10 @@ class PranaVedaApplication : Application() {
     val health: HealthStore by lazy { HealthStore(this) }
 
     /** Saved places (home, work, …), matched while the app is open. */
-    val place: PlaceStore by lazy { PlaceStore(this) }
+    val place: PlaceStore by lazy { PlaceStore(this).also { it.onChange = { arrival.refresh() } } }
+
+    /** Arrival reminders: the phone watches the saved places, even with the app closed. */
+    val arrival: ArrivalStore by lazy { ArrivalStore(this) }
 
     /** The phone's calendar, read for busy and free time, and free-time reminders. */
     val calendar: CalendarStore by lazy { CalendarStore(this) }

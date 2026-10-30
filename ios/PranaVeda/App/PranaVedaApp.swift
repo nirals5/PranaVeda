@@ -41,6 +41,9 @@ struct PranaVedaApp: App {
         if let inline = playfair(19, .headline) { bar.titleTextAttributes = [.font: inline] }
         // Must be registered before launch finishes.
         CalendarStore.registerBackgroundRefresh()
+        // iOS relaunches the app in the background for an arrival; it must
+        // be listening again straight away.
+        ArrivalStore.shared.resume()
     }
 
     var body: some Scene {
@@ -80,6 +83,8 @@ struct PranaVedaApp: App {
                 if phase == .active { Task { await health.load() } }
                 // Where they are is checked only while the app is on screen.
                 place.setActive(phase == .active)
+                // "Always" may have been changed in Settings.
+                if phase == .active { ArrivalStore.shared.refreshPermission() }
                 // Free time is read on screen; reminders are planned on leaving.
                 if phase != .inactive { calendar.setActive(phase == .active) }
             }
@@ -103,6 +108,7 @@ struct PranaVedaApp: App {
                 chat.stopSpeaking = { [voice] in voice.stop() }
                 chat.healthForAmrita = { [health] in health.summaryForAmrita() }
                 chat.locationForAmrita = { [place] in place.contextForAmrita }
+                place.onChange = { Task { await ArrivalStore.shared.sync() } }
                 chat.calendarForAmrita = { [calendar] in calendar.contextForAmrita }
                 calendar.lastPracticeAt = { [practice] in practice.entries.last?.completedDate }
                 calendar.onOpenReminder = { tab = .amrita }

@@ -12,6 +12,11 @@
          the kind of place reaches Amrita. Asked for when location is turned on. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Arrival reminders (place/Arrival.kt): the phone watches the saved places with
+         the app closed; nothing leaves the phone. Asked for when they're turned on. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- The places are watched again after a restart. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Free time (calendar/CalendarStore.kt): busy times only reach Amrita. -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <!-- Recovery & Trends: read only, on the phone (health/HealthStore.kt). -->
@@ -85,6 +90,12 @@
         </activity-alias>
 
         <!-- Home-screen widgets (widget/Widgets.kt). -->
+        <receiver android:name=".place.ArrivalReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <receiver android:name=".widget.TodayWidgetReceiver" android:exported="true" android:label="Today">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

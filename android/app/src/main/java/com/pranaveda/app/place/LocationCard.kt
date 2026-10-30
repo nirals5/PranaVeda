@@ -1,10 +1,13 @@
 package com.pranaveda.app.place
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
+import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,6 +20,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,8 +43,14 @@ import com.pranaveda.app.ui.theme.cardSurface
  * because that is the promise.
  */
 @Composable
-fun LocationCard(place: PlaceStore) {
+fun LocationCard(place: PlaceStore, arrival: ArrivalStore) {
     val context = LocalContext.current
+    val openSettings = {
+        context.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
     // Whatever they allow, turning on proceeds: the store notices a refusal
     // (blocked) or approximate-only, and the status line says so.
     val askForLocation = rememberLauncherForActivityResult(RequestMultiplePermissions()) { place.enable() }
@@ -58,12 +71,7 @@ fun LocationCard(place: PlaceStore) {
                 modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
             )
             when {
-                place.enabled && place.blocked -> Pill("Settings", primary = false) {
-                    context.startActivity(
-                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                }
+                place.enabled && place.blocked -> Pill("Settings", primary = false) { openSettings() }
                 place.enabled -> Pill("Turn off", primary = false) { place.disable() }
                 else -> Pill("Turn on", primary = true) {
                     if (place.hasPermission()) place.enable() else askForLocation.launch(PlaceStore.PERMISSIONS)
@@ -74,6 +82,10 @@ fun LocationCard(place: PlaceStore) {
             PlaceKind.entries.forEach { kind ->
                 HorizontalDivider(color = Pv.stone200)
                 PlaceRow(place, kind)
+            }
+            if (place.places.any { it.kind in Arrival.KINDS }) {
+                HorizontalDivider(color = Pv.stone200)
+                ArrivalRow(arrival, openSettings)
             }
         }
     }
@@ -87,6 +99,48 @@ private fun status(place: PlaceStore): String = when {
         "PranaVeda can see only your approximate location, too vague to tell your places apart. Allow precise location for PranaVeda in Settings."
     place.imprecise -> "Your phone can only give a rough area right now, too vague to tell your places apart."
     else -> place.current?.let { "Right now: ${it.label}." } ?: "Located. Save the spot you are in below so Amrita can recognise it."
+}
+
+/** Arrival reminders, once a place that takes them is saved: notifications, then location "all the time". */
+@Composable
+private fun ArrivalRow(arrival: ArrivalStore, openSettings: () -> Unit) {
+    var notificationsRefused by remember { mutableStateOf(false) }
+    // Whatever they choose for "all the time", it turns on; the row says what's missing.
+    val askForAllTheTime = rememberLauncherForActivityResult(RequestPermission()) { arrival.turn(true) }
+    val askForLocation = {
+        if (Build.VERSION.SDK_INT >= 29 && !arrival.canWatch()) askForAllTheTime.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        else arrival.turn(true)
+    }
+    val askForNotifications = rememberLauncherForActivityResult(RequestPermission()) { granted ->
+        notificationsRefused = !granted
+        if (granted) askForLocation()
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text("Arrival reminders", style = Pv.heading.copy(fontSize = Pv.body.fontSize), color = Pv.ink)
+            Text(
+                when {
+                    notificationsRefused -> "Notifications are off for PranaVeda. Allow them in Settings."
+                    arrival.on && arrival.needsAllTheTime ->
+                        "Set Location to \"Allow all the time\", with precise location, for PranaVeda in Settings, so your phone can notice when you arrive."
+                    else -> "A gentle note when you arrive home, at the studio or at your outdoor spot and stay a few minutes. Your phone notices the arrival, even with PranaVeda closed. Between 7 AM and 10 PM, at most every three hours."
+                },
+                style = Pv.caption,
+                color = Pv.stone500,
+            )
+        }
+        if (notificationsRefused || (arrival.on && arrival.needsAllTheTime)) Pill("Settings", primary = false) { openSettings() }
+        if (!notificationsRefused) {
+            if (arrival.on) {
+                Pill("Turn off", primary = false, description = "Turn off arrival reminders") { arrival.turn(false) }
+            } else {
+                Pill("Turn on", primary = true, description = "Turn on arrival reminders") {
+                    if (Build.VERSION.SDK_INT >= 33 && !arrival.canNotify()) askForNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    else askForLocation()
+                }
+            }
+        }
+    }
 }
 
 @Composable

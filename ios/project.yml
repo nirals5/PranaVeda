@@ -92,6 +92,9 @@ targets:
         # Saved places (Models/PlaceStore.swift): only while the app is open,
         # and only the kind of place reaches Amrita.
         NSLocationWhenInUseUsageDescription: PranaVeda checks where you are against places you save, such as home or work, while the app is open. Amrita is told only the kind of place; your location stays on this phone.
+        # Arrival reminders (Models/Arrival.swift): the phone watches the saved
+        # places for an arrival, with the app closed; nothing leaves the phone.
+        NSLocationAlwaysAndWhenInUseUsageDescription: With arrival reminders on, your phone notices when you arrive at a place you saved, such as home, even with PranaVeda closed, and offers a short practice. Your location stays on this phone.
         # Free time (Models/CalendarStore.swift): read for busy times only;
         # what the events are stays on the phone.
         NSCalendarsFullAccessUsageDescription: PranaVeda reads when you are busy so Amrita can fit practices into your free time and remind you of open moments. Only busy and free times reach Amrita, never what your events are.

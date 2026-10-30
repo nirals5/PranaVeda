@@ -152,7 +152,11 @@ final class CalendarStore: NSObject {
         guard remindersOn, enabled, !blocked, readAt != nil else { return }
         let calendar = Calendar.current
         let end = calendar.date(byAdding: .day, value: 2, to: calendar.startOfDay(for: now))!
-        let last = defaults.data(forKey: Self.shownKey).flatMap { try? JSONDecoder().decode(PlannedReminder.self, from: $0) }
+        var last = defaults.data(forKey: Self.shownKey).flatMap { try? JSONDecoder().decode(PlannedReminder.self, from: $0) }
+        // An arrival reminder counts too: three hours from any PranaVeda reminder.
+        if let arrival = ArrivalStore.lastShown(defaults: defaults, now: now), arrival > (last?.at ?? .distantPast) {
+            last = PlannedReminder(at: arrival, key: "arrival", text: "")
+        }
         let planned = FreeTime.planReminders(busy, from: now.addingTimeInterval(FreeTime.awayBeforeReminder), until: end,
                                              lastPracticeAt: lastPracticeAt?(), last: last)
         defaults.set(try? JSONEncoder().encode(planned), forKey: Self.plannedKey)
@@ -175,6 +179,22 @@ final class CalendarStore: NSObject {
             defaults.set(try? JSONEncoder().encode(shown), forKey: Self.shownKey)
         }
         defaults.removeObject(forKey: Self.plannedKey)
+    }
+
+    /// The latest free-time reminder already shown, for arrival reminders' distance.
+    func lastReminderShown(now: Date = Date()) -> Date? {
+        let planned = defaults.data(forKey: Self.plannedKey).flatMap { try? JSONDecoder().decode([PlannedReminder].self, from: $0) } ?? []
+        let shown = defaults.data(forKey: Self.shownKey).flatMap { try? JSONDecoder().decode(PlannedReminder.self, from: $0) }
+        return ([shown?.at] + planned.map(\.at).filter { $0 <= now }).compactMap { $0 }.max()
+    }
+
+    /// An arrival reminder is coming: drop the planned free-time ones before `until`.
+    func holdBackReminders(until: Date, now: Date = Date()) {
+        let planned = defaults.data(forKey: Self.plannedKey).flatMap { try? JSONDecoder().decode([PlannedReminder].self, from: $0) } ?? []
+        let dropped = planned.filter { $0.at > now && $0.at < until }
+        guard !dropped.isEmpty else { return }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: dropped.map { Self.idPrefix + $0.key })
+        defaults.set(try? JSONEncoder().encode(planned.filter { !dropped.contains($0) }), forKey: Self.plannedKey)
     }
 
     private func cancelReminders() {
@@ -207,13 +227,18 @@ final class CalendarStore: NSObject {
 }
 
 extension CalendarStore: UNUserNotificationCenterDelegate {
-    /// Never while the app is on screen: the welcome screen shows the opening.
+    /// Free-time and arrival reminders: never while the app is on screen
+    /// (the welcome screen shows the opening and where they are).
+    nonisolated private static func isReminder(_ id: String) -> Bool {
+        id.hasPrefix("free-time-") || id.hasPrefix(ArrivalStore.idPrefix)
+    }
+
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        notification.request.identifier.hasPrefix("free-time-") ? [] : [.banner, .sound]
+        Self.isReminder(notification.request.identifier) ? [] : [.banner, .sound]
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        guard response.notification.request.identifier.hasPrefix("free-time-") else { return }
+        guard Self.isReminder(response.notification.request.identifier) else { return }
         await MainActor.run { onOpenReminder?() }
     }
 }

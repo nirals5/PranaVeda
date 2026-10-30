@@ -44,6 +44,13 @@ final class PracticeStore {
         entries = (try? Data(contentsOf: fileURL)).flatMap { try? JSONDecoder().decode([PracticeLogEntry].self, from: $0) } ?? []
     }
 
+    /// When the latest practice on this phone finished, read without a store
+    /// (arrival reminders, in the background).
+    nonisolated static func lastCompletedAt(fileURL: URL = defaultFileURL) -> Date? {
+        let entries = (try? Data(contentsOf: fileURL)).flatMap { try? JSONDecoder().decode([PracticeLogEntry].self, from: $0) } ?? []
+        return entries.compactMap(\.completedDate).max()
+    }
+
     nonisolated static var defaultFileURL: URL {
         let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return folder.appending(path: "practice-log.json")

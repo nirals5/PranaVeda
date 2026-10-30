@@ -127,7 +127,7 @@ class PlaceStore(context: Context) {
 
     var enabled by mutableStateOf(prefs.getBoolean(ENABLED_KEY, false))
         private set
-    var places by mutableStateOf(Places.decode(prefs.getString(PLACES_KEY, null)))
+    var places by mutableStateOf(savedPlaces(prefs))
         private set
     var position by mutableStateOf<PlacePosition?>(null)
         private set
@@ -140,6 +140,8 @@ class PlaceStore(context: Context) {
 
     /** Watching only while the app is on screen. */
     private var active = false
+    /** Location was turned on or off, or a place saved, moved or removed. */
+    var onChange: (() -> Unit)? = null
     private var watching = false
     private val listener = LocationListenerCompat { location -> position = location.toPosition() }
 
@@ -154,6 +156,7 @@ class PlaceStore(context: Context) {
         enabled = true
         prefs.edit().putBoolean(ENABLED_KEY, true).apply()
         watch()
+        onChange?.invoke()
     }
 
     fun disable() {
@@ -161,6 +164,7 @@ class PlaceStore(context: Context) {
         position = null
         prefs.edit().remove(ENABLED_KEY).apply()
         stop()
+        onChange?.invoke()
     }
 
     /** The app came on screen or left it. */
@@ -179,7 +183,10 @@ class PlaceStore(context: Context) {
         persist()
     }
 
-    private fun persist() = prefs.edit().putString(PLACES_KEY, Places.encode(places)).apply()
+    private fun persist() {
+        prefs.edit().putString(PLACES_KEY, Places.encode(places)).apply()
+        onChange?.invoke()
+    }
 
     fun hasPermission() = granted(Manifest.permission.ACCESS_COARSE_LOCATION) || granted(Manifest.permission.ACCESS_FINE_LOCATION)
 
@@ -229,9 +236,12 @@ class PlaceStore(context: Context) {
     private fun Location.toPosition() = PlacePosition(latitude, longitude, if (hasAccuracy()) accuracy.toDouble() else Double.MAX_VALUE)
 
     companion object {
-        private const val ENABLED_KEY = "pranaveda_location_enabled"
+        const val ENABLED_KEY = "pranaveda_location_enabled"
         private const val PLACES_KEY = "pranaveda_places"
         private const val RECENT_NANOS = 5 * 60 * 1_000_000_000L
+        /** The saved spots, read without a store (arrival reminders, in the background). */
+        fun savedPlaces(prefs: android.content.SharedPreferences): List<SavedPlace> = Places.decode(prefs.getString(PLACES_KEY, null))
+
         val PERMISSIONS = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
     }
 }
