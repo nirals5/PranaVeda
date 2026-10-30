@@ -141,6 +141,19 @@ export const wellnessProfiles = pgTable('wellness_profiles', {
   updatedAt: timestamptz('updated_at').notNull().defaultNow(),
 });
 
+// Saved places and the website's calendar link, kept on the account only
+// once the user turns that on (api/_lib/connections.ts). `data` is sealed
+// JSON (AES-256-GCM under CONNECTIONS_ENC_KEY): a calendar link works like a
+// password, and places are where someone lives and works.
+export const accountConnections = pgTable('account_connections', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  data: text('data').notNull(),
+  version: integer('version').notNull().default(1),
+  updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+});
+
 // Finished practices, for signed-in users. Append-only: an entry is never
 // changed or removed (except with the account), and its id is made on the
 // device, so uploading the same entry twice is harmless. `seq` is the order

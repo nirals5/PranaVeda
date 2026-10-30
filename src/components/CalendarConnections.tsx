@@ -80,7 +80,7 @@ export default function CalendarConnections({ calendar, notifications }: { calen
               <p className="text-[17px] font-serif text-[#2D3436] leading-snug">Private calendar link</p>
               <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
                 {calendar.icsConnected
-                  ? 'Connected. Reading busy times only.'
+                  ? 'Connected. Reading busy times only. The link stays on this device unless you keep it on your account (on your profile page).'
                   : 'For Apple iCloud, Outlook, or Google: paste the private iCal address from your calendar’s sharing settings.'}
               </p>
             </div>

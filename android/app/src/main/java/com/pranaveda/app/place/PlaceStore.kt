@@ -178,6 +178,13 @@ class PlaceStore(context: Context) {
         persist()
     }
 
+    /** The account's places, when they are kept there (ConnectionsSync). */
+    fun replace(value: List<SavedPlace>) {
+        if (value == places) return
+        places = value
+        persist()
+    }
+
     fun remove(kind: PlaceKind) {
         places = places.filter { it.kind != kind }
         persist()

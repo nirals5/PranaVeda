@@ -12,6 +12,8 @@ struct AccountView: View {
     var calendar: CalendarStore? = nil
     /// Holds the wellness profile, where the experience setting lives.
     var chat: ChatViewModel? = nil
+    /// Saved places on the account (opt-in).
+    var connections: ConnectionsSync? = nil
     /// Over to the chat ("Begin with Amrita" on the calendar).
     var onBegin: () -> Void = {}
     @State private var confirmingDelete = false
@@ -82,6 +84,7 @@ struct AccountView: View {
             Text("Your wellness profile is saved to your account and shared with the website.")
                 .font(Theme.body)
                 .foregroundStyle(Theme.stone700)
+            if let connections { PlacesOnAccount(connections: connections) }
             Button("Sign out") { Task { await auth.signOut() } }
                 .font(Theme.body.weight(.medium))
                 .padding(.top, 4)
@@ -107,6 +110,40 @@ struct AccountView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
+    }
+}
+
+/// Saved places kept on the account, encrypted, so the website and other
+/// devices use them too. Off by default; the website does the same for its
+/// calendar link.
+private struct PlacesOnAccount: View {
+    let connections: ConnectionsSync
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Places on your account").font(Theme.serif(.body)).foregroundStyle(Theme.ink)
+                Text(detail).font(Theme.caption).foregroundStyle(Theme.stone500)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let kept = connections.kept {
+                Button(connections.pending ? "One moment" : kept ? "Turn off" : "Turn on") {
+                    Task { kept ? await connections.turnOff() : await connections.turnOn() }
+                }
+                .buttonStyle(PillButton(primary: !kept))
+                .disabled(connections.pending)
+                .accessibilityLabel(kept ? "Stop keeping places on your account" : "Keep places on your account")
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private var detail: String {
+        if connections.failed { return "That didn't work just now. Please try again." }
+        if connections.kept == true {
+            return "Kept on your account, encrypted, so the website and your other devices use the same saved places. Turning this off removes them from the account; this phone keeps its own."
+        }
+        return "Keep your saved places on your account, encrypted, so the website and your other devices use them too. Off, they stay on this phone."
     }
 }
 

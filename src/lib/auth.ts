@@ -160,6 +160,33 @@ export async function fetchSavedRituals<R>(): Promise<R[] | null> {
   return response.ok ? ((await response.json()).rituals as R[]) : null;
 }
 
+// Places and the calendar link kept on the account (opt-in). `kept` is false
+// while the account keeps none; a stale write gets what is stored now, with
+// `conflict` set. Null when the request failed (offline, or not available).
+export interface AccountConnections<C> {
+  kept: boolean;
+  connections: C;
+  version: number;
+  conflict?: boolean;
+}
+
+export async function fetchAccountConnections<C>(): Promise<AccountConnections<C> | null> {
+  const { response } = await fetchWithSession('/api/sync/connections', { method: 'GET' });
+  return response.ok ? response.json() : null;
+}
+
+export async function saveAccountConnections<C>(changes: object, baseVersion: number): Promise<AccountConnections<C> | null> {
+  const { response } = await fetchWithSession('/api/sync/connections', json('PUT', { ...changes, baseVersion }));
+  if (response.ok) return response.json();
+  if (response.status === 409) return { ...(await response.json()), conflict: true };
+  return null;
+}
+
+export async function forgetAccountConnections(): Promise<boolean> {
+  const { response } = await fetchWithSession('/api/sync/connections', json('DELETE'));
+  return response.ok;
+}
+
 export async function fetchPracticesAfter<E>(cursor: number): Promise<{ entries: E[]; cursor: number; hasMore: boolean } | null> {
   const { response } = await fetchWithSession(`/api/sync/practice-log?after=${cursor}`, { method: 'GET' });
   return response.ok ? response.json() : null;

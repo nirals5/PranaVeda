@@ -214,7 +214,7 @@ In the iPhone and Android apps:
 - **Where to turn it on:** a Location card on the You tab. It has the same places, the same rules and the same promise.
 - **Permission:** saved places need location "while using the app" only. iPhone uses Core Location; Android uses its built-in fused provider.
 - **Approximate location:** if someone allows only an approximate location, the card says it is too vague to tell places apart, and asks them to allow precise location.
-- **Not shared between devices:** saved spots stay on the phone. They are not synced to the website or the account.
+- **Shared between devices only if asked:** saved spots stay on the phone unless the user turns on "Places on your account" (see Accounts and sync).
 - **Code:** `ios/PranaVeda/Models/PlaceStore.swift` and `android/.../place/PlaceStore.kt`.
 - **Arrival reminders (apps only, opt-in):** a switch on the Location card, shown once Home, Studio or Outdoor spot is saved. When they arrive at one and stay 5 minutes, the phone shows a note such as "You're home. A few minutes of slow breathing to settle in?". Tapping it opens Ask Amrita, where the first suggestion fits the place. Work is left out on purpose.
   - **Pacing:** as the free-time reminders: 7 AM to 10 PM, not within 2 hours of a practice, at least 3 hours after any PranaVeda reminder (free-time and arrival reminders share the gap), never while the app is open, never during a busy calendar event, and at most once a day per place.
@@ -301,8 +301,13 @@ What signing in does:
 - **Practice history:** every finished practice is saved to the account, so the calendar, streak and trends show practices from all devices. A practice finished offline is uploaded later.
 - **Saved rituals:** bookmarks are saved to the account and follow the person to other devices. Removing one removes it everywhere; the server keeps a small marker in its place, so a device that was offline cannot bring it back.
 - **Greeting:** the home screen greets the person by first name.
+- **Places and calendar link (opt-in):** a switch in the account card ("Places and calendar link" on the website, "Places on your account" in the apps), off by default. Turned on, the saved places (home, work, studio, outdoor spot) and the website's private calendar link are kept on the account, encrypted, and every signed-in device uses them: save Home on a phone and the website knows it. The apps sync places only; they read the phone's own calendar and leave the link alone.
+  - **Joining:** a device that turns it on (or signs in where it is already on) adds its own places to the account's; for a kind both have, the account's spot wins, and the account's link wins over the device's.
+  - **Changes:** a place saved, moved or removed, or the link changed, is sent straight away; only what changed is sent, so a phone moving Home does not overwrite a link changed on another computer.
+  - **Off:** turning it off removes them from the account; each device keeps what it has. Signing out puts back the device's own places and link from before it followed the account.
+  - **Stored:** sealed with AES-256-GCM under `CONNECTIONS_ENC_KEY` (see below), never in the clear; without the key the switch reports it is unavailable. `GET`/`PUT`/`DELETE /api/sync/connections`, with a version so two devices cannot overwrite each other (`api/_lib/connections.ts`).
 
-Not synced: calendar connections, location settings, wearable readings and the chat conversation stay on the device.
+Not synced: Google sign-ins (each browser's lasts about an hour), the phones' own calendars and health stores, location and reminder on/off settings, wearable readings and the chat conversation stay on the device.
 
 - **First sign-in on a device:** if the account has no profile yet, this device's profile becomes the account's. Otherwise the account's replaces the device's copy.
 - **Sign-out:** by any route (signing out, a session that ended, account deletion), the device goes back to how it was before sign-in. The account's profile, practices and saved rituals are removed from it, and its own pre-sign-in data is put back, so the next person on a shared device does not see them. A practice that never reached the account is kept rather than lost.
@@ -326,11 +331,12 @@ Switching it on (locally, on a preview, or in production):
 3. Set `AUTH_JWT_SECRET` to a new random value for each environment, for example from `openssl rand -base64 48`.
 4. Set `VITE_GOOGLE_CLIENT_ID`, and add the site's address to the OAuth client's "Authorized JavaScript origins". For anyone other than listed test users to sign in, the OAuth consent screen must be published.
 5. Set `VITE_ACCOUNTS_ENABLED` to `"true"`, then rebuild. `VITE_` settings are read at build time.
+6. For places and the calendar link on the account, set `CONNECTIONS_ENC_KEY` to at least 32 random characters (`openssl rand -base64 48`), separately for each environment, and never change it once set: what was sealed under the old key can't be opened.
 
 Server endpoints:
 
 - **`/api/auth/*`** and **`/api/me`:** sign-in, refresh, sign-out, the current user, and account deletion (`api/auth.ts`).
-- **`/api/sync/*`:** profile and practice-log sync (`api/sync.ts`).
+- **`/api/sync/*`:** profile, practice-log, saved-ritual, and places-and-calendar-link sync (`api/sync.ts`).
 - **Shared code:** lives in `api/_lib/`, and relative imports under `api/` must end in `.js`. Vercel runs these files as native ES modules, where an import without the extension fails at the first request.
 
 ### Practice catalog API
@@ -360,7 +366,7 @@ Signed out, or with accounts switched off, everything is kept in the browser on 
 
 Disconnecting Google Health also clears its saved readings.
 
-Signed in, the browser also keeps a few markers so sync can hand the device back on sign-out: `pranaveda_signed_in`, `pranaveda_profile_owner`, `pranaveda_profile_before_signin`, and `pranaveda_practice_owner`, `pranaveda_practice_own_ids`, `pranaveda_practice_synced_ids`, `pranaveda_practice_cursor`, and `pranaveda_saved_owner`, `pranaveda_saved_own_ids`, `pranaveda_saved_synced_ids`, `pranaveda_saved_removed_ids`.
+Signed in, the browser also keeps a few markers so sync can hand the device back on sign-out: `pranaveda_signed_in`, `pranaveda_profile_owner`, `pranaveda_profile_before_signin`, and `pranaveda_practice_owner`, `pranaveda_practice_own_ids`, `pranaveda_practice_synced_ids`, `pranaveda_practice_cursor`, and `pranaveda_saved_owner`, `pranaveda_saved_own_ids`, `pranaveda_saved_synced_ids`, `pranaveda_saved_removed_ids`, and `pranaveda_connections_owner`, `pranaveda_connections_version`, `pranaveda_connections_synced`, `pranaveda_connections_own`.
 
 Signed in, the server (Neon Postgres) also stores:
 
@@ -373,6 +379,7 @@ Signed in, the server (Neon Postgres) also stores:
 | Wellness profile | `wellness_profiles` |
 | Practice history, including heart readings and ritual snapshots | `practice_log_entries` |
 | Saved rituals, and markers for removed ones (no ritual content) | `saved_rituals` |
+| Saved places and the private calendar link, only if the user turns that on; encrypted | `account_connections` |
 
 Everything is removed when the account is deleted.
 

@@ -297,6 +297,17 @@ export function useExternalCalendar() {
     setConnections((c) => ({ ...c, icsUrl: undefined }));
   }, []);
 
+  // The account's link, when it is kept there (useConnectionsSync). Read
+  // straight away; a link that no longer works shows its error as usual.
+  const adoptIcsUrl = useCallback((url: string | undefined) => {
+    if (connectionsRef.current.icsUrl === url) return;
+    if (!url) setIcsBusy([]);
+    setErrors((e) => ({ ...e, ics: undefined }));
+    connectionsRef.current = { ...connectionsRef.current, icsUrl: url };
+    setConnections(connectionsRef.current);
+    if (url) refresh();
+  }, [refresh]);
+
   // Fail closed: free time is only trusted when EVERY connected calendar has
   // been read. If one has lapsed or errored, Amrita stays quiet rather than
   // nudge into a commitment she cannot see.
@@ -310,6 +321,7 @@ export function useExternalCalendar() {
     googleConnected: !!connections.google,
     googleNeedsReconnect,
     icsConnected: !!connections.icsUrl,
+    icsUrl: connections.icsUrl,
     connected,
     busy,
     now,
@@ -319,6 +331,7 @@ export function useExternalCalendar() {
     disconnectGoogle,
     connectIcs,
     disconnectIcs,
+    adoptIcsUrl,
   };
 }
 

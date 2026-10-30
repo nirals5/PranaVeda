@@ -15,6 +15,8 @@ struct PranaVedaApp: App {
     @State private var health = HealthStore()
     @State private var place = PlaceStore()
     @State private var calendar = CalendarStore.shared
+    /// Saved places on the account, once turned on.
+    @State private var connections = ConnectionsSync()
     @State private var tab = AppTab.amrita
     /// Raised by the widgets' "Talk to Amrita": the chat starts listening.
     @State private var voiceRequest = 0
@@ -62,7 +64,7 @@ struct PranaVedaApp: App {
                 LibraryView(catalog: catalog, conditions: chat.profileConditions)
                     .tabItem { Label("Library", systemImage: "figure.mind.and.body") }
                     .tag(AppTab.library)
-                AccountView(auth: auth, practice: practice, saved: saved, health: health, place: place, calendar: calendar, chat: chat) { tab = .amrita }
+                AccountView(auth: auth, practice: practice, saved: saved, health: health, place: place, calendar: calendar, chat: chat, connections: connections) { tab = .amrita }
                     .tabItem { Label("You", systemImage: "person.crop.circle") }
                     .tag(AppTab.you)
             }
@@ -85,6 +87,8 @@ struct PranaVedaApp: App {
                 place.setActive(phase == .active)
                 // "Always" may have been changed in Settings.
                 if phase == .active { ArrivalStore.shared.refreshPermission() }
+                // Places changed on another device.
+                if phase == .active { Task { await connections.sync() } }
                 // Free time is read on screen; reminders are planned on leaving.
                 if phase != .inactive { calendar.setActive(phase == .active) }
             }
@@ -108,22 +112,29 @@ struct PranaVedaApp: App {
                 chat.stopSpeaking = { [voice] in voice.stop() }
                 chat.healthForAmrita = { [health] in health.summaryForAmrita() }
                 chat.locationForAmrita = { [place] in place.contextForAmrita }
-                place.onChange = { Task { await ArrivalStore.shared.sync() } }
+                connections.auth = auth
+                connections.place = place
+                place.onChange = { [connections] in
+                    Task { await ArrivalStore.shared.sync() }
+                    connections.placesChanged()
+                }
                 chat.calendarForAmrita = { [calendar] in calendar.contextForAmrita }
                 calendar.lastPracticeAt = { [practice] in practice.entries.last?.completedDate }
                 calendar.onOpenReminder = { tab = .amrita }
                 heyAmrita.onWake = { open(WidgetLink.talk) }
                 practice.auth = auth
                 saved.auth = auth
-                auth.onSignedIn = { [chat, practice, saved] user in
+                auth.onSignedIn = { [chat, practice, saved, connections] user in
                     await chat.adoptAccountProfile(for: user)
                     await practice.adoptAccount(user)
                     await saved.adoptAccount(user)
+                    await connections.adoptAccount(user)
                 }
-                auth.onSignedOut = { [chat, practice, saved] in
+                auth.onSignedOut = { [chat, practice, saved, connections] in
                     chat.handBackDevice()
                     practice.handBackDevice()
                     saved.handBackDevice()
+                    connections.handBackDevice()
                 }
                 await auth.restore()
             }

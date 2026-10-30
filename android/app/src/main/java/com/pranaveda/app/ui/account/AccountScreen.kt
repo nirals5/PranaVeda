@@ -50,7 +50,9 @@ import androidx.compose.ui.unit.dp
 import com.pranaveda.app.PranaVedaApplication
 import com.pranaveda.app.R
 import com.pranaveda.app.model.RecommendationResult
+import com.pranaveda.app.place.ConnectionsSync
 import com.pranaveda.app.place.LocationCard
+import com.pranaveda.app.place.Pill
 import com.pranaveda.app.practice.PracticeCalendarCard
 import com.pranaveda.app.practice.PracticeTrendsCard
 import com.pranaveda.app.practice.SavedRitualsCard
@@ -84,15 +86,15 @@ fun AccountScreen(auth: AuthStore, chat: ChatViewModel? = null, onBegin: () -> U
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            val app = LocalContext.current.applicationContext as PranaVedaApplication
             val user = auth.user
             if (user != null) {
-                SignedIn(user, auth, onNotice = { notice = it })
+                SignedIn(user, auth, app.connections, onNotice = { notice = it })
             } else {
                 SignedOut(auth, onStart = { notice = null })
             }
             (auth.problem ?: notice)?.let { Text(it, style = Pv.bodySmall, color = Pv.terracotta) }
             chat?.let { ExperienceSetting(it) }
-            val app = LocalContext.current.applicationContext as PranaVedaApplication
             LocationCard(app.place, app.arrival)
             CalendarCard(app.calendar)
             var reopening by remember { mutableStateOf<RecommendationResult?>(null) }
@@ -150,7 +152,7 @@ private fun SignedOut(auth: AuthStore, onStart: () -> Unit) {
 }
 
 @Composable
-private fun SignedIn(user: AccountUser, auth: AuthStore, onNotice: (String?) -> Unit) {
+private fun SignedIn(user: AccountUser, auth: AuthStore, connections: ConnectionsSync, onNotice: (String?) -> Unit) {
     val scope = rememberCoroutineScope()
     var confirmingDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
@@ -166,6 +168,7 @@ private fun SignedIn(user: AccountUser, auth: AuthStore, onNotice: (String?) -> 
             style = Pv.body,
             color = Pv.stone700,
         )
+        PlacesOnAccount(connections)
         TextButton(onClick = { onNotice(null); scope.launch { auth.signOut() } }) {
             Text("Sign out", style = Pv.body.copy(fontWeight = FontWeight.Medium), color = Pv.lavenderDeep)
         }
@@ -251,5 +254,33 @@ private fun ExperienceSetting(chat: ChatViewModel) {
             color = Pv.stone700,
         )
         problem?.let { Text(it, style = Pv.bodySmall, color = Pv.terracotta) }
+    }
+}
+
+/** Saved places kept on the account, encrypted, so the website and other devices use them too. Off by default; the website does the same for its calendar link. */
+@Composable
+private fun PlacesOnAccount(connections: ConnectionsSync) {
+    val scope = rememberCoroutineScope()
+    androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text("Places on your account", style = Pv.heading.copy(fontSize = Pv.body.fontSize), color = Pv.ink)
+            Text(
+                when {
+                    connections.failed -> "That didn't work just now. Please try again."
+                    connections.kept == true ->
+                        "Kept on your account, encrypted, so the website and your other devices use the same saved places. Turning this off removes them from the account; this phone keeps its own."
+                    else -> "Keep your saved places on your account, encrypted, so the website and your other devices use them too. Off, they stay on this phone."
+                },
+                style = Pv.caption,
+                color = Pv.stone500,
+            )
+        }
+        val kept = connections.kept ?: return@Row
+        Pill(
+            if (connections.pending) "One moment" else if (kept) "Turn off" else "Turn on",
+            primary = !kept,
+            enabled = !connections.pending,
+            description = if (kept) "Stop keeping places on your account" else "Keep places on your account",
+        ) { scope.launch { if (kept) connections.turnOff() else connections.turnOn() } }
     }
 }

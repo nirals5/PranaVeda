@@ -26,6 +26,7 @@ import { useNudgeNotifications } from './hooks/useNudgeNotifications';
 import { useHeartRateMonitor } from './hooks/useHeartRateMonitor';
 import { useWearableHealth, buildHealthContext } from './hooks/useWearableHealth';
 import { usePlace, PLACE_SUGGESTION } from './hooks/usePlace';
+import { useConnectionsSync } from './hooks/useConnectionsSync';
 
 export default function App() {
   const prefersReducedMotion = useReducedMotion();
@@ -70,6 +71,8 @@ export default function App() {
   // Optional sign-in. Held here so it survives moving between screens; inert
   // (no requests, always "guest") where accounts are switched off.
   const auth = useAuth();
+  // Places and the calendar link, on the account once the user turns that on.
+  const connectionsSync = useConnectionsSync(auth, place, calendar);
   const { items: chatItems, profile, replaceProfile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat(
     calendarContext,
     healthContext,
@@ -369,6 +372,7 @@ export default function App() {
                 heart={heart}
                 health={health}
                 place={place}
+                connectionsSync={connectionsSync}
                 onExperienceChange={changeExperience}
                 onOpenRitual={(result) => {
                   handleOpenRitual(result);
