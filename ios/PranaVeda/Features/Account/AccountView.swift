@@ -26,7 +26,7 @@ struct AccountView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         if let user = auth.user { signedIn(user) } else { signedOut }
                         if let chat { ExperienceSetting(chat: chat) }
-                        if let place { LocationSettings(place: place) }
+                        if let place { LocationSettings(place: place, arrival: .shared) }
                         if let calendar { CalendarSettings(calendar: calendar) }
                         PracticeCalendarView(practice: practice, onBegin: onBegin)
                         PracticeTrendsView(practice: practice, health: health)

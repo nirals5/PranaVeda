@@ -133,6 +133,8 @@ class MainActivity : ComponentActivity() {
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { lifecycleScope.launch { app.health.load() } }
                 // Where they are is checked only while the app is on screen.
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { app.place.setActive(true) }
+                // "All the time" may have been changed in Settings.
+                LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { app.arrival.refresh() }
                 LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { app.place.setActive(false) }
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { app.calendar.setActive(true) }
                 LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { app.calendar.setActive(false) }

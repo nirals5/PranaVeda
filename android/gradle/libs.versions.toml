@@ -15,8 +15,10 @@ credentials = "1.6.0"
 googleid = "1.2.1"
 glance = "1.2.0"
 healthConnect = "1.1.0"
+playServicesLocation = "21.3.0"
 
 [libraries]
+play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }

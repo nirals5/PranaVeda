@@ -1,5 +1,7 @@
 package com.pranaveda.app.calendar
 
+import com.pranaveda.app.place.ArrivalStore
+
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -124,7 +126,8 @@ class CalendarStore(context: Context) {
         if (Duration.between(leftAt, now) < FreeTime.AWAY_BEFORE_REMINDER) return null
         val busy = readBusy(appContext, now) ?: return null // fail closed
         val slot = FreeTime.openSlot(busy, now, lastPracticeAt)
-        val lastAt = prefs.getLong(SHOWN_AT_KEY, 0).takeIf { it > 0 }?.let(Instant::ofEpochMilli)
+        // An arrival reminder counts too: three hours from any PranaVeda reminder.
+        val lastAt = ArrivalStore.lastReminderAt(prefs)
         if (!FreeTime.shouldRemind(slot, now, prefs.getString(SHOWN_KEY, null), lastAt)) return null
         prefs.edit().putString(SHOWN_KEY, slot!!.key).putLong(SHOWN_AT_KEY, now.toEpochMilli()).apply()
         return FreeTime.describe(slot)
@@ -141,10 +144,10 @@ class CalendarStore(context: Context) {
     companion object {
         private const val ENABLED_KEY = "pranaveda_calendar_enabled"
         private const val REMINDERS_KEY = "pranaveda_free_time_reminders"
-        private const val ON_SCREEN_KEY = "pranaveda_on_screen"
+        const val ON_SCREEN_KEY = "pranaveda_on_screen"
         private const val LEFT_AT_KEY = "pranaveda_left_screen_at"
         private const val SHOWN_KEY = "pranaveda_free_time_last_key"
-        private const val SHOWN_AT_KEY = "pranaveda_free_time_last_at"
+        const val SHOWN_AT_KEY = "pranaveda_free_time_last_at"
         private const val WORK_NAME = "pranaveda-free-time"
         const val CHANNEL = "free_time"
 

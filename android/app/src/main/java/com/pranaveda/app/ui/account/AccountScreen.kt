@@ -93,7 +93,7 @@ fun AccountScreen(auth: AuthStore, chat: ChatViewModel? = null, onBegin: () -> U
             (auth.problem ?: notice)?.let { Text(it, style = Pv.bodySmall, color = Pv.terracotta) }
             chat?.let { ExperienceSetting(it) }
             val app = LocalContext.current.applicationContext as PranaVedaApplication
-            LocationCard(app.place)
+            LocationCard(app.place, app.arrival)
             CalendarCard(app.calendar)
             var reopening by remember { mutableStateOf<RecommendationResult?>(null) }
             PracticeCalendarCard(app.practice, onOpenRitual = { reopening = it }, onBegin = onBegin)

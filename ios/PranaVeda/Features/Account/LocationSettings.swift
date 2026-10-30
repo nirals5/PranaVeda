@@ -5,6 +5,7 @@ import SwiftUI
 /// because that is the promise.
 struct LocationSettings: View {
     let place: PlaceStore
+    let arrival: ArrivalStore
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -30,6 +31,10 @@ struct LocationSettings: View {
                     Divider().overlay(Theme.stone200)
                     row(kind)
                 }
+                if place.places.contains(where: { Arrival.kinds.contains($0.kind) }) {
+                    Divider().overlay(Theme.stone200)
+                    arrivalRow
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -47,6 +52,34 @@ struct LocationSettings: View {
         }
         if let current = place.current { return "Right now: \(current.label)." }
         return "Located. Save the spot you are in below so Amrita can recognise it."
+    }
+
+    /// Arrival reminders, once a place that takes them is saved.
+    private var arrivalRow: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Arrival reminders").font(Theme.serif(.body)).foregroundStyle(Theme.ink)
+                Text(arrivalDetail).font(Theme.caption).foregroundStyle(Theme.stone500)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if arrival.notificationsBlocked || (arrival.on && arrival.needsAlways) {
+                Button("Settings") { if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) } }
+                    .buttonStyle(PillButton(primary: false))
+            }
+            if !arrival.notificationsBlocked {
+                Button(arrival.on ? "Turn off" : "Turn on") { Task { await arrival.setOn(!arrival.on) } }
+                    .buttonStyle(PillButton(primary: !arrival.on))
+                    .accessibilityLabel(arrival.on ? "Turn off arrival reminders" : "Turn on arrival reminders")
+            }
+        }
+    }
+
+    private var arrivalDetail: String {
+        if arrival.notificationsBlocked { return "Notifications are off for PranaVeda. Allow them in Settings." }
+        if arrival.on && arrival.needsAlways {
+            return "Set Location to Always for PranaVeda in Settings, so your phone can notice when you arrive."
+        }
+        return "A gentle note when you arrive home, at the studio or at your outdoor spot and stay a few minutes. Your phone notices the arrival, even with PranaVeda closed. Between 7 AM and 10 PM, at most every three hours."
     }
 
     private func row(_ kind: PlaceKind) -> some View {

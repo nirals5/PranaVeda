@@ -110,14 +110,21 @@ final class PlaceStore: NSObject {
     }()
     /// Watching only while the app is on screen.
     @ObservationIgnored private var active = false
+    /// Location was turned on or off, or a place saved, moved or removed.
+    @ObservationIgnored var onChange: (() -> Void)?
 
-    private static let enabledKey = "pranaveda_location_enabled"
-    private static let placesKey = "pranaveda_places"
+    static let enabledKey = "pranaveda_location_enabled"
+    private nonisolated static let placesKey = "pranaveda_places"
+
+    /// The saved spots, read without a store (arrival reminders, in the background).
+    nonisolated static func savedPlaces(defaults: UserDefaults = .standard) -> [SavedPlace] {
+        defaults.data(forKey: placesKey).flatMap { try? JSONDecoder().decode([SavedPlace].self, from: $0) } ?? []
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         enabled = defaults.bool(forKey: Self.enabledKey)
-        places = defaults.data(forKey: Self.placesKey).flatMap { try? JSONDecoder().decode([SavedPlace].self, from: $0) } ?? []
+        places = Self.savedPlaces(defaults: defaults)
     }
 
     var located: Bool { position != nil }
@@ -133,6 +140,7 @@ final class PlaceStore: NSObject {
         enabled = true
         defaults.set(true, forKey: Self.enabledKey)
         watch()
+        onChange?()
     }
 
     func disable() {
@@ -140,6 +148,7 @@ final class PlaceStore: NSObject {
         position = nil
         defaults.removeObject(forKey: Self.enabledKey)
         manager.stopUpdatingLocation()
+        onChange?()
     }
 
     /// The app came on screen or left it.
@@ -165,6 +174,7 @@ final class PlaceStore: NSObject {
 
     private func persist() {
         defaults.set(try? JSONEncoder().encode(places), forKey: Self.placesKey)
+        onChange?()
     }
 
     private func watch() {

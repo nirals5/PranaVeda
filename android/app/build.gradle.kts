@@ -80,6 +80,8 @@ dependencies {
     implementation(libs.coil.network.okhttp)
     // Free-time reminders: a check every 15 minutes, with no server.
     implementation(libs.androidx.work.runtime)
+    // Arrival reminders: geofences, so arrivals are noticed with the app closed.
+    implementation(libs.play.services.location)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
