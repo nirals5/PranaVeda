@@ -170,9 +170,18 @@ Limits:
 - **No automatic recognition.** A web page cannot detect devices on its own; the user must click to search. A previously connected device may reconnect on load where the browser supports it, but this is experimental.
 - **Bluetooth works in Chrome and Edge only**, on desktop and Android. Safari, Firefox, and all iPhone browsers show a "cannot use Bluetooth" message.
 - **Most watches will not appear in the device list.** Chest straps and arm bands will; a watch appears only if it has a "broadcast heart rate" mode switched on.
-- **Apple Watch is not supported.** It does not broadcast heart rate as a standard Bluetooth sensor, and its data lives in Apple Health, which only a native iPhone app can read.
+- **Apple Watch is not supported on the website.** It does not broadcast heart rate as a standard Bluetooth sensor, and its data lives in Apple Health, which only a native iPhone app can read. The iPhone app supports it (below).
 - **Google Health access lapses about hourly.** Saved readings stay visible; refreshing needs a "Reconnect" click.
 - Google may require app verification for health-data access before public launch.
+
+#### Apple Watch in the iPhone app
+
+A switch under **Heart & sleep** on the You tab, "Heart rate from Apple Watch during practice", off by default and shown once PranaVeda's watch app is on a paired watch.
+
+- **During a guided practice** (a ritual or breathwork), the iPhone opens PranaVeda on the watch (`startWatchApp(toHandle:)`). The watch runs a Mind and Body workout, the only way a watch app gets heart rate every few seconds, and mirrors it to the iPhone (watchOS 10 / iOS 17 workout mirroring); each reading travels as a small message. The practice screen shows a live heart badge.
+- **At the end** the summary is saved with the practice in the website's shape (start, end, average, lowest, highest; no HRV, which Apple Watch doesn't share live) and shown as "Your heart rate moved from 78 to 64 bpm…". It syncs to the account like any practice. The watch saves the workout to Apple Health; a practice closed early saves nothing.
+- **Code:** `ios/PranaVeda/Models/WatchHeart.swift` and `HeartSummary.swift` (the website's `summarizeSession`), and the watch app in `ios/PranaVedaWatch/` (target `PranaVedaWatch`, watchOS 10, so a Series 5 works).
+- **Installing on a watch for development:** turn on Developer Mode on the watch (it appears under Settings › Privacy & Security only while Xcode is asking for it; confirm after the restart), let Xcode connect to it once (Xcode reaches the watch over Wi-Fi), then build the `PranaVedaWatch` scheme for the watch so the free team registers it. Like the phone app, it needs reinstalling every 7 days on a free account.
 
 ### Location
 

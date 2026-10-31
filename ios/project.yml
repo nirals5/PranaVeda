@@ -5,6 +5,9 @@ options:
   bundleIdPrefix: com.pranaveda
   deploymentTarget:
     iOS: "17.0"
+    # Series 5 watches stop at watchOS 10, the first with live workout
+    # mirroring to the iPhone.
+    watchOS: "10.0"
   createIntermediateGroups: true
 packages:
   GoogleSignIn:
@@ -23,6 +26,7 @@ targets:
     sources: [PranaVeda, Shared]
     dependencies:
       - target: PranaVedaWidgets
+      - target: PranaVedaWatch
       - package: GoogleSignIn
         product: GoogleSignIn
       - package: GoogleSignIn
@@ -88,7 +92,10 @@ targets:
         NSSpeechRecognitionUsageDescription: Your words are turned into text so Amrita can read what you said.
         # Recovery & Trends reads sleep, resting heart rate and HRV from Apple
         # Health, on the phone only (Models/HealthStore.swift).
-        NSHealthShareUsageDescription: PranaVeda shows your sleep, resting heart rate and heart-rate variability beside your practice. They are read on this phone, and a short summary goes to Amrita only if you turn that on.
+        NSHealthShareUsageDescription: PranaVeda shows your sleep, resting heart rate and heart-rate variability beside your practice, and your heart rate during a practice from Apple Watch. They are read on this phone, and a short summary goes to Amrita only if you turn that on.
+        # Heart rate from Apple Watch (Models/WatchHeart.swift): the watch saves
+        # each finished practice as a Mind and Body workout.
+        NSHealthUpdateUsageDescription: With heart rate from Apple Watch on, each finished guided practice is saved to Apple Health as a Mind and Body workout.
         # Saved places (Models/PlaceStore.swift): only while the app is open,
         # and only the kind of place reaches Amrita.
         NSLocationWhenInUseUsageDescription: PranaVeda checks where you are against places you save, such as home or work, while the app is open. Amrita is told only the kind of place; your location stays on this phone, and saved places do too unless you keep them on your account.
@@ -139,6 +146,31 @@ targets:
           - PlusJakartaSans-Italic.ttf
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+  # Heart rate during a practice guided on the iPhone (PranaVedaWatch/).
+  PranaVedaWatch:
+    type: application
+    platform: watchOS
+    sources: [PranaVedaWatch]
+    configFiles:
+      Debug: Configuration/App.xcconfig
+      Release: Configuration/App.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(PV_BUNDLE_ID).watchkitapp
+        CODE_SIGN_ENTITLEMENTS: PranaVedaWatch/PranaVedaWatch.entitlements
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: PranaVeda
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: $(PV_BUNDLE_ID)
+        INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp: NO
+        INFOPLIST_KEY_NSHealthShareUsageDescription: PranaVeda reads your heart rate during a practice and shows it here and on your iPhone.
+        INFOPLIST_KEY_NSHealthUpdateUsageDescription: Each finished guided practice is saved to Apple Health as a Mind and Body workout.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SKIP_INSTALL: YES
+    info:
+      path: PranaVedaWatch/Info.plist
+      properties:
+        # Keeps the workout, and its readings, going with the screen down.
+        WKBackgroundModes: [workout-processing]
   PranaVedaTests:
     type: bundle.unit-test
     platform: iOS
@@ -156,3 +188,8 @@ schemes:
         PranaVedaTests: [test]
     test:
       targets: [PranaVedaTests]
+  # The watch app on its own, for installing straight onto a watch.
+  PranaVedaWatch:
+    build:
+      targets:
+        PranaVedaWatch: all

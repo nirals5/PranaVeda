@@ -2,6 +2,7 @@
 PranaVeda.xcodeproj/
 PranaVeda/Info.plist
 PranaVedaWidgets/Info.plist
+PranaVedaWatch/Info.plist
 # Xcode per-user state and build output.
 xcuserdata/
 DerivedData/

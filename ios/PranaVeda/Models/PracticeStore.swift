@@ -58,8 +58,9 @@ final class PracticeStore {
 
     /// Records a finished practice, and sends it to the account when signed in.
     @discardableResult
-    func log(kind: PracticeLogEntry.Kind, title: String, durationMinutes: Int, result: RecommendationResult?) -> PracticeLogEntry {
-        let entry = PracticeLog.newEntry(kind: kind, title: title, durationMinutes: durationMinutes, result: result)
+    func log(kind: PracticeLogEntry.Kind, title: String, durationMinutes: Int, result: RecommendationResult?, heart: HeartSummary? = nil) -> PracticeLogEntry {
+        var entry = PracticeLog.newEntry(kind: kind, title: title, durationMinutes: durationMinutes, result: result)
+        entry.heart = heart
         setEntries(PracticeLog.trimmed(entries + [entry]))
         if auth?.isSignedIn == true { Task { await sync() } }
         return entry

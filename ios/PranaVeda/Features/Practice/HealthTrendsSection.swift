@@ -9,6 +9,7 @@ struct HealthTrendsSection: View {
     let health: HealthStore
     /// "YYYY-MM-DD" of every day with a practice.
     let practiceDays: Set<String>
+    @State private var watchHeart = WatchHeart.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -40,8 +41,25 @@ struct HealthTrendsSection: View {
                 }
                 shareWithAmrita
             }
+            if watchHeart.watchReady || watchHeart.enabled { watchDuringPractice }
         }
         .task { await health.load() }
+    }
+
+    /// Heart rate from Apple Watch during a guided practice; only offered
+    /// with PranaVeda on a paired watch.
+    private var watchDuringPractice: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: Binding(get: { watchHeart.enabled }, set: { on in Task { await watchHeart.setEnabled(on) } })) {
+                Text("Heart rate from Apple Watch during practice").font(Theme.body).foregroundStyle(Theme.ink)
+            }
+            .tint(Theme.lavender)
+            Text(watchHeart.blocked
+                 ? "Apple Health didn't allow it. Allow PranaVeda to save workouts and read heart rate in Settings › Health › Data Access, then try again."
+                 : "A guided practice opens PranaVeda on your watch, shows your heart rate as you go, and saves the start, end and average with the practice. Each finished practice is also saved to Apple Health as a Mind and Body workout.")
+                .font(Theme.caption).foregroundStyle(watchHeart.blocked ? Theme.terracotta : Theme.stone500)
+        }
+        .padding(.top, 4)
     }
 
     /// The opt-in: off until they turn it on.

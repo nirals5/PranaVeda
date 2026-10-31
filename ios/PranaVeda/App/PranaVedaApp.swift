@@ -46,6 +46,8 @@ struct PranaVedaApp: App {
         // iOS relaunches the app in the background for an arrival; it must
         // be listening again straight away.
         ArrivalStore.shared.resume()
+        // The watch's mirrored workout can arrive as soon as a practice starts.
+        WatchHeart.shared.activate()
     }
 
     var body: some Scene {
