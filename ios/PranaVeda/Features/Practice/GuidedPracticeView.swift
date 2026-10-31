@@ -487,23 +487,30 @@ private struct FeelingCheck: View {
         VStack(spacing: 10) {
             Text(chosen == nil ? "How do you feel now?" : "Thank you. Amrita will keep this in mind.")
                 .font(Theme.body).foregroundStyle(Theme.stone700)
-            HStack(spacing: 8) {
-                ForEach(PracticeLogEntry.Feeling.allCases, id: \.self) { feeling in
-                    let selected = chosen == feeling
-                    Button { practice.rate(entryId, feeling) } label: {
-                        Text(feeling.label)
-                            .font(.caption.weight(.medium))
-                            .lineLimit(1).minimumScaleFactor(0.8)
-                            .foregroundStyle(selected ? .white : Theme.ink)
-                            .padding(.horizontal, 12).padding(.vertical, 9)
-                            .background(selected ? Theme.lavender : Color.white.opacity(0.8), in: Capsule())
-                            .overlay(Capsule().stroke(selected ? Theme.lavender : Theme.stone700.opacity(0.25)))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-                }
+            // A row when the three fit at the person's text size, else a stack,
+            // so a label is never cut short.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { choices }
+                VStack(spacing: 8) { choices }
             }
         }
         .accessibilityElement(children: .contain)
+    }
+
+    private var choices: some View {
+        ForEach(PracticeLogEntry.Feeling.allCases, id: \.self) { feeling in
+            let selected = chosen == feeling
+            Button { practice.rate(entryId, feeling) } label: {
+                Text(feeling.label)
+                    .font(.caption.weight(.medium))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(selected ? .white : Theme.ink)
+                    .padding(.horizontal, 12).padding(.vertical, 9)
+                    .background(selected ? Theme.lavender : Color.white.opacity(0.8), in: Capsule())
+                    .overlay(Capsule().stroke(selected ? Theme.lavender : Theme.stone700.opacity(0.25)))
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(selected ? .isSelected : [])
+        }
     }
 }

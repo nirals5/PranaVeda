@@ -40,11 +40,31 @@ after 7 days; run it from Xcode again to refresh it).
 
 1. Copy `Configuration/Local.xcconfig.example` to `Configuration/Local.xcconfig`
    (git ignores it) and fill in your signing team, and your Mac's network name
-   for `PV_API_BASE_URL[sdk=iphoneos*]`. Phone builds then reach the dev server
+   for `PV_API_BASE_URL[config=Debug][sdk=iphoneos*]`. Phone Debug builds then reach the dev server
    at `http://<your-mac>.local:3000`; the phone must be on the same Wi-Fi.
 2. Run `xcodegen` again, connect the iPhone, turn on Developer Mode on it
    (Settings → Privacy & Security), and run the app on it from Xcode.
 3. The first time, iOS asks to allow access to the local network: allow it.
+
+### On production
+
+A Release build talks to production (`https://v0-pranaveda.vercel.app`), so it
+works anywhere without the Mac. Install it over a development build from `ios/`,
+with your iPhone's id from `xcrun devicectl list devices`:
+
+```bash
+xcodebuild -project PranaVeda.xcodeproj -scheme PranaVeda -configuration Release -destination 'id=<iphone-id>' -derivedDataPath build/production -allowProvisioningUpdates clean build
+```
+
+```bash
+xcrun devicectl device install app --device <iphone-id> build/production/Build/Products/Release-iphoneos/PranaVeda.app
+```
+
+The app asks you to sign in once, because production has its own accounts.
+Practices that came from the development account leave the phone at that point;
+anything the phone had before signing in, or that never reached that account,
+stays and goes up to your production account. A free Apple ID's 7-day limit still
+applies.
 
 Tests (stream parsing and decoding of the server's events and cards):
 

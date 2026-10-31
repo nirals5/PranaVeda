@@ -43,6 +43,14 @@ android {
         release {
             isMinifyEnabled = false
         }
+        // The app on production, for your own phones: signed with the debug key
+        // like a development build, so it installs over one and Google sign-in
+        // recognises it. Not the store build, which needs its own key.
+        create("production") {
+            initWith(getByName("debug"))
+            matchingFallbacks += "debug"
+            buildConfigField("String", "PV_API_BASE_URL", "\"https://v0-pranaveda.vercel.app\"")
+        }
     }
 
     compileOptions {

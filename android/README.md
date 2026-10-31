@@ -49,6 +49,22 @@ pv.apiBaseUrl=http://Your-Mac.local:3000
 Then turn on USB debugging on the phone, connect it, and run `./gradlew installDebug`.
 The phone must be on the same Wi-Fi as the Mac.
 
+### On production
+
+The `production` build type talks to production (`https://v0-pranaveda.vercel.app`),
+so it works anywhere without the Mac. It uses the debug key, so it installs over a
+development build:
+
+```bash
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew installProduction
+```
+
+With more than one phone connected, pick one with `ANDROID_SERIAL=<serial>`. The app
+asks you to sign in once, because production has its own accounts. Practices that came
+from the development account leave the phone at that point; anything the phone had
+before signing in, or that never reached that account, stays and goes up to your
+production account.
+
 Tests (stream parsing, decoding of the server's events and cards, and the API
 client against a stand-in server):
 
