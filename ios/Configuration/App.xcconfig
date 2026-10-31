@@ -4,9 +4,11 @@
 
 // Where the PranaVeda API lives. The iOS Simulator shares the Mac's network,
 // so the local dev server (npm run dev) is reachable at localhost. A real
-// iPhone is not: Local.xcconfig sets the Mac's address for phone builds.
+// iPhone is not: Local.xcconfig sets the Mac's address for phone Debug builds.
 // ("/$()/" keeps "//" from starting a comment in this file format.)
 PV_API_BASE_URL = http:/$()/localhost:3000
+// A Release build uses production, so it works anywhere without the Mac.
+PV_API_BASE_URL[config=Release] = https:/$()/v0-pranaveda.vercel.app
 
 // The app's identifier. A free (personal) Apple account may need a unique
 // one; override it in Local.xcconfig.
