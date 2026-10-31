@@ -32,8 +32,11 @@ struct PracticeLogEntry: Codable, Hashable, Sendable, Identifiable {
     var result: RecommendationResult?
     /// How it left them, if they said.
     var feeling: Feeling?
+    /// Heart rate across it, when an Apple Watch (or, on the website, a
+    /// Bluetooth strap) was reading it.
+    var heart: HeartSummary?
 
-    init(id: String, kind: Kind, title: String, completedAt: String, localDate: String, durationMinutes: Int, result: RecommendationResult?, feeling: Feeling? = nil) {
+    init(id: String, kind: Kind, title: String, completedAt: String, localDate: String, durationMinutes: Int, result: RecommendationResult?, feeling: Feeling? = nil, heart: HeartSummary? = nil) {
         self.id = id
         self.kind = kind
         self.title = title
@@ -42,9 +45,10 @@ struct PracticeLogEntry: Codable, Hashable, Sendable, Identifiable {
         self.durationMinutes = durationMinutes
         self.result = result
         self.feeling = feeling
+        self.heart = heart
     }
 
-    private enum Keys: String, CodingKey { case id, kind, title, completedAt, localDate, durationMinutes, result, feeling }
+    private enum Keys: String, CodingKey { case id, kind, title, completedAt, localDate, durationMinutes, result, feeling, heart }
 
     // Entries from other devices may carry fields or ritual shapes this app
     // does not know; an unreadable ritual is dropped rather than the entry.
@@ -58,6 +62,7 @@ struct PracticeLogEntry: Codable, Hashable, Sendable, Identifiable {
         durationMinutes = try c.decode(Int.self, forKey: .durationMinutes)
         result = try? c.decodeIfPresent(RecommendationResult.self, forKey: .result)
         feeling = try? c.decodeIfPresent(Feeling.self, forKey: .feeling)
+        heart = try? c.decodeIfPresent(HeartSummary.self, forKey: .heart)
     }
 
     var completedDate: Date? { PracticeLog.isoFormatter.date(from: completedAt) ?? PracticeLog.isoFormatterNoFraction.date(from: completedAt) }

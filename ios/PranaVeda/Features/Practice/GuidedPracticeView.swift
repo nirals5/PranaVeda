@@ -16,6 +16,8 @@ struct GuidedPracticeView: View {
     /// The practice on the lock screen and in the Dynamic Island.
     @State private var liveActivity = PracticeLiveActivity()
     @State private var heyAmrita = HeyAmrita.shared
+    /// "Your heart rate moved from 78 to 64 bpm…", when the watch read it.
+    @State private var heartNote: String?
 
     init(result: RecommendationResult) {
         self.result = result
@@ -30,7 +32,7 @@ struct GuidedPracticeView: View {
             if finished {
                 PracticeComplete(
                     title: result.yogaPractice.title,
-                    detail: "\(result.yogaPractice.title) is saved to your practice.",
+                    detail: "\(result.yogaPractice.title) is saved to your practice." + (heartNote.map { " " + $0 } ?? ""),
                     breathwork: result.breathwork,
                     result: result,
                     entryId: loggedId,
@@ -47,12 +49,15 @@ struct GuidedPracticeView: View {
             if let first = poses.first { guide.speak(Guidance.startPose(first)) }
             showLiveActivity()
             heyAmrita.practiceCommands = { obey($0) }
+            WatchHeart.shared.begin()
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
             heyAmrita.practiceCommands = nil
             guide.stop()
             liveActivity.end()
+            // Closed before the end: nothing is saved on the watch.
+            WatchHeart.shared.cancel()
         }
         .onChange(of: isRunning) { showLiveActivity() }
         .task(id: isRunning) {
@@ -136,9 +141,11 @@ struct GuidedPracticeView: View {
                 showLiveActivity()
             case .finished:
                 isRunning = false
+                let heart = WatchHeart.shared.finish()
+                heartNote = heart?.movedNote(kind: .ritual)
                 loggedId = practice.log(kind: .ritual, title: result.yogaPractice.title,
                                         durationMinutes: result.yogaPractice.durationMinutes ?? sequence.durations.reduce(0, +) / 60,
-                                        result: result).id
+                                        result: result, heart: heart).id
                 guide.speak(Guidance.ritualComplete)
                 liveActivity.end()
                 withAnimation { finished = true }
@@ -163,6 +170,7 @@ struct BreathworkPacerView: View {
     @State private var finished = false
     @State private var loggedId: String?
     @State private var heyAmrita = HeyAmrita.shared
+    @State private var heartNote: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(pattern: BreathworkPattern, result: RecommendationResult? = nil) {
@@ -177,7 +185,7 @@ struct BreathworkPacerView: View {
             if finished {
                 PracticeComplete(
                     title: pattern.name,
-                    detail: "\(pattern.name) is saved to your practice.",
+                    detail: "\(pattern.name) is saved to your practice." + (heartNote.map { " " + $0 } ?? ""),
                     breathwork: nil,
                     result: nil,
                     entryId: loggedId,
@@ -197,6 +205,8 @@ struct BreathworkPacerView: View {
             liveActivity.end()
             UIApplication.shared.isIdleTimerDisabled = false
             guide.stop()
+            // Closed before the end: nothing is saved on the watch.
+            WatchHeart.shared.cancel()
         }
         .task(id: isRunning) {
             guard isRunning else { return }
@@ -251,6 +261,7 @@ struct BreathworkPacerView: View {
     private func toggle() {
         if !started {
             started = true
+            WatchHeart.shared.begin()
             guide.speak(Guidance.beginBreathwork(pattern.name, caution: pattern.caution))
             handle([pacer.startEvent], speakFirst: false)
         }
@@ -319,7 +330,9 @@ struct BreathworkPacerView: View {
                 showLiveActivity()
             case .finished:
                 isRunning = false
-                loggedId = practice.log(kind: .breathwork, title: pattern.name, durationMinutes: pacer.totalMinutes, result: result).id
+                let heart = WatchHeart.shared.finish()
+                heartNote = heart?.movedNote(kind: .breathwork)
+                loggedId = practice.log(kind: .breathwork, title: pattern.name, durationMinutes: pacer.totalMinutes, result: result, heart: heart).id
                 guide.speak(Guidance.breathworkComplete(pattern.name))
                 liveActivity.end()
                 withAnimation { finished = true }
@@ -349,6 +362,7 @@ private struct PracticeTopBar: View {
     let guide: SpeechGuide
     let onClose: () -> Void
     @State private var heyAmrita = HeyAmrita.shared
+    @State private var watchHeart = WatchHeart.shared
 
     var body: some View {
         HStack {
@@ -360,6 +374,13 @@ private struct PracticeTopBar: View {
             Spacer()
             VStack(spacing: 2) {
                 Text(title).sectionLabel()
+                // Live from Apple Watch, when it is reading.
+                if let bpm = watchHeart.bpm {
+                    Label("\(bpm) bpm", systemImage: "heart.fill")
+                        .font(Theme.bodySmall.monospacedDigit())
+                        .foregroundStyle(Theme.terracotta)
+                        .accessibilityLabel("Heart rate \(bpm) beats per minute")
+                }
                 // While "Hey Amrita" listens, a reminder of what to say.
                 if heyAmrita.isListening {
                     Text(heyAmrita.state == .awake ? "Listening…" : "Say “Hey Amrita, pause”")
