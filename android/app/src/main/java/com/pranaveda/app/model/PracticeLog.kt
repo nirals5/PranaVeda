@@ -37,6 +37,9 @@ data class PracticeLogEntry(
     val result: RecommendationResult? = null,
     /** How it left them, if they said (H11). */
     val feeling: Feeling? = null,
+    /** Heart rate across it, when a sensor read it. */
+    @Serializable(with = LenientHeartSerializer::class)
+    val heart: HeartSummary? = null,
 ) {
     /** "How do you feel now?" after the practice. Amrita leans away from practices that leave them less settled. */
     @Serializable
@@ -78,6 +81,21 @@ object LenientRitualSerializer : KSerializer<RecommendationResult?> {
     }
 }
 
+/** Reads a heart summary if it can; otherwise none, keeping the entry. */
+object LenientHeartSerializer : KSerializer<HeartSummary?> {
+    private val inner = HeartSummary.serializer()
+    override val descriptor: SerialDescriptor = inner.descriptor.nullable
+
+    override fun deserialize(decoder: Decoder): HeartSummary? {
+        val element: JsonElement = (decoder as JsonDecoder).decodeJsonElement()
+        return runCatching { PvJson.decodeFromJsonElement(inner, element) }.getOrNull()
+    }
+
+    override fun serialize(encoder: Encoder, value: HeartSummary?) {
+        if (value == null) encoder.encodeNull() else encoder.encodeSerializableValue(inner, value)
+    }
+}
+
 /** The rules of the practice log, shared with the website (src/hooks/usePracticeLog.ts). */
 object PracticeLog {
     const val MAX_ENTRIES = 500
@@ -95,6 +113,7 @@ object PracticeLog {
         result: RecommendationResult?,
         now: Instant = Instant.now(),
         zone: ZoneId = ZoneId.systemDefault(),
+        heart: HeartSummary? = null,
     ): PracticeLogEntry {
         val alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
         val suffix = (1..5).map { alphabet[Random.nextInt(alphabet.length)] }.joinToString("")
@@ -105,6 +124,7 @@ object PracticeLog {
             completedAt = ISO_MILLIS.format(now),
             localDate = now.atZone(zone).toLocalDate().toString(),
             durationMinutes = durationMinutes,
+            heart = heart,
             result = result,
         )
     }

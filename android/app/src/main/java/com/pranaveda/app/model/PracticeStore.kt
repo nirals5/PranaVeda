@@ -52,8 +52,8 @@ class PracticeStore(
     private var syncAgain = false
 
     /** Records a finished practice, and sends it to the account when signed in. */
-    fun log(kind: PracticeLogEntry.Kind, title: String, durationMinutes: Int, result: RecommendationResult?): PracticeLogEntry {
-        val entry = PracticeLog.newEntry(kind, title, durationMinutes, result)
+    fun log(kind: PracticeLogEntry.Kind, title: String, durationMinutes: Int, result: RecommendationResult?, heart: HeartSummary? = null): PracticeLogEntry {
+        val entry = PracticeLog.newEntry(kind, title, durationMinutes, result, heart = heart)
         storeEntries(PracticeLog.trimmed(entries + entry))
         if (auth?.isSignedIn == true) scope.launch { sync() }
         return entry

@@ -61,6 +61,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import com.pranaveda.app.PranaVedaApplication
+import com.pranaveda.app.health.HeartSensor
 import com.pranaveda.app.model.BreathworkPattern
 import com.pranaveda.app.model.PracticeLogEntry
 import com.pranaveda.app.model.PracticeStore
@@ -129,6 +130,9 @@ private fun PracticeClock(running: Boolean, tick: (Double) -> Unit) {
 @Composable
 private fun heyAmrita(): HeyAmrita = (LocalContext.current.applicationContext as PranaVedaApplication).heyAmrita
 
+@Composable
+private fun heartSensor(): HeartSensor = (LocalContext.current.applicationContext as PranaVedaApplication).heartSensor
+
 /** While the practice is open, "Hey Amrita, pause" and the rest go to [obey]. */
 @Composable
 private fun ListenForCommands(obey: (WakePhrase.Command?) -> Unit) {
@@ -162,6 +166,17 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
     var finished by remember { mutableStateOf(false) }
     // The log entry made on finishing, for "How do you feel now?".
     var loggedId by remember { mutableStateOf<String?>(null) }
+    val heart = heartSensor()
+    // "Your heart rate moved from 78 to 64 bpm…", when a sensor read it.
+    var heartNote by remember { mutableStateOf<String?>(null) }
+    DisposableEffect(Unit) {
+        heart.hold()
+        heart.begin()
+        onDispose {
+            heart.cancel()
+            heart.release()
+        }
+    }
     val notice = rememberPracticeNotice()
 
     fun showNotice() {
@@ -179,11 +194,14 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
             PoseSequence.Event.Finished -> {
                 running = false
                 notice.cancel()
+                val summary = heart.finish()
+                heartNote = summary?.movedNote(PracticeLogEntry.Kind.Ritual)
                 loggedId = practice.log(
                     PracticeLogEntry.Kind.Ritual,
                     result.yogaPractice.title,
                     result.yogaPractice.durationMinutes ?: (sequence.durations.sum() / 60),
                     result,
+                    summary,
                 ).id
                 guide.speak(Guidance.RITUAL_COMPLETE)
                 finished = true
@@ -219,7 +237,7 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
     PracticeDialog(onClose) {
         when {
             finished -> PracticeComplete(
-                detail = "${result.yogaPractice.title} is saved to your practice.",
+                detail = "${result.yogaPractice.title} is saved to your practice." + (heartNote?.let { " $it" } ?: ""),
                 breathwork = result.breathwork,
                 result = result,
                 entryId = loggedId,
@@ -279,6 +297,16 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
     // The log entry made on finishing, for "How do you feel now?".
     var loggedId by remember { mutableStateOf<String?>(null) }
     val notice = rememberPracticeNotice()
+    val heart = heartSensor()
+    // "Your heart rate moved from 78 to 64 bpm…", when a sensor read it.
+    var heartNote by remember { mutableStateOf<String?>(null) }
+    DisposableEffect(Unit) {
+        heart.hold()
+        onDispose {
+            heart.cancel()
+            heart.release()
+        }
+    }
 
     fun showNotice() {
         if (!started || finished) return
@@ -296,7 +324,9 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
             BreathPacer.Event.Finished -> {
                 running = false
                 notice.cancel()
-                loggedId = practice.log(PracticeLogEntry.Kind.Breathwork, pattern.name, pacer.totalMinutes, result).id
+                val summary = heart.finish()
+                heartNote = summary?.movedNote(PracticeLogEntry.Kind.Breathwork)
+                loggedId = practice.log(PracticeLogEntry.Kind.Breathwork, pattern.name, pacer.totalMinutes, result, summary).id
                 guide.speak(Guidance.breathworkComplete(pattern.name))
                 finished = true
             }
@@ -307,6 +337,7 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
     fun toggle() {
         if (!started) {
             started = true
+            heart.begin()
             guide.speak(Guidance.beginBreathwork(pattern.name, pattern.caution))
             handle(listOf(pacer.startEvent), speak = false)
         }
@@ -331,7 +362,7 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
 
     PracticeDialog(onClose) {
         if (finished) {
-            PracticeComplete(detail = "${pattern.name} is saved to your practice.", breathwork = null, result = null, entryId = loggedId, onDone = onClose)
+            PracticeComplete(detail = "${pattern.name} is saved to your practice." + (heartNote?.let { " $it" } ?: ""), breathwork = null, result = null, entryId = loggedId, onDone = onClose)
             return@PracticeDialog
         }
         version // read so the screen follows the timer
@@ -393,12 +424,16 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
 @Composable
 private fun PracticeTopBar(title: String, guide: SpeechGuide, onClose: () -> Unit) {
     val heyAmrita = heyAmrita()
+    val bpm = heartSensor().bpm
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = onClose, modifier = Modifier.semantics { contentDescription = "End practice" }) {
             Text("✕", fontSize = 20.sp, color = Pv.stone700)
         }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             SectionLabel(title)
+            bpm?.let {
+                Text("♥ $it", style = Pv.bodySmall, color = Pv.lavenderDeep, modifier = Modifier.semantics { contentDescription = "$it beats per minute" })
+            }
             // While "Hey Amrita" listens, a reminder of what to say.
             if (heyAmrita.isListening) {
                 val awake = heyAmrita.state == HeyAmrita.State.Awake
