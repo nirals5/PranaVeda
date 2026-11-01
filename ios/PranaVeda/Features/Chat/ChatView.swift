@@ -142,6 +142,7 @@ struct ChatView: View {
                 onSelect: { model.send($0) }
             )
             .padding(.top, 6)
+            if let offer = model.profileOffer { ProfileOfferBar(model: model, offer: offer).padding(.top, 8) }
             if let calendar { FreeTimeBar(calendar: calendar, onPractice: { model.send($0) }).padding(.top, 8) }
             if let insight {
                 DailyInsightCard(state: insight.state)

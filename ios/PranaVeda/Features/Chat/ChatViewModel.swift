@@ -13,6 +13,10 @@ final class ChatViewModel {
     private(set) var items: [ChatItem] = []
     private(set) var isStreaming = false
     private(set) var profile: JSONValue
+    /// This phone's own profile from before sign-in, while someone is signed in.
+    private var deviceProfile: JSONValue?
+    /// Which offer of this phone's details "Not now" answered.
+    private var declinedOffer: String?
 
     /// Set when sign-in is available; requests are then sent as the
     /// signed-in person.
@@ -43,6 +47,7 @@ final class ChatViewModel {
     // which is put back on sign-out (as on the website).
     private static let ownerKey = "pranaveda_profile_owner"
     private static let backupKey = "pranaveda_profile_before_signin"
+    private static let declinedOfferKey = "pranaveda_profile_offer_declined"
 
     init(api: APIClient = APIClient(), defaults: UserDefaults = .standard) {
         self.api = api
@@ -53,6 +58,8 @@ final class ChatViewModel {
         } else {
             profile = .object([:])
         }
+        deviceProfile = defaults.data(forKey: Self.backupKey).flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) }
+        declinedOffer = defaults.string(forKey: Self.declinedOfferKey)
     }
 
     var profileName: String? { profile["name"]?.stringValue }
@@ -152,6 +159,7 @@ final class ChatViewModel {
             if defaults.string(forKey: Self.ownerKey) == nil {
                 if isEmpty(profile) { defaults.removeObject(forKey: Self.backupKey) }
                 else if let data = try? JSONEncoder().encode(profile) { defaults.set(data, forKey: Self.backupKey) }
+                deviceProfile = isEmpty(profile) ? nil : profile
             }
             defaults.set(user.id, forKey: Self.ownerKey)
 
@@ -166,6 +174,36 @@ final class ChatViewModel {
             // Offline or unavailable: the copy here stays; sync runs again
             // next launch.
         }
+    }
+
+    /// What this phone has that the account doesn't, while signed in, unless
+    /// "Not now" already answered it.
+    var profileOffer: ProfileOffer? {
+        guard auth?.user != nil, let offer = ProfileOffer.make(device: deviceProfile, account: profile), offer.key != declinedOffer else { return nil }
+        return offer
+    }
+
+    /// False when it could not be saved; the offer stays.
+    func addProfileOffer() async -> Bool {
+        guard let auth, let deviceProfile, let token = await auth.validAccessToken() else { return false }
+        let api = api
+        do {
+            let stored = try await ProfileOffer.add(
+                device: deviceProfile,
+                load: { try await api.fetchAccountProfile(accessToken: token) },
+                save: { try await api.saveAccountProfile($0, baseVersion: $1, accessToken: token) }
+            )
+            guard let stored else { return false }
+            setProfile(stored)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func declineProfileOffer(_ offer: ProfileOffer) {
+        declinedOffer = offer.key
+        defaults.set(offer.key, forKey: Self.declinedOfferKey)
     }
 
     /// Changed in the You tab. Signed in, the account is the profile, so the
@@ -196,6 +234,9 @@ final class ChatViewModel {
         setProfile(backup ?? .object([:]))
         defaults.removeObject(forKey: Self.ownerKey)
         defaults.removeObject(forKey: Self.backupKey)
+        defaults.removeObject(forKey: Self.declinedOfferKey)
+        deviceProfile = nil
+        declinedOffer = nil
     }
 
     private func setProfile(_ value: JSONValue) {

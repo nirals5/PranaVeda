@@ -318,7 +318,7 @@ What signing in does:
 
 Not synced: Google sign-ins (each browser's lasts about an hour), the phones' own calendars and health stores, location and reminder on/off settings, wearable readings and the chat conversation stay on the device.
 
-- **First sign-in on a device:** if the account has no profile yet, this device's profile becomes the account's. Otherwise the account's replaces the device's copy.
+- **First sign-in on a device:** if the account has no profile yet, this device's profile becomes the account's. Otherwise the account's replaces the device's copy. If the device had details the account lacks, a bar on the chat screen offers to add them. Nothing is added without a yes, and the account's own values are never replaced.
 - **Sign-out:** by any route (signing out, a session that ended, account deletion), the device goes back to how it was before sign-in. The account's profile, practices and saved rituals are removed from it, and its own pre-sign-in data is put back, so the next person on a shared device does not see them. A practice that never reached the account is kept rather than lost.
 - **Account deletion:** "Delete account" in the Profile header removes the account, its sign-in methods, sessions, profile, practice history and saved rituals from the server, and signs out every device.
 
@@ -375,7 +375,7 @@ Signed out, or with accounts switched off, everything is kept in the browser on 
 
 Disconnecting Google Health also clears its saved readings.
 
-Signed in, the browser also keeps a few markers so sync can hand the device back on sign-out: `pranaveda_signed_in`, `pranaveda_profile_owner`, `pranaveda_profile_before_signin`, and `pranaveda_practice_owner`, `pranaveda_practice_own_ids`, `pranaveda_practice_synced_ids`, `pranaveda_practice_cursor`, and `pranaveda_saved_owner`, `pranaveda_saved_own_ids`, `pranaveda_saved_synced_ids`, `pranaveda_saved_removed_ids`, and `pranaveda_connections_owner`, `pranaveda_connections_version`, `pranaveda_connections_synced`, `pranaveda_connections_own`.
+Signed in, the browser also keeps a few markers so sync can hand the device back on sign-out: `pranaveda_signed_in`, `pranaveda_profile_owner`, `pranaveda_profile_offer_declined`, `pranaveda_profile_before_signin`, and `pranaveda_practice_owner`, `pranaveda_practice_own_ids`, `pranaveda_practice_synced_ids`, `pranaveda_practice_cursor`, and `pranaveda_saved_owner`, `pranaveda_saved_own_ids`, `pranaveda_saved_synced_ids`, `pranaveda_saved_removed_ids`, and `pranaveda_connections_owner`, `pranaveda_connections_version`, `pranaveda_connections_synced`, `pranaveda_connections_own`.
 
 Signed in, the server (Neon Postgres) also stores:
 
