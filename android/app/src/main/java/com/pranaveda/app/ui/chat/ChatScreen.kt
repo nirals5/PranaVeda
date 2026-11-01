@@ -282,6 +282,7 @@ fun ChatScreen(
                     val place = (LocalContext.current.applicationContext as PranaVedaApplication).place
                     SuggestionChips(Suggestions.list(place.current, model.knowsConstitution), onSelect = { model.send(it) })
                 }
+                model.profileOffer?.let { offer -> item { ProfileOfferBar(model, offer) } }
                 item {
                     val app = LocalContext.current.applicationContext as PranaVedaApplication
                     FreeTimeBar(app.calendar, app.practice.entries.lastOrNull()?.completedInstant, onPractice = { model.send(it) })

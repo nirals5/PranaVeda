@@ -22,6 +22,7 @@ import { useSavedRituals } from './hooks/useSavedRituals';
 import { usePracticeLog } from './hooks/usePracticeLog';
 import { useExternalCalendar, describeCalendar } from './hooks/useExternalCalendar';
 import FreeTimeNudge from './components/FreeTimeNudge';
+import ProfileOfferBar from './components/ProfileOfferBar';
 import { useNudgeNotifications } from './hooks/useNudgeNotifications';
 import { useHeartRateMonitor } from './hooks/useHeartRateMonitor';
 import { useWearableHealth, buildHealthContext } from './hooks/useWearableHealth';
@@ -79,7 +80,7 @@ export default function App() {
     locationContext,
     auth.sessionEnded
   );
-  useProfileSync(auth, profile, replaceProfile);
+  const { profileOffer, addOffer, declineOffer } = useProfileSync(auth, profile, replaceProfile);
 
   // Changed in the profile view. Signed in, the account is the profile, so the
   // server sets it; a guest's profile lives here and goes with every message.
@@ -440,6 +441,9 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="flex flex-col items-center w-full px-5 sm:px-6 text-center space-y-10 sm:space-y-12"
             >
+              {profileOffer && (
+                <ProfileOfferBar offer={profileOffer} onAdd={addOffer} onDismiss={() => declineOffer(profileOffer)} />
+              )}
               {calendar.connected && (
                 <FreeTimeNudge
                   busy={calendar.busy}

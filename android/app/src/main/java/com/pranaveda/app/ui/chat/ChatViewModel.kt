@@ -1,5 +1,6 @@
 package com.pranaveda.app.ui.chat
 
+import com.pranaveda.app.model.ProfileOffer
 import android.app.Application
 import android.content.Context
 import android.util.Log
@@ -57,6 +58,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val place = (application as PranaVedaApplication).place
     private val calendar = (application as PranaVedaApplication).calendar
     private val prefs = application.getSharedPreferences("pranaveda", Context.MODE_PRIVATE)
+
+    /** This phone's own profile from before sign-in, while someone is signed in. */
+    private var deviceProfile by mutableStateOf(readProfile(BACKUP_KEY))
+
+    /** Which offer of this phone's details "Not now" answered. */
+    private var declinedOffer by mutableStateOf(prefs.getString(DECLINED_OFFER_KEY, null))
     private var streamJob: Job? = null
 
     /** Speaks the reply to a spoken message (the app's AmritaVoice), and stops whatever is still being said. */
@@ -104,6 +111,29 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      * server sets it; signed out, the profile here goes with every message.
      * False when it could not be saved.
      */
+    val profileOffer: ProfileOffer?
+        get() = if (auth.user == null) null else ProfileOffer.of(deviceProfile, profile)?.takeUnless { it.key == declinedOffer }
+
+    /** False when it could not be saved; the offer stays. */
+    suspend fun addProfileOffer(): Boolean {
+        val device = deviceProfile ?: return false
+        val token = auth.validAccessToken() ?: return false
+        val stored = runCatching {
+            ProfileOffer.add(
+                device,
+                load = { accounts.fetchAccountProfile(token) },
+                save = { merged, version -> accounts.saveAccountProfile(merged, version, token) },
+            )
+        }.getOrNull() ?: return false
+        storeProfile(stored)
+        return true
+    }
+
+    fun declineProfileOffer(offer: ProfileOffer) {
+        declinedOffer = offer.key
+        prefs.edit().putString(DECLINED_OFFER_KEY, offer.key).apply()
+    }
+
     suspend fun changeExperience(value: String?): Boolean {
         if (auth.user != null) {
             val token = auth.validAccessToken() ?: return false
@@ -197,6 +227,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 prefs.edit().apply {
                     if (profile.isEmpty()) remove(BACKUP_KEY) else putString(BACKUP_KEY, profile.toString())
                 }.apply()
+                deviceProfile = profile.takeUnless { it.isEmpty() }
             }
             prefs.edit().putString(OWNER_KEY, user.id).apply()
 
@@ -221,7 +252,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private fun handBackDevice() {
         if (prefs.getString(OWNER_KEY, null) == null) return
         storeProfile(readProfile(BACKUP_KEY) ?: JsonObject(emptyMap()))
-        prefs.edit().remove(OWNER_KEY).remove(BACKUP_KEY).apply()
+        prefs.edit().remove(OWNER_KEY).remove(BACKUP_KEY).remove(DECLINED_OFFER_KEY).apply()
+        deviceProfile = null
+        declinedOffer = null
     }
 
     private fun storeProfile(value: JsonObject) {
@@ -259,6 +292,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         private const val PROFILE_KEY = "pranaveda_profile"
         private const val OWNER_KEY = "pranaveda_profile_owner"
         private const val BACKUP_KEY = "pranaveda_profile_before_signin"
+        private const val DECLINED_OFFER_KEY = "pranaveda_profile_offer_declined"
 
         /** Like the iOS app's "10/14/2026, 3:04:05 PM". */
         internal val LOCAL_TIME = DateTimeFormatter.ofPattern("M/d/yyyy, h:mm:ss a", Locale.US)
