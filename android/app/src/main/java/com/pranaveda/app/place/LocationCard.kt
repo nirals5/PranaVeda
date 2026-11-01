@@ -115,8 +115,9 @@ private fun ArrivalRow(arrival: ArrivalStore, openSettings: () -> Unit) {
         notificationsRefused = !granted
         if (granted) askForLocation()
     }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Column(Modifier.weight(1f)) {
+    // The wording is long, so it gets the full width and the buttons sit below it.
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column {
             Text("Arrival reminders", style = Pv.heading.copy(fontSize = Pv.body.fontSize), color = Pv.ink)
             Text(
                 when {
@@ -129,14 +130,16 @@ private fun ArrivalRow(arrival: ArrivalStore, openSettings: () -> Unit) {
                 color = Pv.stone500,
             )
         }
-        if (notificationsRefused || (arrival.on && arrival.needsAllTheTime)) Pill("Settings", primary = false) { openSettings() }
-        if (!notificationsRefused) {
-            if (arrival.on) {
-                Pill("Turn off", primary = false, description = "Turn off arrival reminders") { arrival.turn(false) }
-            } else {
-                Pill("Turn on", primary = true, description = "Turn on arrival reminders") {
-                    if (Build.VERSION.SDK_INT >= 33 && !arrival.canNotify()) askForNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    else askForLocation()
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+            if (notificationsRefused || (arrival.on && arrival.needsAllTheTime)) Pill("Settings", primary = false) { openSettings() }
+            if (!notificationsRefused) {
+                if (arrival.on) {
+                    Pill("Turn off", primary = false, description = "Turn off arrival reminders") { arrival.turn(false) }
+                } else {
+                    Pill("Turn on", primary = true, description = "Turn on arrival reminders") {
+                        if (Build.VERSION.SDK_INT >= 33 && !arrival.canNotify()) askForNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        else askForLocation()
+                    }
                 }
             }
         }

@@ -54,22 +54,25 @@ struct LocationSettings: View {
         return "Located. Save the spot you are in below so Amrita can recognise it."
     }
 
-    /// Arrival reminders, once a place that takes them is saved.
+    /// Arrival reminders, once a place that takes them is saved. The wording is
+    /// long, so it gets the full width and the buttons sit below it.
     private var arrivalRow: some View {
-        HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Arrival reminders").font(Theme.serif(.body)).foregroundStyle(Theme.ink)
                 Text(arrivalDetail).font(Theme.caption).foregroundStyle(Theme.stone500)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if arrival.notificationsBlocked || (arrival.on && arrival.needsAlways) {
-                Button("Settings") { if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) } }
-                    .buttonStyle(PillButton(primary: false))
-            }
-            if !arrival.notificationsBlocked {
-                Button(arrival.on ? "Turn off" : "Turn on") { Task { await arrival.setOn(!arrival.on) } }
-                    .buttonStyle(PillButton(primary: !arrival.on))
-                    .accessibilityLabel(arrival.on ? "Turn off arrival reminders" : "Turn on arrival reminders")
+            HStack(spacing: 10) {
+                Spacer(minLength: 0)
+                if arrival.notificationsBlocked || (arrival.on && arrival.needsAlways) {
+                    Button("Settings") { if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) } }
+                        .buttonStyle(PillButton(primary: false))
+                }
+                if !arrival.notificationsBlocked {
+                    Button(arrival.on ? "Turn off" : "Turn on") { Task { await arrival.setOn(!arrival.on) } }
+                        .buttonStyle(PillButton(primary: !arrival.on))
+                        .accessibilityLabel(arrival.on ? "Turn off arrival reminders" : "Turn on arrival reminders")
+                }
             }
         }
     }
