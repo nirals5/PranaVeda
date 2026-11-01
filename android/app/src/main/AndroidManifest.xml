@@ -24,6 +24,15 @@
     <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />
 
+    <!-- A heart-rate sensor (health/HeartSensor.kt): only the one someone picks, only for
+         readings. Asked for at "Find a sensor". Before Android 12, finding nearby devices
+         needs the location permission above. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
     <!-- Spoken guidance and replies use the phone's text-to-speech engine, and
          speaking to Amrita its speech recognition; from Android 11 an app must
          declare that it looks for them. -->

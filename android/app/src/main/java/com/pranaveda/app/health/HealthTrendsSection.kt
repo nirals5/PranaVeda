@@ -56,6 +56,7 @@ fun HealthTrendsSection(health: HealthStore, practiceDays: Set<String>) {
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Heart & sleep", style = Pv.heading, color = Pv.ink, modifier = Modifier.semantics { heading() })
+        HeartSensorRow()
         when (val state = health.state) {
             is HealthStore.State.Unavailable -> {
                 Text(

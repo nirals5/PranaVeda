@@ -2,6 +2,7 @@ package com.pranaveda.app
 
 import com.pranaveda.app.calendar.CalendarStore
 import com.pranaveda.app.health.HealthStore
+import com.pranaveda.app.health.HeartSensor
 import com.pranaveda.app.place.ArrivalStore
 import com.pranaveda.app.place.ConnectionsSync
 import com.pranaveda.app.place.PlaceStore
@@ -46,6 +47,9 @@ class PranaVedaApplication : Application() {
 
     /** Heart and sleep readings from Health Connect, for Recovery & Trends. */
     val health: HealthStore by lazy { HealthStore(this) }
+
+    /** A Bluetooth heart-rate sensor, for live readings during a practice. */
+    val heartSensor: HeartSensor by lazy { HeartSensor(this) }
 
     /** Saved places (home, work, …), matched while the app is open. */
     val place: PlaceStore by lazy {
