@@ -61,6 +61,11 @@ export function useConnectionsSync(auth: Auth, place: Place, calendar: ExternalC
     write(VERSION_KEY, version);
     placeRef.current.replacePlaces(connections.places);
     calendarRef.current.adoptIcsUrl(connections.calendarLink);
+    // These reach the refs on the next render, but sync can look again before
+    // that. Reading the old copy then would send it back, and each device
+    // would keep overwriting the account with the copy it just replaced.
+    placeRef.current = { ...placeRef.current, places: connections.places };
+    calendarRef.current = { ...calendarRef.current, icsUrl: connections.calendarLink };
     setKept(true);
   }, []);
 
@@ -96,16 +101,28 @@ export function useConnectionsSync(auth: Auth, place: Place, calendar: ExternalC
         if (version > 0) {
           const changes = changedFields(local(), read<Connections>(AGREED_KEY, { places: [] }));
           if (Object.keys(changes).length) {
+            const sent = JSON.stringify(local());
             let reply = await saveAccountConnections<Connections>(changes, version);
             // Changed elsewhere meanwhile: this device's change is the newest.
             if (reply?.conflict && reply.kept) reply = await saveAccountConnections<Connections>(changes, reply.version);
             if (!reply) return; // offline: tried again later
-            settle(reply);
+            if (reply.kept && !reply.conflict && JSON.stringify(local()) !== sent) {
+              // Changed here while sending: keep that change and send it next.
+              write(AGREED_KEY, reply.connections);
+              write(VERSION_KEY, reply.version);
+              again.current = true;
+            } else settle(reply);
             continue;
           }
         }
+        const before = JSON.stringify(local());
         const account = await fetchAccountConnections<Connections>();
         if (!account) return;
+        if (JSON.stringify(local()) !== before) {
+          // Changed here while reading: that change goes first.
+          again.current = true;
+          continue;
+        }
         if (!account.kept) {
           if (version > 0) stopFollowing();
           else setKept(false);
