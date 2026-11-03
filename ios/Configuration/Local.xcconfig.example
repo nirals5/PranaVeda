@@ -15,6 +15,6 @@ DEVELOPMENT_TEAM =
 // production.
 PV_API_BASE_URL[config=Debug][sdk=iphoneos*] = http:/$()/Your-Mac-Name.local:3000
 
-// Sign in with Apple needs a paid Apple Developer team (set DEVELOPMENT_TEAM
-// to it above). Then turn it on here, and set the Apple values in .env.
-// PV_APPLE_SIGN_IN = YES
+// Sign in with Apple is on by default and needs a paid Apple Developer team.
+// With a free personal team, turn it off:
+// PV_APPLE_SIGN_IN = NO

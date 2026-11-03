@@ -72,21 +72,27 @@ Tests (stream parsing and decoding of the server's events and cards):
 xcodebuild -project PranaVeda.xcodeproj -scheme PranaVeda -destination 'platform=iOS Simulator,name=iPhone 18 Pro' test
 ```
 
-## Sign in with Apple (off until a paid Apple Developer team)
+## Sign in with Apple
 
-The code is in the app, switched off: Apple allows it only for apps signed by a
-paid Apple Developer Program team, and builds signed by a free personal team
-fail if they ask for it. To turn it on:
+On by default (`PV_APPLE_SIGN_IN = YES` in `Configuration/App.xcconfig`): the
+app is signed by PranaVeda's paid Apple Developer team, and App Review requires
+it alongside Google sign-in. The build carries the Sign in with Apple capability
+(`PranaVeda/PranaVeda.entitlements`) and the "You" tab shows Apple's button
+above Google's. Building with `-allowProvisioningUpdates` (or Xcode's automatic
+signing) adds the capability to the app id the first time.
 
-1. In `Configuration/Local.xcconfig`, set `DEVELOPMENT_TEAM` to the paid team
-   and add `PV_APPLE_SIGN_IN = YES`, then run `xcodegen`. The build then
-   carries the Sign in with Apple capability (`PranaVeda/PranaVeda.entitlements`)
-   and the "You" tab shows Apple's button above Google's.
-2. In developer.apple.com → Keys, create a key with Sign in with Apple for the
-   app id `com.pranaveda.app`; download its `.p8` (keep it outside the project).
-3. In the server's `.env`: `APPLE_BUNDLE_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`,
-   `APPLE_PRIVATE_KEY` (the `.p8` contents) and `CONNECTIONS_ENC_KEY`, which
-   encrypts Apple's token so it can be revoked when an account is deleted.
+A free personal team cannot sign it: add `PV_APPLE_SIGN_IN = NO` to
+`Configuration/Local.xcconfig` and run `xcodegen` again.
+
+The server, locally (`.env`) and on Vercel, needs:
+
+1. `APPLE_BUNDLE_ID=com.pranaveda.app` and `APPLE_TEAM_ID`: without the bundle
+   id it refuses the app's Apple sign-ins.
+2. A key from developer.apple.com → Keys with Sign in with Apple for the app id
+   `com.pranaveda.app`: its id in `APPLE_KEY_ID`, its `.p8` contents in
+   `APPLE_PRIVATE_KEY` (keep the file outside the project), and
+   `CONNECTIONS_ENC_KEY`. Together they keep Apple's token, encrypted, so it can
+   be revoked when an account is deleted, as Apple requires.
 
 At launch, a session that was started with Apple is ended if the person has
 since stopped using their Apple ID with PranaVeda (Settings → Apple Account →
