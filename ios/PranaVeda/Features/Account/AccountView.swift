@@ -79,7 +79,13 @@ struct AccountView: View {
             Text("Signed in").sectionLabel().accessibilityAddTraits(.isHeader)
             Text(user.displayName ?? user.email ?? "Your account").font(Theme.heading(.title)).foregroundStyle(Theme.ink)
             if user.displayName != nil, let email = user.email {
+                // One line, shrinking to fit, then cut in the middle: an address
+                // (an Apple relay one is long) never breaks mid-word.
                 Text(email).font(Theme.bodySmall).foregroundStyle(Theme.stone500)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
             }
             Text("Your wellness profile is saved to your account and shared with the website.")
                 .font(Theme.body)
