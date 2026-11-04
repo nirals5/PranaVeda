@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
-import { Mic, MicOff, X, Sparkles, Volume2, VolumeX, Check } from 'lucide-react';
+import { Mic, MicOff, X, Sparkles, Check } from 'lucide-react';
 
 interface VoiceModalProps {
   isOpen: boolean;
@@ -8,13 +8,43 @@ interface VoiceModalProps {
   onSubmitPrompt: (spokenText: string) => void;
 }
 
+/** Why voice can't be used, if it can't. */
+export type VoiceProblem = 'unsupported' | 'blocked' | 'no-microphone' | 'failed';
+
+/** What to tell someone when voice can't be used, in plain words. Nothing is
+ *  ever made up in its place: only what they actually said is sent. */
+export const VOICE_PROBLEM_TEXT: Record<VoiceProblem, string> = {
+  unsupported: "Voice isn't available in this browser. Try Chrome, Edge or Safari, or type your message instead.",
+  blocked: "PranaVeda can't use your microphone. Allow it in your browser's site settings and try again, or type your message instead.",
+  'no-microphone': "No microphone was found. Check that one is connected, or type your message instead.",
+  failed: "Voice stopped working just now. Please try again, or type your message instead.",
+};
+
+/** Maps a Web Speech API error code to what we tell the person, or null for
+ *  codes that need no message ("no-speech" just means silence so far, and
+ *  "aborted" is us stopping it). */
+export function voiceProblemFor(code: string): VoiceProblem | null {
+  switch (code) {
+    case 'not-allowed':
+    case 'service-not-allowed':
+      return 'blocked';
+    case 'audio-capture':
+      return 'no-microphone';
+    case 'no-speech':
+    case 'aborted':
+      return null;
+    default:
+      return 'failed';
+  }
+}
+
 export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceModalProps) {
   const prefersReducedMotion = useReducedMotion();
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [statusText, setStatusText] = useState('Opening voice assistant...');
-  const [mediaError, setMediaError] = useState(false);
-  
+  const [problem, setProblem] = useState<VoiceProblem | null>(null);
+
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
@@ -23,61 +53,66 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
       return;
     }
 
-    // Start Recording automated delay or trigger Speech API
-    setIsRecording(true);
     setTranscript('');
-    setStatusText("Aligning frequency... Speak naturally.");
-    setMediaError(false);
-    
-    // Check for browser recognition capabilities
+    setProblem(null);
+
+    const fail = (why: VoiceProblem) => {
+      setProblem(why);
+      setIsRecording(false);
+      setStatusText(VOICE_PROBLEM_TEXT[why]);
+    };
+
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      try {
-        const rec = new SpeechRecognition();
-        rec.continuous = true;
-        rec.interimResults = true;
-        rec.lang = 'en-US';
+    if (!SpeechRecognition) {
+      // Firefox, for one, has no speech recognition.
+      fail('unsupported');
+      return;
+    }
 
-        rec.onstart = () => {
-          setStatusText("I am listening deeply. Share what is on your mind...");
-        };
+    setIsRecording(true);
+    setStatusText("Aligning frequency... Speak naturally.");
+    try {
+      const rec = new SpeechRecognition();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
 
-        rec.onresult = (event: any) => {
-          let curr = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              curr += event.results[i][0].transcript;
-            } else {
-              curr += event.results[i][0].transcript;
-            }
-          }
-          if (curr) setTranscript(curr);
-        };
+      rec.onstart = () => {
+        setStatusText("I am listening deeply. Share what is on your mind...");
+      };
 
-        rec.onerror = (err: any) => {
-          console.warn("Speech recognition error:", err);
-          // If restricted or blocked, we do simulated speech typing safely so the user gets a seamless experience
-          if (err.error === 'not-allowed') {
-            setMediaError(true);
-            runSimulatedSpeech();
-          }
-        };
+      // The whole of what has been heard so far, final and interim alike, so
+      // earlier sentences stay when a new one begins.
+      rec.onresult = (event: any) => {
+        let heard = '';
+        for (let i = 0; i < event.results.length; ++i) {
+          heard += event.results[i][0].transcript;
+        }
+        setTranscript(heard);
+      };
 
-        rec.onend = () => {
-          // Keep active unless stopped manually
-        };
+      rec.onerror = (err: any) => {
+        console.warn("Speech recognition error:", err?.error ?? err);
+        const why = voiceProblemFor(err?.error ?? '');
+        if (why) {
+          if (recognitionRef.current === rec) recognitionRef.current = null;
+          fail(why);
+        }
+      };
 
-        rec.start();
-        recognitionRef.current = rec;
-      } catch (e) {
-        console.error("Failed to start SpeechRecognition:", e);
-        setMediaError(true);
-        runSimulatedSpeech();
-      }
-    } else {
-      // Setup mock simulation in case browser doesn't support Web Speech
-      setMediaError(true);
-      runSimulatedSpeech();
+      rec.onend = () => {
+        // The browser stops listening after a pause; what was heard stays.
+        if (recognitionRef.current === rec) {
+          recognitionRef.current = null;
+          setIsRecording(false);
+        }
+      };
+
+      rec.start();
+      recognitionRef.current = rec;
+    } catch (e) {
+      console.error("Failed to start SpeechRecognition:", e);
+      fail('failed');
     }
 
     return () => {
@@ -85,52 +120,23 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
     };
   }, [isOpen]);
 
-  const runSimulatedSpeech = () => {
-    // Guard against double-mount (React StrictMode runs the effect twice):
-    // clear any interval a previous invocation left running.
-    if ((recognitionRef as any).currentSimInterval) {
-      clearInterval((recognitionRef as any).currentSimInterval);
-    }
-    setStatusText("I am listening. (Simulated Mode - microphone blocked or unsupported)");
-    setTranscript('');
-    const simulationPhrases = [
-      "I ", "feel ", "very ", "stressed ", "lately, ", "and ", "my ", "lower ", "back ", "is ", "stiff ", "from ", "long ", "hours ", "of ", "sitting ", "at ", "my ", "office ", "desk."
-    ];
-
-    let currentWordIdx = 0;
-    const interval = setInterval(() => {
-      if (currentWordIdx >= simulationPhrases.length) {
-        clearInterval(interval);
-        setStatusText("Complete. Tapping complete below sends this to Amrita.");
-        return;
-      }
-      // Capture the word before updating state so the updater stays pure —
-      // reading the shared index inside it appends stale/undefined words.
-      const word = simulationPhrases[currentWordIdx];
-      currentWordIdx++;
-      setTranscript(prev => prev + word);
-    }, 450);
-
-    (recognitionRef as any).currentSimInterval = interval;
-  };
-
   const stopRecording = () => {
     setIsRecording(false);
-    if (recognitionRef.current) {
+    const rec = recognitionRef.current;
+    recognitionRef.current = null;
+    if (rec) {
       try {
-        recognitionRef.current.stop();
+        rec.stop();
       } catch (e) {}
-      recognitionRef.current = null;
-    }
-    if ((recognitionRef as any).currentSimInterval) {
-      clearInterval((recognitionRef as any).currentSimInterval);
     }
   };
 
+  const spoken = transcript.trim();
+
   const handleComplete = () => {
+    if (!spoken) return;
     stopRecording();
-    const finalTranscript = transcript.trim() || "What does Ayurveda suggest for low energy and digestion?";
-    onSubmitPrompt(finalTranscript);
+    onSubmitPrompt(spoken);
     onClose();
   };
 
@@ -222,17 +228,17 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
                 }}
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               >
-                <Mic className="w-9 h-9 text-[#8A79A5]" />
+                {problem ? <MicOff className="w-9 h-9 text-[#8A79A5]" /> : <Mic className="w-9 h-9 text-[#8A79A5]" />}
               </motion.div>
             </div>
 
             {/* Coach Voice Status */}
             <div className="text-center space-y-1.5">
               <p className="text-xs font-mono font-medium text-stone-500 uppercase tracking-widest">
-                {isRecording ? "LISTENING" : "RITUAL COMPLETED"}
+                {problem ? "VOICE UNAVAILABLE" : isRecording ? "LISTENING" : "HEARD YOU"}
               </p>
-              <p className="text-sm font-serif italic text-stone-800 max-w-xs mx-auto leading-relaxed">
-                "{statusText}"
+              <p role="status" className="text-sm font-serif italic text-stone-800 max-w-xs mx-auto leading-relaxed">
+                {problem ? statusText : `"${statusText}"`}
               </p>
             </div>
           </div>
@@ -243,13 +249,8 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
               VOICE TRANSLATION
             </span>
             <p className="text-stone-700 text-xs font-serif italic leading-relaxed">
-              {transcript || "Speak naturally... share physical aches, sleepless cycles, stress blockages, or energy priorities."}
+              {transcript || (problem ? "Nothing heard." : "Speak naturally... share physical aches, sleepless cycles, stress blockages, or energy priorities.")}
             </p>
-            {mediaError && (
-              <span className="text-[12px] text-[#865959]/75 font-mono block mt-2.5">
-                * Simulated audio feed activated - your browser's mic permission is sandboxed.
-              </span>
-            )}
           </div>
 
           {/* Action Trigger Buttons */}
@@ -262,7 +263,8 @@ export default function VoiceModal({ isOpen, onClose, onSubmitPrompt }: VoiceMod
             </button>
             <button
               onClick={handleComplete}
-              className="flex-1 py-3 bg-[#8A79A5] hover:bg-[#72618F] text-white text-xs uppercase tracking-widest font-mono font-bold rounded-xl shadow-[0_8px_20px_rgba(138,121,165,0.3)] transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:translate-y-[-1px]"
+              disabled={!spoken}
+              className="flex-1 py-3 bg-[#8A79A5] hover:bg-[#72618F] text-white text-xs uppercase tracking-widest font-mono font-bold rounded-xl shadow-[0_8px_20px_rgba(138,121,165,0.3)] transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:translate-y-[-1px] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#8A79A5] disabled:hover:translate-y-0"
             >
               <Check className="w-3.5 h-3.5" /> Submit Voice Query
             </button>
