@@ -44,6 +44,12 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        # Portrait only on iPad too, which App Store Connect accepts only for an
+        # app that opts out of iPad multitasking (Split View and Slide Over).
+        INFOPLIST_KEY_UIRequiresFullScreen: YES
+        # Only standard encryption (HTTPS), which is exempt: without this, each
+        # TestFlight build waits for the export-compliance question.
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_CFBundleDisplayName: PranaVeda
         # The lotus from the website, rendered by scripts/make-app-icon.swift.
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -162,6 +168,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: PranaVeda
         INFOPLIST_KEY_WKCompanionAppBundleIdentifier: $(PV_BUNDLE_ID)
         INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp: NO
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_NSHealthShareUsageDescription: PranaVeda reads your heart rate during a practice and shows it here and on your iPhone.
         INFOPLIST_KEY_NSHealthUpdateUsageDescription: Each finished guided practice is saved to Apple Health as a Mind and Body workout.
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

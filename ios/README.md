@@ -72,6 +72,35 @@ Tests (stream parsing and decoding of the server's events and cards):
 xcodebuild -project PranaVeda.xcodeproj -scheme PranaVeda -destination 'platform=iOS Simulator,name=iPhone 18 Pro' test
 ```
 
+## TestFlight and the App Store
+
+The App Store build is a Release archive. It talks to production and is signed
+for distribution when it is uploaded. The app record in App Store Connect
+(apps → +, bundle id `com.pranaveda.app`) must exist first.
+
+Each upload needs a higher build number (`CURRENT_PROJECT_VERSION` in
+`project.yml`). A new version for the store also raises `MARKETING_VERSION`.
+Pass them for one build instead of editing the file:
+
+```bash
+xcodebuild -project PranaVeda.xcodeproj -scheme PranaVeda -configuration Release -destination 'generic/platform=iOS' -archivePath build/PranaVeda.xcarchive -allowProvisioningUpdates CURRENT_PROJECT_VERSION=2 archive
+```
+
+```bash
+xcodebuild -exportArchive -archivePath build/PranaVeda.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath build/export -allowProvisioningUpdates
+```
+
+The upload uses the Apple account signed in to Xcode (Settings → Accounts).
+App Store Connect processes the build in 5 to 30 minutes, then it appears under
+TestFlight. Testers in your own team (internal testers) can install it right away
+through the TestFlight app. External testers need Apple's beta review first.
+
+The app is iPhone and iPad, portrait only. On iPad it runs full screen
+(`UIRequiresFullScreen`), because App Store Connect accepts a portrait-only iPad
+app only when it opts out of Split View and Slide Over. It declares only exempt
+encryption (HTTPS, `ITSAppUsesNonExemptEncryption = NO`), so builds don't wait
+for the export-compliance question.
+
 ## Sign in with Apple
 
 On by default (`PV_APPLE_SIGN_IN = YES` in `Configuration/App.xcconfig`): the
