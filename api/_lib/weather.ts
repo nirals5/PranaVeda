@@ -9,8 +9,9 @@ import { SignJWT, importPKCS8 } from 'jose';
 // request (from the network address, city level, no permission prompt). The
 // weather comes from Apple's WeatherKit REST API when it is configured
 // (WEATHERKIT_* and APPLE_TEAM_ID; included with the Apple Developer Program,
-// commercial use allowed). Without it, as in local development, Open-Meteo
-// stands in: no key, but free for non-commercial use only. Coordinates are
+// commercial use allowed). If WeatherKit fails, or is not configured (as in
+// local development), MET Norway's Locationforecast stands in: free, no key,
+// commercial use allowed under CC BY 4.0 with credit. Coordinates are
 // rounded to a tenth of a degree (about 10 km) before they leave the server,
 // and are never stored. What the person says about their weather wins over the
 // forecast.
@@ -80,34 +81,6 @@ export function approximateLocation(req: Pick<Request, 'headers'>): { lat: numbe
   return { lat: round(lat), lon: round(lon) };
 }
 
-// WMO weather codes, as Open-Meteo reports them, in a few words.
-export function describeCode(code: number): string {
-  if (code === 0) return 'clear';
-  if (code <= 2) return 'partly cloudy';
-  if (code === 3) return 'overcast';
-  if (code === 45 || code === 48) return 'foggy';
-  if (code >= 51 && code <= 57) return 'drizzle';
-  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return 'rain';
-  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow';
-  if (code >= 95) return 'thunderstorms';
-  return 'unsettled';
-}
-
-export function weatherFromForecast(body: any): Weather | null {
-  const c = body?.current;
-  const temperatureC = Number(c?.temperature_2m);
-  const feelsLikeC = Number(c?.apparent_temperature ?? c?.temperature_2m);
-  if (!Number.isFinite(temperatureC) || !Number.isFinite(feelsLikeC)) return null;
-  return {
-    temperatureC: Math.round(temperatureC),
-    feelsLikeC: Math.round(feelsLikeC),
-    description: describeCode(Number(c?.weather_code)),
-    windy: Number(c?.wind_speed_10m) >= 30,
-    feel: feelOf(feelsLikeC),
-    unit: 'C',
-  };
-}
-
 // Apple's WeatherKit condition codes, in the same few words.
 const CONDITIONS: Record<string, string> = {
   Clear: 'clear', MostlyClear: 'clear', Hot: 'clear', Frigid: 'clear',
@@ -148,7 +121,7 @@ const weatherKitConfig = () => {
     : null;
 };
 
-export const weatherProvider = (): 'weatherkit' | 'open-meteo' => (weatherKitConfig() ? 'weatherkit' : 'open-meteo');
+export const weatherProvider = (): 'weatherkit' | 'met-norway' => (weatherKitConfig() ? 'weatherkit' : 'met-norway');
 
 // WeatherKit authenticates our server with a JWT signed by the WeatherKit key
 // from the Apple Developer portal. One token serves for 50 minutes of its hour.
@@ -172,21 +145,80 @@ export async function weatherKitToken(now = Date.now()): Promise<string> {
   return value;
 }
 
+// MET Norway's symbol codes ("lightrainshowers_day"), in the same few words.
+export function describeSymbol(symbol: unknown): string {
+  const code = String(symbol ?? '').replace(/_(day|night|polartwilight)$/, '');
+  if (!code) return 'unsettled';
+  if (code.includes('thunder')) return 'thunderstorms';
+  if (code.includes('snow')) return 'snow';
+  if (code.includes('rain') || code.includes('sleet')) return 'rain';
+  if (code === 'fog') return 'foggy';
+  if (code === 'cloudy') return 'overcast';
+  if (code === 'partlycloudy') return 'partly cloudy';
+  if (code === 'clearsky' || code === 'fair') return 'clear';
+  return 'unsettled';
+}
+
+// The apparent ("feels like") temperature from temperature, humidity and wind,
+// Steadman's formula as used by the Australian Bureau of Meteorology. MET
+// Norway gives no feels-like of its own.
+export function apparentTemperature(temperatureC: number, humidityPercent: number, windMs: number): number {
+  const vapourPressure = (humidityPercent / 100) * 6.105 * Math.exp((17.27 * temperatureC) / (237.7 + temperatureC));
+  return temperatureC + 0.33 * vapourPressure - 0.7 * windMs - 4;
+}
+
+// MET Norway's Locationforecast "compact": the first time step is now.
+export function weatherFromMetNorway(body: any): Weather | null {
+  const step = body?.properties?.timeseries?.[0]?.data;
+  const d = step?.instant?.details;
+  const temperatureC = Number(d?.air_temperature);
+  if (!Number.isFinite(temperatureC)) return null;
+  const windMs = Number(d?.wind_speed);
+  const humidity = Number(d?.relative_humidity);
+  const feelsLikeC = Number.isFinite(windMs) && Number.isFinite(humidity) ? apparentTemperature(temperatureC, humidity, windMs) : temperatureC;
+  return {
+    temperatureC: Math.round(temperatureC),
+    feelsLikeC: Math.round(feelsLikeC),
+    description: describeSymbol(step?.next_1_hours?.summary?.symbol_code ?? step?.next_6_hours?.summary?.symbol_code),
+    windy: Number.isFinite(windMs) && windMs * 3.6 >= 30,
+    feel: feelOf(feelsLikeC),
+    unit: 'C',
+  };
+}
+
+// MET Norway asks every client to identify itself with a contact.
+export const MET_NORWAY_USER_AGENT = 'PranaVeda/1.0 (https://pranaveda.app; info@pranaveda.app)';
+
+async function fromWeatherKit(at: { lat: number; lon: number }, fetcher: typeof fetch, now: number): Promise<Weather | null> {
+  const res = await fetcher(`https://weatherkit.apple.com/api/v1/weather/en/${at.lat}/${at.lon}?dataSets=currentWeather`, {
+    headers: { Authorization: `Bearer ${await weatherKitToken(now)}` },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`WeatherKit HTTP ${res.status}`);
+  return weatherFromWeatherKit(await res.json());
+}
+
+async function fromMetNorway(at: { lat: number; lon: number }, fetcher: typeof fetch): Promise<Weather | null> {
+  const res = await fetcher(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${at.lat}&lon=${at.lon}`, {
+    headers: { 'User-Agent': MET_NORWAY_USER_AGENT },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`MET Norway HTTP ${res.status}`);
+  return weatherFromMetNorway(await res.json());
+}
+
+// WeatherKit first when it is configured; MET Norway if it fails or is not.
 async function lookUp(at: { lat: number; lon: number }, fetcher: typeof fetch, now: number): Promise<Weather | null> {
   if (weatherProvider() === 'weatherkit') {
-    const res = await fetcher(`https://weatherkit.apple.com/api/v1/weather/en/${at.lat}/${at.lon}?dataSets=currentWeather`, {
-      headers: { Authorization: `Bearer ${await weatherKitToken(now)}` },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (!res.ok) throw new Error(`WeatherKit HTTP ${res.status}`);
-    return weatherFromWeatherKit(await res.json());
+    try {
+      const weather = await fromWeatherKit(at, fetcher, now);
+      if (weather) return weather;
+      throw new Error('WeatherKit gave no current weather');
+    } catch (err: any) {
+      console.error('[weather] WeatherKit failed, trying MET Norway:', err?.message || err);
+    }
   }
-  const url =
-    `https://api.open-meteo.com/v1/forecast?latitude=${at.lat}&longitude=${at.lon}` +
-    '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m';
-  const res = await fetcher(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return weatherFromForecast(await res.json());
+  return fromMetNorway(at, fetcher);
 }
 
 // One lookup per area every half hour, shared by everyone there; a failed

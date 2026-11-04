@@ -8,11 +8,13 @@ import {
   unitFor,
   clearWeatherCache,
   currentWeather,
-  describeCode,
+  apparentTemperature,
   describeCondition,
+  describeSymbol,
+  MET_NORWAY_USER_AGENT,
   feelOf,
   weatherFeel,
-  weatherFromForecast,
+  weatherFromMetNorway,
   weatherFromWeatherKit,
   weatherKitToken,
   weatherProvider,
@@ -22,7 +24,7 @@ import { BUILT_IN_CATALOG, buildBreathworkCard, buildRitual, buildSystemPrompt, 
 
 // G14: practices the Practice Library marks avoid_weather are not offered in
 // that weather where they are: what they said, else the forecast for their
-// approximate location (Vercel's IP geolocation, then Open-Meteo).
+// approximate location (Vercel's IP geolocation, then WeatherKit or MET Norway).
 
 const weather = (feelsLikeC: number, temperatureC = feelsLikeC): Weather => ({
   temperatureC,
@@ -180,14 +182,29 @@ describe('the forecast', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  const forecast = { current: { temperature_2m: 4.6, apparent_temperature: 1.2, weather_code: 61, wind_speed_10m: 35 } };
+  // MET Norway's compact forecast: 4.6 °C, 85% humidity, 9.7 m/s (35 km/h) wind, rain.
+  const forecast = {
+    properties: {
+      timeseries: [
+        { time: '2026-10-27T13:00:00Z', data: { instant: { details: { air_temperature: 4.6, relative_humidity: 85, wind_speed: 9.7 } }, next_1_hours: { summary: { symbol_code: 'lightrain' } } } },
+      ],
+    },
+  };
   const ok = () => vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify(forecast)));
   const T = Date.parse('2026-10-27T13:00:00Z');
 
-  it('reads Open-Meteo’s current conditions', () => {
-    expect(weatherFromForecast(forecast)).toEqual({ temperatureC: 5, feelsLikeC: 1, description: 'rain', windy: true, feel: 'cold', unit: 'C' });
-    expect(weatherFromForecast({})).toBeNull();
-    expect([describeCode(0), describeCode(3), describeCode(73), describeCode(95)]).toEqual(['clear', 'overcast', 'snow', 'thunderstorms']);
+  it('reads MET Norway’s current conditions, working out how it feels', () => {
+    expect(weatherFromMetNorway(forecast)).toEqual({ temperatureC: 5, feelsLikeC: -4, description: 'rain', windy: true, feel: 'cold', unit: 'C' });
+    expect(weatherFromMetNorway({})).toBeNull();
+    expect([describeSymbol('clearsky_night'), describeSymbol('fair_day'), describeSymbol('cloudy'), describeSymbol('heavysnowshowers_day'),
+      describeSymbol('rainandthunder'), describeSymbol('lightsleet'), describeSymbol('fog'), describeSymbol(undefined)])
+      .toEqual(['clear', 'clear', 'overcast', 'snow', 'thunderstorms', 'rain', 'foggy', 'unsettled']);
+  });
+
+  it('feels warmer in humid heat and colder in wind, by Steadman’s apparent temperature', () => {
+    expect(Math.round(apparentTemperature(32, 70, 1))).toBe(38);
+    expect(Math.round(apparentTemperature(2, 80, 10))).toBe(-7);
+    expect(Math.round(apparentTemperature(20, 50, 2))).toBe(18);
   });
 
   it('is asked for the rounded coordinates, once per area per half hour', async () => {
@@ -196,7 +213,9 @@ describe('the forecast', () => {
     expect((await currentWeather(at, fetcher as any, T))?.feel).toBe('cold');
     await currentWeather(at, fetcher as any, T + 29 * 60_000);
     expect(fetcher).toHaveBeenCalledTimes(1);
-    expect(fetcher.mock.calls[0][0]).toContain('latitude=47.6&longitude=-122.3');
+    expect(fetcher.mock.calls[0][0]).toBe('https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=47.6&lon=-122.3');
+    expect((fetcher.mock.calls[0][1]?.headers as Record<string, string>)['User-Agent']).toBe(MET_NORWAY_USER_AGENT);
+    expect(MET_NORWAY_USER_AGENT).toContain('pranaveda.app');
     await currentWeather(at, fetcher as any, T + 31 * 60_000);
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
@@ -268,19 +287,29 @@ describe('Apple WeatherKit', () => {
     expect(await weatherKitToken(T + 51 * 60_000)).not.toBe(first);
   });
 
-  it('gives nothing when Apple refuses, without falling back to Open-Meteo', async () => {
-    const refused = vi.fn(async () => new Response('unauthorized', { status: 401 }));
-    expect(await currentWeather({ lat: 1, lon: 2 }, refused as any, T)).toBeNull();
-    expect(refused).toHaveBeenCalledTimes(1);
-    expect(String((refused.mock.calls[0] as unknown[])[0])).toContain('weatherkit.apple.com');
+  const met = { properties: { timeseries: [{ data: { instant: { details: { air_temperature: 21, relative_humidity: 50, wind_speed: 2 } }, next_1_hours: { summary: { symbol_code: 'fair_day' } } } }] } };
+
+  it('falls back to MET Norway when Apple refuses', async () => {
+    const fetcher = vi.fn(async (url: string) =>
+      url.includes('weatherkit.apple.com') ? new Response('unauthorized', { status: 401 }) : new Response(JSON.stringify(met)));
+    expect((await currentWeather({ lat: 1, lon: 2 }, fetcher as any, T))?.description).toBe('clear');
+    expect(fetcher.mock.calls.map((c) => new URL(String(c[0])).host)).toEqual(['weatherkit.apple.com', 'api.met.no']);
   });
 
-  it('uses Open-Meteo when WeatherKit is not configured, as in local development', async () => {
+  it('gives nothing when both fail, and waits five minutes before asking again', async () => {
+    const failing = vi.fn(async () => new Response('busy', { status: 503 }));
+    expect(await currentWeather({ lat: 1, lon: 2 }, failing as any, T)).toBeNull();
+    expect(await currentWeather({ lat: 1, lon: 2 }, failing as any, T + 4 * 60_000)).toBeNull();
+    expect(failing).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses MET Norway alone when WeatherKit is not configured, as in local development', async () => {
     delete process.env.WEATHERKIT_PRIVATE_KEY;
-    expect(weatherProvider()).toBe('open-meteo');
-    const fetcher = vi.fn(async () => new Response(JSON.stringify({ current: { temperature_2m: 20, apparent_temperature: 20, weather_code: 0, wind_speed_10m: 5 } })));
+    expect(weatherProvider()).toBe('met-norway');
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(met)));
     await currentWeather({ lat: 1, lon: 2 }, fetcher as any, T);
-    expect(String((fetcher.mock.calls[0] as unknown[])[0])).toContain('api.open-meteo.com');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(String((fetcher.mock.calls[0] as unknown[])[0])).toContain('api.met.no');
   });
 });
 

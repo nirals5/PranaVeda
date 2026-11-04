@@ -592,6 +592,15 @@ export default function App() {
           >
             APPLE WEATHER
           </a>
+          {' AND '}
+          <a
+            href="https://www.met.no/en"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#72618F] underline decoration-[#8A79A5]/50 underline-offset-2 hover:text-[#8A79A5] transition-colors"
+          >
+            MET NORWAY
+          </a>
         </p>
         <p className="text-[11px]">
           <a

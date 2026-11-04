@@ -81,7 +81,7 @@
 
   <h3>Location</h3>
   <p><strong>Precise location.</strong> If you allow it, your device's location is compared with places you saved yourself (Home, Work and so on), on your device. Only the kind of place, such as "home", is ever shared with Amrita. Your position is not sent to us and no location history is kept.</p>
-  <p><strong>Approximate location.</strong> Our hosting provider estimates your city from your network address. We use it, rounded to about 10 km, to look up the local weather from Apple Weather (WeatherKit), so that Amrita does not suggest a cooling breath on a cold day. It is not stored.</p>
+  <p><strong>Approximate location.</strong> Our hosting provider estimates your city from your network address. We use it, rounded to about 10 km, to look up the local weather from Apple Weather (WeatherKit), or from MET Norway if Apple's service is unavailable, so that Amrita does not suggest a cooling breath on a cold day. It is not stored.</p>
 
   <h3>Calendar</h3>
   <p>If you connect Google Calendar or a private calendar link, PranaVeda reads only when you are busy, to suggest practice in your free time. Event titles and details are never read. Your calendar is not stored on our servers, except the calendar link itself, encrypted, if you choose to keep it on your account.</p>
@@ -107,6 +107,7 @@
     <tr><td>Neon</td><td>The database that keeps accounts and what is stored with them.</td></tr>
     <tr><td>Google</td><td>Sign in with Google, and, only if you connect them, Google Calendar free/busy times and the Google Health API. On Android, speech recognition. The website loads its fonts from Google Fonts.</td></tr>
     <tr><td>Apple</td><td>Sign in with Apple; the weather (Apple Weather), from a location rounded to about 10 km; and on iPhone, speech recognition and Apple Health (read on your device).</td></tr>
+    <tr><td>MET Norway</td><td>Weather if Apple's service is unavailable, from a location rounded to about 10 km.</td></tr>
     <tr><td>ElevenLabs</td><td>Amrita's spoken voice: the text of her replies.</td></tr>
     <tr><td>Amazon</td><td>The Alexa skill.</td></tr>
   </table>

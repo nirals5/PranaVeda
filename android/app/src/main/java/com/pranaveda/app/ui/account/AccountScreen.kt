@@ -108,18 +108,22 @@ fun AccountScreen(auth: AuthStore, chat: ChatViewModel? = null, onBegin: () -> U
     }
 }
 
-/** Who the pose photographs and the weather come from, as at the foot of the website. Apple asks WeatherKit apps to credit Apple Weather and link to its data sources. */
+/** Who the pose photographs and the weather come from, as at the foot of the website. Apple asks WeatherKit apps to credit Apple Weather and link to its data sources; MET Norway, the backup, asks for credit (CC BY 4.0). */
 @Composable
 private fun Credits() {
     val linkStyle = TextLinkStyles(SpanStyle(color = Pv.lavenderDeep, textDecoration = TextDecoration.Underline))
-    fun credit(lead: String, name: String, url: String) = buildAnnotatedString {
+    fun credit(lead: String, name: String, url: String, and: Pair<String, String>? = null) = buildAnnotatedString {
         append(lead)
         withLink(LinkAnnotation.Url(url, linkStyle)) { append(name) }
+        if (and != null) {
+            append(" and ")
+            withLink(LinkAnnotation.Url(and.second, linkStyle)) { append(and.first) }
+        }
     }
     Column(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf(
             credit("Pose photography by ", "Sneha Desai · Yin and Yang Yoga", "https://yin-yangyoga.com/"),
-            credit("Weather data by ", "Apple Weather", "https://developer.apple.com/weatherkit/data-source-attribution/"),
+            credit("Weather data by ", "Apple Weather", "https://developer.apple.com/weatherkit/data-source-attribution/", and = "MET Norway" to "https://www.met.no/en"),
             credit("", "Privacy Policy", "${BuildConfig.PV_API_BASE_URL}/privacy"),
         ).forEach { Text(it, style = Pv.caption, color = Pv.stone500, textAlign = TextAlign.Center) }
     }
