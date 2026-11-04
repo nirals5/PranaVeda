@@ -21,7 +21,7 @@ lives here, so a listing can be rebuilt from the repo. Text fields are plain
 | iPhone 6.3" screenshots (required) | `app-store/screenshots/iphone-6.3/` (1206 × 2622), in order. Goes in "iPhone with Dynamic Island (medium display)" | up to 10 |
 | iPhone 6.9" screenshots (optional) | `app-store/screenshots/iphone-6.9/` (1320 × 2868), the same shots at full size, for "large display" in Media Manager | up to 10 |
 | iPad 13" screenshots | `app-store/screenshots/ipad-13/` (2064 × 2752), in order | up to 10 |
-| Apple Watch screenshots | **Still to do**, see below | |
+| Apple Watch screenshots | `app-store/screenshots/watch/` (368 × 448), in order | up to 10 |
 
 Apple now requires the 6.1"/6.3" "medium display" iPhone size (6.9" is optional)
 and the 13" iPad size; it scales those down for the smaller devices. The 6.3" set
@@ -92,6 +92,11 @@ Data safety and the Health Connect declaration are KAN-12 and KAN-13.
     (`adb shell wm size 1080x1920`; Play rejects screenshots taller than 2:1),
     with System UI demo mode for the status bar.
   - Saved as JPEG (quality 90) to keep the repo small; both stores accept JPEG.
+  - Apple Watch: taken on Hetan's Series 5 (40 mm, 324 × 394) with the side
+    button and Digital Crown during a guided practice, then scaled to 368 × 448
+    (`sips -z 448 368`), the nearest size App Store Connect accepts. Capturing
+    from the Mac (`xcrun devicectl device capture screenshot`) works only when
+    no workout is running.
 - **Play icon**: `ios/PranaVeda/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`
   scaled to 512 with `sips -z 512 512`.
 - **Feature graphic**: `source/feature-graphic.html` (Niral's Triangle room
@@ -103,11 +108,6 @@ Data safety and the Health Connect declaration are KAN-12 and KAN-13.
 
 ## Still to do
 
-- **Apple Watch screenshots.** The Watch app ships inside the iOS build, so App
-  Store Connect asks for at least one. No watchOS simulator runtime is
-  installed here; take one on the paired Apple Watch during a guided practice
-  (Xcode → Devices and Simulators → Take Screenshot), or install the watchOS
-  runtime and use a simulator.
 - **Photos for the poses that still use stock pictures**: Mountain, Warrior II,
   Tree, Easy Pose, Seated Forward Bend, Bound Angle and Supine Spinal Twist.
   The screenshots avoid them where possible.
