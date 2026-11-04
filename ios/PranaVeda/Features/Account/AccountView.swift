@@ -154,12 +154,13 @@ private struct PlacesOnAccount: View {
 }
 
 /// Who the pose photographs and the weather come from, as at the foot of the
-/// website. Open-Meteo's free tier asks for this credit.
+/// website. Apple asks WeatherKit apps to show the Apple Weather mark and a
+/// link to its data sources.
 private struct Credits: View {
     var body: some View {
         VStack(spacing: 6) {
             Text("Pose photography by [Sneha Desai · Yin and Yang Yoga](https://yin-yangyoga.com/)")
-            Text("Weather data by [Open-Meteo.com](https://open-meteo.com/)")
+            Text("Weather data by [\u{F8FF} Weather](https://developer.apple.com/weatherkit/data-source-attribution/)")
             Link("Privacy Policy", destination: AppConfig.apiBaseURL.appending(path: "privacy"))
                 .padding(.top, 4)
         }

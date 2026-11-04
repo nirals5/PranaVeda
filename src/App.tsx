@@ -585,12 +585,12 @@ export default function App() {
           </a>
           {' · '}WEATHER DATA BY{' '}
           <a
-            href="https://open-meteo.com/"
+            href="https://developer.apple.com/weatherkit/data-source-attribution/"
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#72618F] underline decoration-[#8A79A5]/50 underline-offset-2 hover:text-[#8A79A5] transition-colors"
           >
-            OPEN-METEO.COM
+            APPLE WEATHER
           </a>
         </p>
         <p className="text-[11px]">

@@ -108,7 +108,7 @@ fun AccountScreen(auth: AuthStore, chat: ChatViewModel? = null, onBegin: () -> U
     }
 }
 
-/** Who the pose photographs and the weather come from, as at the foot of the website. Open-Meteo's free tier asks for this credit. */
+/** Who the pose photographs and the weather come from, as at the foot of the website. Apple asks WeatherKit apps to credit Apple Weather and link to its data sources. */
 @Composable
 private fun Credits() {
     val linkStyle = TextLinkStyles(SpanStyle(color = Pv.lavenderDeep, textDecoration = TextDecoration.Underline))
@@ -119,7 +119,7 @@ private fun Credits() {
     Column(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf(
             credit("Pose photography by ", "Sneha Desai · Yin and Yang Yoga", "https://yin-yangyoga.com/"),
-            credit("Weather data by ", "Open-Meteo.com", "https://open-meteo.com/"),
+            credit("Weather data by ", "Apple Weather", "https://developer.apple.com/weatherkit/data-source-attribution/"),
             credit("", "Privacy Policy", "${BuildConfig.PV_API_BASE_URL}/privacy"),
         ).forEach { Text(it, style = Pv.caption, color = Pv.stone500, textAlign = TextAlign.Center) }
     }
