@@ -160,6 +160,8 @@ private struct Credits: View {
         VStack(spacing: 6) {
             Text("Pose photography by [Sneha Desai · Yin and Yang Yoga](https://yin-yangyoga.com/)")
             Text("Weather data by [Open-Meteo.com](https://open-meteo.com/)")
+            Link("Privacy Policy", destination: AppConfig.apiBaseURL.appending(path: "privacy"))
+                .padding(.top, 4)
         }
         .font(Theme.caption)
         .foregroundStyle(Theme.stone500)
