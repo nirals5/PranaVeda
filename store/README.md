@@ -18,12 +18,16 @@ lives here, so a listing can be rebuilt from the repo. Text fields are plain
 | Privacy Policy URL | https://pranaveda.app/privacy | |
 | Category | Primary: Health & Fitness. Secondary: Lifestyle | |
 | Copyright | 2026 Hetan Shah | |
-| iPhone 6.9" screenshots | `app-store/screenshots/iphone-6.9/` (1320 × 2868), in order | up to 10 |
+| iPhone 6.3" screenshots (required) | `app-store/screenshots/iphone-6.3/` (1206 × 2622), in order. Goes in "iPhone with Dynamic Island (medium display)" | up to 10 |
+| iPhone 6.9" screenshots (optional) | `app-store/screenshots/iphone-6.9/` (1320 × 2868), the same shots at full size, for "large display" in Media Manager | up to 10 |
 | iPad 13" screenshots | `app-store/screenshots/ipad-13/` (2064 × 2752), in order | up to 10 |
 | Apple Watch screenshots | **Still to do**, see below | |
 
-App Store Connect scales the 6.9" and 13" sets down for the smaller sizes, so
-no other sizes are needed.
+Apple now requires the 6.1"/6.3" "medium display" iPhone size (6.9" is optional)
+and the 13" iPad size; it scales those down for the smaller devices. The 6.3" set
+is the 6.9" set scaled with `sips -z 2622 1206` (the two shapes differ by under
+0.1%). Screenshots are dragged in by hand: the built-in browser can't upload
+files.
 
 **App Review notes** (App Review Information → Notes):
 
