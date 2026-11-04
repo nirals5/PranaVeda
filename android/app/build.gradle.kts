@@ -23,6 +23,18 @@ val apiBaseUrl: String = localProperties.getProperty("pv.apiBaseUrl") ?: "http:/
 val googleWebClientId: String = localProperties.getProperty("pv.googleWebClientId")
     ?: "163737232285-a82gbd3vfmlmles1v6cnlnn5ub21vld1.apps.googleusercontent.com"
 
+// Release signing for Google Play: the upload key, kept outside the project,
+// described by keystore.properties (not committed; see README "Release build").
+// Without that file a release build is left unsigned and cannot be uploaded.
+val keystoreProperties = Properties().apply {
+    rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+
+// Each upload to Google Play needs a higher versionCode:
+//   ./gradlew bundleRelease -Ppv.versionCode=2 -Ppv.versionName=0.1.1
+val versionCodeOverride = (findProperty("pv.versionCode") as String?)?.toInt()
+val versionNameOverride = findProperty("pv.versionName") as String?
+
 android {
     namespace = "com.pranaveda.app"
     compileSdk {
@@ -33,15 +45,30 @@ android {
         applicationId = "com.pranaveda.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = versionCodeOverride ?: 1
+        versionName = versionNameOverride ?: "0.1.0"
         buildConfigField("String", "PV_API_BASE_URL", "\"$apiBaseUrl\"")
         buildConfigField("String", "PV_GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
     }
 
+    signingConfigs {
+        if (keystoreProperties.containsKey("storeFile")) {
+            create("upload") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
+        // The store build: production, signed with the upload key. Google Play
+        // re-signs it with the app signing key it keeps (Play App Signing).
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("upload")
+            buildConfigField("String", "PV_API_BASE_URL", "\"https://v0-pranaveda.vercel.app\"")
         }
         // The app on production, for your own phones: signed with the debug key
         // like a development build, so it installs over one and Google sign-in

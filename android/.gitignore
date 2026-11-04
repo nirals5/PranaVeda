@@ -8,3 +8,7 @@ captures/
 .cxx/
 # Machine-specific: the SDK location and an optional pv.apiBaseUrl override.
 local.properties
+# Release signing: the upload key's passwords, and any keystore copied in by mistake.
+keystore.properties
+*.jks
+*.keystore
