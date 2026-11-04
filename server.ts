@@ -19,10 +19,13 @@ app.use(authApp);
 app.use(syncApp);
 
 async function startServer() {
-  // The privacy policy is a plain page in public/ (as on Vercel, vercel.json).
-  app.get('/privacy', (_req, res) => {
-    res.sendFile(path.join(process.cwd(), process.env.NODE_ENV === 'production' ? 'dist' : 'public', 'privacy.html'));
-  });
+  // The privacy policy and support page are plain pages in public/ (as on
+  // Vercel, vercel.json).
+  for (const page of ['privacy', 'support']) {
+    app.get(`/${page}`, (_req, res) => {
+      res.sendFile(path.join(process.cwd(), process.env.NODE_ENV === 'production' ? 'dist' : 'public', `${page}.html`));
+    });
+  }
 
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
