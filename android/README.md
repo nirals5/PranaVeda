@@ -72,10 +72,54 @@ client against a stand-in server):
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew testDebugUnitTest
 ```
 
+## Release build for Google Play
+
+Google Play gets an app bundle (`.aab`) signed with your **upload key**. With Play
+App Signing (the default for new apps), Google keeps the key that signs what
+people install and re-signs each upload with it, so a lost upload key can be
+reset through Play Console support. The release build talks to production.
+
+### 1. Make the upload key (once)
+
+Keep it outside the project and back it up (a password manager or an encrypted
+drive). `keytool` asks for a password and for your name and organisation:
+
+```bash
+mkdir -p ~/Keys && "/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool" -genkeypair -v -keystore ~/Keys/pranaveda-upload.jks -alias upload -keyalg RSA -keysize 4096 -validity 10000
+```
+
+### 2. Tell Gradle where it is
+
+Copy `keystore.properties.example` to `keystore.properties` (git ignores it) and
+fill in the path, alias and passwords (a PKCS12 keystore, keytool's default, uses
+the store password for the key too). Without that file a release build is left
+unsigned and Play Console refuses it.
+
+### 3. Build the bundle
+
+Each upload needs a higher `versionCode` than the last:
+
+```bash
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew bundleRelease -Ppv.versionCode=1 -Ppv.versionName=0.1.0
+```
+
+The bundle is `app/build/outputs/bundle/release/app-release.aab`.
+
+### 4. Google sign-in on the store build
+
+Apps installed from Play are signed with Google's app signing key, so Google
+sign-in needs an Android OAuth client for that key's SHA-1 (Play Console → Test
+and release → App integrity → App signing), plus one for the upload key's SHA-1
+to test a locally built release:
+
+```bash
+"/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool" -list -v -keystore ~/Keys/pranaveda-upload.jks -alias upload | grep SHA1
+```
+
 ## Google sign-in
 
 - The app asks Google for an ID token issued to the **web** OAuth client (`pv.googleWebClientId`, defaulting to the one in `app/build.gradle.kts`). Android's Credential Manager requires that, and the server already accepts it, so the server needs no Android-specific setting.
-- Google recognises the app through a separate **Android** OAuth client in the same Google Cloud project, registered for package `com.pranaveda.app` and the SHA-1 of the signing key. The one there now is for the debug key (`~/.android/debug.keystore`); a release build signed with another key needs its own Android client. Without a matching one, sign-in fails with a "developer error".
+- Google recognises the app through a separate **Android** OAuth client in the same Google Cloud project, registered for package `com.pranaveda.app` and the SHA-1 of the signing key. The one there now is for the debug key (`~/.android/debug.keystore`); a release build signed with another key needs its own Android client (see "Release build for Google Play"). Without a matching one, sign-in fails with a "developer error".
 - The emulator needs a Google account signed in. Use a system image "with Google Play" or "with Google APIs".
 - The session's refresh token is encrypted with a key in the Android Keystore and is left out of backups. The access token is kept only in memory.
 
