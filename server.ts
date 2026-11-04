@@ -19,6 +19,11 @@ app.use(authApp);
 app.use(syncApp);
 
 async function startServer() {
+  // The privacy policy is a plain page in public/ (as on Vercel, vercel.json).
+  app.get('/privacy', (_req, res) => {
+    res.sendFile(path.join(process.cwd(), process.env.NODE_ENV === 'production' ? 'dist' : 'public', 'privacy.html'));
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({

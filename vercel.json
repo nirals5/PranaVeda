@@ -12,6 +12,7 @@
     { "source": "/api/me", "destination": "/api/auth" },
     { "source": "/api/sync/:path*", "destination": "/api/sync" },
     { "source": "/api/:path*", "destination": "/api/index" },
+    { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/:path*", "destination": "/index.html" }
   ]
 }

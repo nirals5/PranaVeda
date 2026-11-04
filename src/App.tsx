@@ -593,6 +593,14 @@ export default function App() {
             OPEN-METEO.COM
           </a>
         </p>
+        <p className="text-[11px]">
+          <a
+            href="/privacy"
+            className="text-[#72618F] underline decoration-[#8A79A5]/50 underline-offset-2 hover:text-[#8A79A5] transition-colors"
+          >
+            PRIVACY POLICY
+          </a>
+        </p>
       </footer>
 
       {/* 6. Custom Elegant Floating Glassmorphism Toast Notification */}

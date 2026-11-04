@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
+import com.pranaveda.app.BuildConfig
 import com.pranaveda.app.PranaVedaApplication
 import com.pranaveda.app.R
 import com.pranaveda.app.model.RecommendationResult
@@ -119,6 +120,7 @@ private fun Credits() {
         listOf(
             credit("Pose photography by ", "Sneha Desai · Yin and Yang Yoga", "https://yin-yangyoga.com/"),
             credit("Weather data by ", "Open-Meteo.com", "https://open-meteo.com/"),
+            credit("", "Privacy Policy", "${BuildConfig.PV_API_BASE_URL}/privacy"),
         ).forEach { Text(it, style = Pv.caption, color = Pv.stone500, textAlign = TextAlign.Center) }
     }
 }
