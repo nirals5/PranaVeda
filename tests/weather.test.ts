@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { decodeProtectedHeader, exportPKCS8, generateKeyPair, jwtVerify } from 'jose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { catalogFromRows, getCatalog, resetCatalogCache } from '../api/_lib/catalog.js';
 import {
@@ -8,9 +9,13 @@ import {
   clearWeatherCache,
   currentWeather,
   describeCode,
+  describeCondition,
   feelOf,
   weatherFeel,
   weatherFromForecast,
+  weatherFromWeatherKit,
+  weatherKitToken,
+  weatherProvider,
 } from '../api/_lib/weather.js';
 import type { Weather } from '../api/_lib/weather.js';
 import { BUILT_IN_CATALOG, buildBreathworkCard, buildRitual, buildSystemPrompt, catalogPromptSummary } from '../api/index.js';
@@ -203,6 +208,79 @@ describe('the forecast', () => {
     expect(await currentWeather(at, failing as any, T + 4 * 60_000)).toBeNull();
     expect(failing).toHaveBeenCalledTimes(1);
     expect(await currentWeather(at, ok() as any, T + 6 * 60_000)).not.toBeNull();
+  });
+});
+
+describe('Apple WeatherKit', () => {
+  const ENV = ['APPLE_TEAM_ID', 'WEATHERKIT_SERVICE_ID', 'WEATHERKIT_KEY_ID', 'WEATHERKIT_PRIVATE_KEY'] as const;
+  const saved: Record<string, string | undefined> = {};
+  const T = Date.parse('2026-11-04T09:00:00Z');
+  const body = { currentWeather: { temperature: 3.4, temperatureApparent: -0.6, conditionCode: 'Snow', windSpeed: 12 } };
+  let publicKey: CryptoKey;
+
+  beforeEach(async () => {
+    clearWeatherCache();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    for (const k of ENV) saved[k] = process.env[k];
+    const pair = await generateKeyPair('ES256', { extractable: true });
+    publicKey = pair.publicKey as CryptoKey;
+    Object.assign(process.env, {
+      APPLE_TEAM_ID: 'TEAM123456',
+      WEATHERKIT_SERVICE_ID: 'app.pranaveda.weatherkit',
+      WEATHERKIT_KEY_ID: 'KEY1234567',
+      // As stored in an env editor: line breaks as literal "\n".
+      WEATHERKIT_PRIVATE_KEY: (await exportPKCS8(pair.privateKey)).replace(/\n/g, '\\n'),
+    });
+  });
+  afterEach(() => {
+    for (const k of ENV) (saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k]));
+    clearWeatherCache();
+    vi.restoreAllMocks();
+  });
+
+  it('reads current conditions in the same few words', () => {
+    expect(weatherFromWeatherKit(body)).toEqual({ temperatureC: 3, feelsLikeC: -1, description: 'snow', windy: false, feel: 'cold', unit: 'C' });
+    expect(weatherFromWeatherKit({ currentWeather: { temperature: 33, temperatureApparent: 36, conditionCode: 'MostlyClear', windSpeed: 40 } }))
+      .toMatchObject({ description: 'clear', windy: true, feel: 'hot' });
+    expect(weatherFromWeatherKit({})).toBeNull();
+    expect([describeCondition('Cloudy'), describeCondition('HeavyRain'), describeCondition('ScatteredThunderstorms'), describeCondition('Unknown')])
+      .toEqual(['overcast', 'rain', 'thunderstorms', 'unsettled']);
+  });
+
+  it('asks Apple with a signed token for the rounded coordinates', async () => {
+    expect(weatherProvider()).toBe('weatherkit');
+    const fetcher = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify(body)));
+    expect((await currentWeather({ lat: 47.6, lon: -122.3 }, fetcher as any, T))?.description).toBe('snow');
+
+    const [url, init] = fetcher.mock.calls[0];
+    expect(url).toBe('https://weatherkit.apple.com/api/v1/weather/en/47.6/-122.3?dataSets=currentWeather');
+    const jwt = String((init?.headers as Record<string, string>).Authorization).replace(/^Bearer /, '');
+    const header = decodeProtectedHeader(jwt);
+    expect(header).toMatchObject({ alg: 'ES256', kid: 'KEY1234567', id: 'TEAM123456.app.pranaveda.weatherkit' });
+    const { payload } = await jwtVerify(jwt, publicKey, { currentDate: new Date(T) });
+    expect(payload).toMatchObject({ iss: 'TEAM123456', sub: 'app.pranaveda.weatherkit' });
+    expect(Number(payload.exp) - Number(payload.iat)).toBe(3600);
+  });
+
+  it('reuses one token for 50 minutes', async () => {
+    const first = await weatherKitToken(T);
+    expect(await weatherKitToken(T + 49 * 60_000)).toBe(first);
+    expect(await weatherKitToken(T + 51 * 60_000)).not.toBe(first);
+  });
+
+  it('gives nothing when Apple refuses, without falling back to Open-Meteo', async () => {
+    const refused = vi.fn(async () => new Response('unauthorized', { status: 401 }));
+    expect(await currentWeather({ lat: 1, lon: 2 }, refused as any, T)).toBeNull();
+    expect(refused).toHaveBeenCalledTimes(1);
+    expect(String((refused.mock.calls[0] as unknown[])[0])).toContain('weatherkit.apple.com');
+  });
+
+  it('uses Open-Meteo when WeatherKit is not configured, as in local development', async () => {
+    delete process.env.WEATHERKIT_PRIVATE_KEY;
+    expect(weatherProvider()).toBe('open-meteo');
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ current: { temperature_2m: 20, apparent_temperature: 20, weather_code: 0, wind_speed_10m: 5 } })));
+    await currentWeather({ lat: 1, lon: 2 }, fetcher as any, T);
+    expect(String((fetcher.mock.calls[0] as unknown[])[0])).toContain('api.open-meteo.com');
   });
 });
 

@@ -234,15 +234,15 @@ In the iPhone and Android apps:
 
 ### Weather
 
-Amrita knows roughly what the weather is like where the user is, so practices the Practice Library marks `avoid_weather` are not offered in that weather (G14): Cooling Breath and Hissing Breath in the cold, Sun-Piercing Breath in the heat. It works on the website and both apps, with no permission prompt. It uses free services only:
+Amrita knows roughly what the weather is like where the user is, so practices the Practice Library marks `avoid_weather` are not offered in that weather (G14): Cooling Breath and Hissing Breath in the cold, Sun-Piercing Breath in the heat. It works on the website and both apps, with no permission prompt:
 
 - **Where:** the approximate location Vercel adds to every request, worked out from the network address (city level). It can be off behind a VPN, or by a town.
-- **Weather:** [Open-Meteo](https://open-meteo.com), which needs no key. Its free tier is for non-commercial use, with attribution ("Weather data by Open-Meteo.com", CC BY 4.0). If PranaVeda becomes commercial, move to its paid plan or another provider (`api/_lib/weather.ts`).
+- **Weather:** Apple's [WeatherKit REST API](https://developer.apple.com/weatherkit/), included with the Apple Developer Program (500,000 calls a month; commercial use allowed). The server signs a short-lived token with the WeatherKit key (`WEATHERKIT_SERVICE_ID`, `WEATHERKIT_KEY_ID`, `WEATHERKIT_PRIVATE_KEY`, plus `APPLE_TEAM_ID`) and reuses it for 50 minutes. Apple requires the credit "Apple Weather" with a link to its [data sources](https://developer.apple.com/weatherkit/data-source-attribution/); the website footer and the apps' You tab show it. Without the WeatherKit settings, as in local development, [Open-Meteo](https://open-meteo.com) stands in (no key; non-commercial use only). In production a WeatherKit failure gives no weather rather than falling back.
 - **Hot or cold:** a feels-like temperature of 10 °C or below is cold, and 30 °C or above is hot (`COLD_AT_C`, `HOT_AT_C`).
 - **What they say wins.** If the user says their weather is different ("my room is hot"), Amrita passes that on with the card, and it is checked against that instead.
 - One lookup per area every half hour, shared by everyone there. If the lookup fails, or takes more than 1.5 seconds, Amrita is told nothing about weather, and the next try is five minutes later.
 
-Privacy: coordinates are rounded to about 10 km before they are sent to Open-Meteo, and are never stored. Amrita is told the temperature and conditions, not the place.
+Privacy: coordinates are rounded to about 10 km before they are sent to Apple (or Open-Meteo locally), and are never stored. Amrita is told the temperature and conditions, not the place.
 
 - **Locally** there are no Vercel headers, so set `WEATHER_TEST_LOCATION="47.6,-122.3"` to test with a fixed place.
 - **Turn it off:** `WEATHER=off`.

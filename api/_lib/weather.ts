@@ -1,15 +1,19 @@
 import type { Request } from 'express';
+import { SignJWT, importPKCS8 } from 'jose';
 
 // G14, weather. The weather where someone is now, so that practices the
 // Practice Library marks avoid_weather (Cooling and Hissing Breath in the
 // cold, Sun-Piercing Breath in the heat) are not offered.
 //
-// Free services only for now: where they are comes from the approximate
-// location Vercel adds to every request (from the network address, city
-// level, no permission prompt), and the weather from Open-Meteo, which needs
-// no key and is free for non-commercial use. Coordinates are rounded to a
-// tenth of a degree (about 10 km) before they leave the server, and are never
-// stored. What the person says about their weather wins over the forecast.
+// Where someone is comes from the approximate location Vercel adds to every
+// request (from the network address, city level, no permission prompt). The
+// weather comes from Apple's WeatherKit REST API when it is configured
+// (WEATHERKIT_* and APPLE_TEAM_ID; included with the Apple Developer Program,
+// commercial use allowed). Without it, as in local development, Open-Meteo
+// stands in: no key, but free for non-commercial use only. Coordinates are
+// rounded to a tenth of a degree (about 10 km) before they leave the server,
+// and are never stored. What the person says about their weather wins over the
+// forecast.
 
 export type WeatherFeel = 'hot' | 'cold';
 
@@ -104,6 +108,87 @@ export function weatherFromForecast(body: any): Weather | null {
   };
 }
 
+// Apple's WeatherKit condition codes, in the same few words.
+const CONDITIONS: Record<string, string> = {
+  Clear: 'clear', MostlyClear: 'clear', Hot: 'clear', Frigid: 'clear',
+  PartlyCloudy: 'partly cloudy', MostlyCloudy: 'partly cloudy',
+  Cloudy: 'overcast',
+  Foggy: 'foggy', Haze: 'foggy', Smoky: 'foggy',
+  Drizzle: 'drizzle', FreezingDrizzle: 'drizzle',
+  Rain: 'rain', HeavyRain: 'rain', SunShowers: 'rain', FreezingRain: 'rain', Sleet: 'rain', MixedRainAndSleet: 'rain',
+  MixedRainAndSnow: 'snow', MixedSnowAndSleet: 'snow', Flurries: 'snow', SunFlurries: 'snow', Snow: 'snow',
+  HeavySnow: 'snow', BlowingSnow: 'snow', Blizzard: 'snow', Hail: 'snow',
+  Thunderstorms: 'thunderstorms', IsolatedThunderstorms: 'thunderstorms', ScatteredThunderstorms: 'thunderstorms',
+  StrongStorms: 'thunderstorms', TropicalStorm: 'thunderstorms', Hurricane: 'thunderstorms',
+  Breezy: 'clear', Windy: 'clear', BlowingDust: 'unsettled',
+};
+
+export const describeCondition = (code: unknown) => CONDITIONS[String(code)] ?? 'unsettled';
+
+// WeatherKit's current conditions (metric: °C and km/h).
+export function weatherFromWeatherKit(body: any): Weather | null {
+  const c = body?.currentWeather;
+  const temperatureC = Number(c?.temperature);
+  const feelsLikeC = Number(c?.temperatureApparent ?? c?.temperature);
+  if (!Number.isFinite(temperatureC) || !Number.isFinite(feelsLikeC)) return null;
+  return {
+    temperatureC: Math.round(temperatureC),
+    feelsLikeC: Math.round(feelsLikeC),
+    description: describeCondition(c?.conditionCode),
+    windy: Number(c?.windSpeed) >= 30 || c?.conditionCode === 'Windy',
+    feel: feelOf(feelsLikeC),
+    unit: 'C',
+  };
+}
+
+const weatherKitConfig = () => {
+  const { APPLE_TEAM_ID, WEATHERKIT_SERVICE_ID, WEATHERKIT_KEY_ID, WEATHERKIT_PRIVATE_KEY } = process.env;
+  return APPLE_TEAM_ID && WEATHERKIT_SERVICE_ID && WEATHERKIT_KEY_ID && WEATHERKIT_PRIVATE_KEY
+    ? { teamId: APPLE_TEAM_ID, serviceId: WEATHERKIT_SERVICE_ID, keyId: WEATHERKIT_KEY_ID, privateKey: WEATHERKIT_PRIVATE_KEY }
+    : null;
+};
+
+export const weatherProvider = (): 'weatherkit' | 'open-meteo' => (weatherKitConfig() ? 'weatherkit' : 'open-meteo');
+
+// WeatherKit authenticates our server with a JWT signed by the WeatherKit key
+// from the Apple Developer portal. One token serves for 50 minutes of its hour.
+let token: { value: string; until: number } | null = null;
+
+export async function weatherKitToken(now = Date.now()): Promise<string> {
+  if (token && token.until > now) return token.value;
+  const cfg = weatherKitConfig();
+  if (!cfg) throw new Error('WeatherKit is not configured');
+  // Env editors often store the .p8 file's line breaks as literal "\n".
+  const key = await importPKCS8(cfg.privateKey.replace(/\\n/g, '\n'), 'ES256');
+  const issuedAt = Math.floor(now / 1000);
+  const value = await new SignJWT({})
+    .setProtectedHeader({ alg: 'ES256', kid: cfg.keyId, id: `${cfg.teamId}.${cfg.serviceId}` })
+    .setIssuer(cfg.teamId)
+    .setSubject(cfg.serviceId)
+    .setIssuedAt(issuedAt)
+    .setExpirationTime(issuedAt + 60 * 60)
+    .sign(key);
+  token = { value, until: now + 50 * 60 * 1000 };
+  return value;
+}
+
+async function lookUp(at: { lat: number; lon: number }, fetcher: typeof fetch, now: number): Promise<Weather | null> {
+  if (weatherProvider() === 'weatherkit') {
+    const res = await fetcher(`https://weatherkit.apple.com/api/v1/weather/en/${at.lat}/${at.lon}?dataSets=currentWeather`, {
+      headers: { Authorization: `Bearer ${await weatherKitToken(now)}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`WeatherKit HTTP ${res.status}`);
+    return weatherFromWeatherKit(await res.json());
+  }
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${at.lat}&longitude=${at.lon}` +
+    '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m';
+  const res = await fetcher(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return weatherFromForecast(await res.json());
+}
+
 // One lookup per area every half hour, shared by everyone there; a failed
 // lookup is not retried for five minutes, so a slow service costs one wait.
 const cache = new Map<string, { weather: Weather | null; until: number }>();
@@ -118,12 +203,7 @@ export async function currentWeather(
   if (hit && hit.until > now) return hit.weather;
   let weather: Weather | null = null;
   try {
-    const url =
-      `https://api.open-meteo.com/v1/forecast?latitude=${at.lat}&longitude=${at.lon}` +
-      '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m';
-    const res = await fetcher(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    weather = weatherFromForecast(await res.json());
+    weather = await lookUp(at, fetcher, now);
   } catch (err: any) {
     console.error('[weather] lookup failed:', err?.message || err);
   }
@@ -138,7 +218,10 @@ export async function weatherFor(req: Pick<Request, 'headers'>): Promise<Weather
   return weather && { ...weather, unit: unitFor(req) };
 }
 
-export const clearWeatherCache = () => cache.clear();
+export const clearWeatherCache = () => {
+  cache.clear();
+  token = null;
+};
 
 // The weather a card is checked against: what they said (Amrita's weatherNow:
 // hot, cold or mild), else the forecast.
