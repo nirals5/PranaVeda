@@ -22,8 +22,8 @@
     "apis": {
       "custom": {
         "endpoint": {
-          "uri": "https://v0-pranaveda.vercel.app/api/alexa",
-          "sslCertificateType": "Wildcard"
+          "uri": "https://pranaveda.app/api/alexa",
+          "sslCertificateType": "Trusted"
         }
       }
     },
