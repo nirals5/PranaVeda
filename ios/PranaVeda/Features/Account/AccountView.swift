@@ -155,12 +155,12 @@ private struct PlacesOnAccount: View {
 
 /// Who the pose photographs and the weather come from, as at the foot of the
 /// website. Apple asks WeatherKit apps to show the Apple Weather mark and a
-/// link to its data sources.
+/// link to its data sources; MET Norway, the backup, asks for credit (CC BY 4.0).
 private struct Credits: View {
     var body: some View {
         VStack(spacing: 6) {
             Text("Pose photography by [Sneha Desai · Yin and Yang Yoga](https://yin-yangyoga.com/)")
-            Text("Weather data by [\u{F8FF} Weather](https://developer.apple.com/weatherkit/data-source-attribution/)")
+            Text("Weather data by [\u{F8FF} Weather](https://developer.apple.com/weatherkit/data-source-attribution/) and [MET Norway](https://www.met.no/en)")
             Link("Privacy Policy", destination: AppConfig.apiBaseURL.appending(path: "privacy"))
                 .padding(.top, 4)
         }
