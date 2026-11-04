@@ -600,6 +600,13 @@ export default function App() {
           >
             PRIVACY POLICY
           </a>
+          {' · '}
+          <a
+            href="/support"
+            className="text-[#72618F] underline decoration-[#8A79A5]/50 underline-offset-2 hover:text-[#8A79A5] transition-colors"
+          >
+            SUPPORT
+          </a>
         </p>
       </footer>
 
