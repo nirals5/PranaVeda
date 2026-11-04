@@ -51,7 +51,7 @@ The phone must be on the same Wi-Fi as the Mac.
 
 ### On production
 
-The `production` build type talks to production (`https://v0-pranaveda.vercel.app`),
+The `production` build type talks to production (`https://pranaveda.app`),
 so it works anywhere without the Mac. It uses the debug key, so it installs over a
 development build:
 

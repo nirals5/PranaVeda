@@ -48,7 +48,7 @@ after 7 days; run it from Xcode again to refresh it).
 
 ### On production
 
-A Release build talks to production (`https://v0-pranaveda.vercel.app`), so it
+A Release build talks to production (`https://pranaveda.app`), so it
 works anywhere without the Mac. Install it over a development build from `ios/`,
 with your iPhone's id from `xcrun devicectl list devices`:
 

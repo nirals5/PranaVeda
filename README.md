@@ -143,7 +143,7 @@ Practices marked `where_shown = explore_only` in the Practice Library (Headstand
 1. Sign in at [developer.amazon.com](https://developer.amazon.com) with the same Amazon account as the Echo, and accept the developer agreement.
 2. In the Alexa developer console, create a skill: name "PranaVeda", English (US), **Custom** model, **Provision your own** hosting, "Start from scratch".
 3. **Build → Interaction Model → JSON Editor:** paste `alexa/skill-package/interactionModels/custom/en-US.json`, then **Save** and **Build skill**.
-4. **Build → Endpoint:** HTTPS, default region `https://v0-pranaveda.vercel.app/api/alexa`, certificate option "My development endpoint is a sub-domain of a domain that has a wildcard certificate from a certificate authority".
+4. **Build → Endpoint:** HTTPS, default region `https://pranaveda.app/api/alexa`, certificate option "My development endpoint has a certificate from a trusted certificate authority".
 5. **Build → Permissions:** turn on **Reminders**.
 6. Copy the skill ID (shown under the skill's name) into Vercel as `ALEXA_SKILL_ID`, then redeploy.
 7. **Test:** set "Skill testing is enabled in" to **Development**. Try it in the console's simulator, then on any Echo signed in to the same Amazon account. Up to 500 more people can be invited as beta testers. Publishing to everyone needs Amazon's certification.
