@@ -79,7 +79,15 @@ Expect *Everyone* / PEGI 3. Separately, under **Target audience and content**,
 choose **13–15, 16–17 and 18+** only (not under 13), as the privacy policy
 says, which also keeps the app out of the Families policy.
 
-Data safety and the Health Connect declaration are KAN-12 and KAN-13.
+The other App content answers are ready to paste:
+- **Data safety:** `google-play/data-safety.md` (KAN-12).
+- **Health Connect, background location, health apps and the rest:**
+  `google-play/declarations.md` (KAN-13). Background location needs a short
+  video; the script is there.
+
+Play waits for the company: an **organization** account (D-U-N-S number)
+avoids the 12-tester, 14-day closed test that new personal accounts need
+(KAN-14).
 
 ## How the assets were made
 
