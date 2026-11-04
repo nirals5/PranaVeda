@@ -6,6 +6,10 @@ import { ChatItem, ChatCard, RecommendationResult, BreathworkPattern, DoshaProfi
 import pranavedaIcon from '../assets/pranaveda_icon.svg';
 import CautionNote from './CautionNote';
 import PrincipleNote from './PrincipleNote';
+import { fallbackToFlatImage, poseFlatUrl, posePictureUrl } from '../lib/poseImages';
+
+/** "3 minutes" → "3 min", for the small labels under the pictures. */
+const shortDuration = (d: string) => (d || '').replace(/\s*minutes?\b/i, ' min');
 
 interface AmritaChatProps {
   items: ChatItem[];
@@ -60,15 +64,26 @@ function RitualCard({ result, onOpen }: { result: RecommendationResult; onOpen: 
 
       <PrincipleNote principle={result.principle} />
 
+      {/* The poses as pictures, scrolling sideways, as in the apps. */}
+      {result.yogaPractice.poses.length > 0 && (
+        <ul aria-label="Poses in this practice" className="flex gap-3 overflow-x-auto snap-x pb-1 -mx-1 px-1">
+          {result.yogaPractice.poses.map((pose, i) => (
+            <li key={`${i}-${pose.nameEnglish}`} className="snap-start shrink-0 w-[120px]">
+              <img
+                src={posePictureUrl(pose)}
+                onError={(e) => fallbackToFlatImage(e, poseFlatUrl(pose))}
+                alt=""
+                loading="lazy"
+                className="w-[120px] h-[80px] rounded-xl object-cover bg-[#E8E1F2]"
+              />
+              <p className="mt-1.5 text-[12px] leading-snug text-stone-800 font-sans line-clamp-2">{pose.nameEnglish}</p>
+              <p className="text-[11px] text-stone-500 font-sans">{shortDuration(pose.duration)}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+
       <div className="flex flex-wrap gap-2">
-        {result.yogaPractice.poses.map((pose) => (
-          <span
-            key={pose.nameEnglish}
-            className="py-1 px-3 rounded-full bg-white/70 border border-white text-[12px] text-stone-700 font-sans"
-          >
-            {pose.nameEnglish} · {pose.duration.replace(' minutes', 'm').replace(' minute', 'm')}
-          </span>
-        ))}
         <span className="py-1 px-3 rounded-full bg-[#DFE8FA]/60 border border-white text-[12px] text-stone-700 font-sans flex items-center gap-1">
           <Wind className="w-3 h-3 text-[#8A79A5]" /> {result.breathwork.name}
         </span>
