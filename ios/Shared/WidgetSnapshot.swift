@@ -104,5 +104,7 @@ enum WidgetLink {
     static let you = URL(string: "pranaveda://you")!
     /// The newest saved ritual's guided practice (Siri, app shortcuts).
     static let practice = URL(string: "pranaveda://practice")!
+    /// A particular saved ritual's guided practice (Siri).
+    static func practice(_ id: String) -> URL { practice.appending(path: id) }
     static func savedRitual(_ id: String) -> URL { URL(string: "pranaveda://ritual/\(id)")! }
 }

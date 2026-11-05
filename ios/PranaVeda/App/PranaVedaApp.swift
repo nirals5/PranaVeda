@@ -100,6 +100,15 @@ struct PranaVedaApp: App {
                 router.pending = nil
                 open(url)
             }
+            // "Ask Amrita" from Siri or Shortcuts: over to the chat, with the question asked.
+            .onChange(of: router.question, initial: true) {
+                guard let question = router.question?.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+                router.question = nil
+                guard !question.isEmpty else { return }
+                openedRitual = nil
+                tab = .amrita
+                chat.send(question)
+            }
             .sheet(item: $openedRitual) { RitualDetailView(result: $0.result) }
             .fullScreenCover(item: $practicingRitual) {
                 GuidedPracticeView(result: $0.result).environment(practice).environment(saved)
@@ -107,6 +116,8 @@ struct PranaVedaApp: App {
             // The widgets show what the app knows; keep them in step.
             .onChange(of: practice.entries, initial: true) { publishToWidgets() }
             .onChange(of: saved.rituals) { publishToWidgets() }
+            // Siri and Spotlight know the saved rituals by name.
+            .onChange(of: saved.rituals, initial: true) { SiriBridge.ritualsChanged(saved.rituals) }
             .onChange(of: insight.state) { publishToWidgets() }
             .task {
                 chat.auth = auth
@@ -148,7 +159,8 @@ struct PranaVedaApp: App {
         WidgetBridge.publish(entries: practice.entries, saved: saved.rituals, insight: insight.state)
     }
 
-    /// pranaveda://talk, pranaveda://you, pranaveda://ritual/<id>, pranaveda://practice
+    /// pranaveda://talk, pranaveda://you, pranaveda://ritual/<id>,
+    /// pranaveda://practice, pranaveda://practice/<id>
     private func open(_ url: URL) {
         switch url.host() {
         case "talk":
@@ -158,7 +170,11 @@ struct PranaVedaApp: App {
             tab = .you
         case "practice":
             openedRitual = nil
-            if let newest = saved.rituals.first { practicingRitual = newest } else { tab = .library }
+            if url.pathComponents.count > 1 {
+                // A ritual named by Siri; removed since, it's not on the You tab either.
+                let id = url.lastPathComponent
+                if let ritual = saved.rituals.first(where: { $0.id == id }) { practicingRitual = ritual } else { tab = .you }
+            } else if let newest = saved.rituals.first { practicingRitual = newest } else { tab = .library }
         case "ritual":
             let id = url.lastPathComponent
             if let ritual = saved.rituals.first(where: { $0.id == id }) { openedRitual = ritual } else { tab = .you }
