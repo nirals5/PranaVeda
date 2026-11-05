@@ -48,12 +48,15 @@ struct SavedRitualEntity: AppEntity {
     static func matching(_ said: String, in rituals: [SavedRitual]) -> [SavedRitual] {
         let wanted = words(said).subtracting(["my", "the", "a", "ritual", "practice", "flow", "sequence", "routine", "yoga"])
         guard !wanted.isEmpty else { return [] }
-        return rituals
-            .map { ritual in (ritual, wanted.intersection(words(([ritual.title] + ritual.result.yogaPractice.poses.map(\.nameEnglish)).joined(separator: " "))).count) }
-            .filter { $0.1 > 0 }
-            .enumerated()
-            .sorted { $0.element.1 != $1.element.1 ? $0.element.1 > $1.element.1 : $0.offset < $1.offset }
-            .map(\.element.0)
+        // Spelled out step by step: as one chain it is too slow to type-check.
+        var scored: [(index: Int, ritual: SavedRitual, score: Int)] = []
+        for (index, ritual) in rituals.enumerated() {
+            let names: [String] = [ritual.title] + ritual.result.yogaPractice.poses.map(\.nameEnglish)
+            let score = wanted.intersection(words(names.joined(separator: " "))).count
+            if score > 0 { scored.append((index, ritual, score)) }
+        }
+        scored.sort { $0.score != $1.score ? $0.score > $1.score : $0.index < $1.index }
+        return scored.map(\.ritual)
     }
 
     private static func words(_ text: String) -> Set<String> {
