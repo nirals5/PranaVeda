@@ -47,8 +47,12 @@ final class PracticeStore {
     /// When the latest practice on this phone finished, read without a store
     /// (arrival reminders, in the background).
     nonisolated static func lastCompletedAt(fileURL: URL = defaultFileURL) -> Date? {
-        let entries = (try? Data(contentsOf: fileURL)).flatMap { try? JSONDecoder().decode([PracticeLogEntry].self, from: $0) } ?? []
-        return entries.compactMap(\.completedDate).max()
+        savedEntries(fileURL: fileURL).compactMap(\.completedDate).max()
+    }
+
+    /// The log on this phone, read without a store (Siri's practice summary).
+    nonisolated static func savedEntries(fileURL: URL = defaultFileURL) -> [PracticeLogEntry] {
+        (try? Data(contentsOf: fileURL)).flatMap { try? JSONDecoder().decode([PracticeLogEntry].self, from: $0) } ?? []
     }
 
     nonisolated static var defaultFileURL: URL {

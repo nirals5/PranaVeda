@@ -50,6 +50,7 @@ struct GuidedPracticeView: View {
             showLiveActivity()
             heyAmrita.practiceCommands = { obey($0) }
             WatchHeart.shared.begin()
+            SiriBridge.practiceBegan(result)
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
