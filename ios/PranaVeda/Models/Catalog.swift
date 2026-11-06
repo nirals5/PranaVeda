@@ -7,6 +7,39 @@ struct Catalog: Decodable, Sendable {
     /// Advanced poses Amrita never offers (G3), for Library → Explore. Absent
     /// from servers older than Explore.
     let explore: [ExplorePose]?
+    /// Follow-along videos, for Library → Flows and pose pages. Absent from
+    /// servers older than Flows.
+    let flows: [Flow]?
+}
+
+/// One follow-along video (api/_lib/flows.ts), served from media.pranaveda.app.
+struct Flow: Decodable, Hashable, Sendable, Identifiable {
+    let id: String
+    let title: String
+    let group: String
+    let minutes: Int
+    let videoUrl: String
+    let coverUrl: String
+    /// Catalog poses it features, by id.
+    let poses: [String]
+
+    var videoURL: URL? { URL(string: videoUrl) }
+    var coverURL: URL? { URL(string: coverUrl) }
+}
+
+extension Array where Element == Flow {
+    /// The flows by group, groups in the order the server lists them.
+    var grouped: [(group: String, flows: [Flow])] {
+        var order: [String] = []
+        var byGroup: [String: [Flow]] = [:]
+        for flow in self {
+            if byGroup[flow.group] == nil { order.append(flow.group) }
+            byGroup[flow.group, default: []].append(flow)
+        }
+        return order.map { ($0, byGroup[$0]!) }
+    }
+
+    func featuring(_ poseId: String) -> [Flow] { filter { $0.poses.contains(poseId) } }
 }
 
 /// An explore-only pose: shown with an at-your-own-risk note, never guided,

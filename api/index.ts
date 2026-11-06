@@ -19,6 +19,7 @@ export { EXPERIENCE_LEVELS };
 import { getUser } from './_lib/users.js';
 import { DOSHA_GUIDE, DOSHA_GUIDE_NOTE } from './_lib/doshaGuide.js';
 import { catalogOf, conditionConflicts, getCatalog } from './_lib/catalog.js';
+import { flows } from './_lib/flows.js';
 import { fallbackReflection, handleAlexa, say, speak, speakerSafe, verifyAlexaRequest } from './_lib/alexa.js';
 import type { AlexaDeps, PartOfDay } from './_lib/alexa.js';
 import type { Catalog, CatalogCondition } from './_lib/catalog.js';
@@ -888,6 +889,7 @@ export function publicCatalog(base: string, catalog: Catalog = BUILT_IN_CATALOG)
     })),
     breathwork: catalog.breathwork,
     explore: catalog.explore,
+    flows,
   };
 }
 

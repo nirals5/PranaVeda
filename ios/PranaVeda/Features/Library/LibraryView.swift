@@ -18,11 +18,16 @@ struct LibraryView: View {
                             }
                         }
                         .padding(16)
+                        if let flows = catalog.catalog?.flows, !flows.isEmpty {
+                            FlowsSection(flows: flows)
+                        }
                         if let explore = catalog.catalog?.explore, !explore.isEmpty {
                             exploreSection(explore)
                         }
                     }
-                    .navigationDestination(for: CatalogPose.self) { PoseDetailView(pose: $0) }
+                    .navigationDestination(for: CatalogPose.self) { pose in
+                        PoseDetailView(pose: pose, flows: catalog.catalog?.flows?.featuring(pose.id) ?? [])
+                    }
                     .navigationDestination(for: ExplorePose.self) { ExploreDetailView(pose: $0, notFor: $0.notFor(conditions)) }
                 } else if let error = catalog.loadError {
                     VStack(spacing: 12) {
@@ -82,6 +87,8 @@ struct LibraryView: View {
 
 struct PoseDetailView: View {
     let pose: CatalogPose
+    /// The flows that feature this pose.
+    var flows: [Flow] = []
 
     var body: some View {
         ScrollView {
@@ -104,6 +111,7 @@ struct PoseDetailView: View {
                     }
                 }
                 .cardSurface()
+                if !flows.isEmpty { PoseFlowLinks(flows: flows) }
             }
             .padding(16)
         }
