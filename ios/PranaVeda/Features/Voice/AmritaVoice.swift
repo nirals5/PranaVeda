@@ -103,11 +103,11 @@ extension AmritaVoice: AVAudioPlayerDelegate, AVSpeechSynthesizerDelegate {
 extension APIClient {
     /// Amrita's ElevenLabs voice for `text` (MP3), or nil when the server has
     /// no voice configured (it answers 503). Throws when it cannot be reached.
-    func speech(_ text: String) async throws -> Data? {
+    func speech(_ text: String, timeout: TimeInterval = 20) async throws -> Data? {
         struct Body: Encodable { let text: String }
         var request = URLRequest(url: baseURL.appending(path: "api/tts"))
         request.httpMethod = "POST"
-        request.timeoutInterval = 20
+        request.timeoutInterval = timeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(Body(text: text))
         let (data, response) = try await session.data(for: request)

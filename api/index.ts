@@ -2712,9 +2712,14 @@ app.post('/api/calendar/ics', rateLimited('calendar'), async (req, res) => {
   }
 });
 
+// ElevenLabs is paid per character. Well above a pose's guidance or a long
+// chat reply; anything longer is refused before it costs anything.
+export const TTS_MAX_CHARS = 5000;
+
 app.post('/api/tts', rateLimited('voice'), async (req, res) => {
-  const { text } = req.body;
-  if (!text) return res.status(400).json({ error: 'text is required' });
+  const text = req.body?.text;
+  if (typeof text !== 'string' || !text.trim()) return res.status(400).json({ error: 'text is required' });
+  if (text.length > TTS_MAX_CHARS) return res.status(413).json({ error: 'text is too long', max: TTS_MAX_CHARS });
   const elevenKey = process.env.ELEVENLABS_API_KEY;
   const voiceId = process.env.ELEVENLABS_VOICE_ID;
   if (!elevenKey || elevenKey === 'MY_ELEVENLABS_API_KEY' || !voiceId || voiceId === 'MY_ELEVENLABS_VOICE_ID') {

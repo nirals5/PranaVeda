@@ -3,8 +3,13 @@ import { useRef, useCallback } from 'react';
 export function useSpeech() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Paused with a guided practice: what is being said waits, and so does a new
+  // line (Back or Next while paused), until resume().
+  const pausedRef = useRef(false);
+  const queuedRef = useRef<string | null>(null);
 
   const stop = useCallback(() => {
+    queuedRef.current = null;
     // Cancel any in-flight ElevenLabs fetch before it can create a new Audio element
     if (abortRef.current) {
       abortRef.current.abort();
@@ -21,6 +26,10 @@ export function useSpeech() {
   const speak = useCallback(async (text: string) => {
     // stop() aborts the previous controller so any pending fetch is cancelled immediately
     stop();
+    if (pausedRef.current) {
+      queuedRef.current = text;
+      return;
+    }
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -45,7 +54,8 @@ export function useSpeech() {
         audioRef.current = audio;
         audio.onended = () => { URL.revokeObjectURL(url); audioRef.current = null; };
         audio.onerror = () => { URL.revokeObjectURL(url); audioRef.current = null; };
-        audio.play();
+        // Paused while it was on its way: resume() plays it.
+        if (!pausedRef.current) audio.play();
         return;
       }
     } catch (err: any) {
@@ -56,6 +66,10 @@ export function useSpeech() {
     // Browser speech synthesis fallback — only if this call is still the active one
     if (abortRef.current !== controller) return;
     if (!('speechSynthesis' in window)) return;
+    if (pausedRef.current) {
+      queuedRef.current = text;
+      return;
+    }
 
     // ElevenLabs pause markup would be read literally by browser TTS — strip it
     const utterance = new SpeechSynthesisUtterance(text.replace(/<break[^>]*\/>/g, '. . .'));
@@ -71,5 +85,27 @@ export function useSpeech() {
     window.speechSynthesis.speak(utterance);
   }, [stop]);
 
-  return { speak, stop };
+  // With a guided practice's pause: Amrita stops mid-word, to carry on from there.
+  const pause = useCallback(() => {
+    if (pausedRef.current) return;
+    pausedRef.current = true;
+    audioRef.current?.pause();
+    if ('speechSynthesis' in window && window.speechSynthesis.speaking) window.speechSynthesis.pause();
+  }, []);
+
+  const resume = useCallback(() => {
+    if (!pausedRef.current) return;
+    pausedRef.current = false;
+    const queued = queuedRef.current;
+    queuedRef.current = null;
+    if (queued !== null) {
+      void speak(queued);
+    } else if (audioRef.current) {
+      audioRef.current.play()?.catch?.(() => {});
+    } else if ('speechSynthesis' in window && window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
+  }, [speak]);
+
+  return { speak, stop, pause, resume };
 }

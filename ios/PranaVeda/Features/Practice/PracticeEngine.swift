@@ -195,6 +195,20 @@ enum Guidance {
         return seconds >= 7 ? variants[2] : seconds >= 5 ? variants[1] : variants[0]
     }
 
+    /// Everything a breathwork practice says, fetched before it starts so each
+    /// cue lands on its breath (as the website does).
+    static func breathLines(_ pattern: BreathworkPattern) -> [String] {
+        let cues = BreathPacer(pattern).steps.map { cue(for: $0.phase, seconds: $0.seconds) }
+        let all = [beginBreathwork(pattern.name, caution: pattern.caution)] + cues + [breathworkComplete(pattern.name)]
+        var seen = Set<String>()
+        return all.filter { seen.insert($0).inserted }
+    }
+
+    /// What is said after the pose at `index`: the next pose, or the close.
+    static func nextLine(after index: Int, in poses: [YogaPose]) -> String {
+        index + 1 < poses.count ? enterPose(poses[index + 1]) : ritualComplete
+    }
+
     /// Splits text at its pause markers: the words to say, each followed by a
     /// pause in seconds.
     static func script(_ text: String) -> [(words: String, pauseAfter: Double)] {
