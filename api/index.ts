@@ -2555,6 +2555,34 @@ app.post('/api/alexa', express.raw({ type: '*/*', limit: '256kb' }), async (req,
 // The balancing reference behind the Dosha Profile screen, for the native
 // apps (the website imports the same file). Public: it is general guidance,
 // nothing about the person.
+// The Smart assistants card in the apps and on the website. Alexa is listed
+// only once the skill is published: set ALEXA_SKILL_URL to its Amazon page
+// then, and everyone sees it without a new app release. The phrases follow
+// the skill's interaction model (alexa/skill-package).
+const ALEXA_PHRASES = [
+  'Alexa, open Prana Veda',
+  'Alexa, ask Prana Veda for a breathing practice',
+  'Alexa, ask Prana Veda to remind me every evening at seven',
+];
+
+function alexaSkillPage(): string | null {
+  const raw = process.env.ALEXA_SKILL_URL?.trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    const amazon = /(^|\.)amazon\.[a-z.]{2,6}$/.test(url.hostname) && !/\.amazon\.[a-z.]+\./.test(url.hostname);
+    return url.protocol === 'https:' && amazon ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+app.get('/api/assistants', (_req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  const url = alexaSkillPage();
+  res.json({ alexa: url ? { url, phrases: ALEXA_PHRASES } : null });
+});
+
 app.get('/api/dosha-guide', (_req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.json({ doshas: DOSHA_GUIDE, note: DOSHA_GUIDE_NOTE });

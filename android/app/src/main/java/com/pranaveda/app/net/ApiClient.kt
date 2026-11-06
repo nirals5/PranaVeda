@@ -123,6 +123,14 @@ class ApiClient(
         }
     }
 
+    /** The Smart assistants card: Alexa only once the skill is published. */
+    suspend fun assistants(): com.pranaveda.app.model.Assistants = withContext(Dispatchers.IO) {
+        http.newCall(Request.Builder().url(baseUrl.resolve("api/assistants")!!).build()).execute().use { response ->
+            if (response.code != 200) throw HttpStatusException(response.code)
+            PvJson.decodeFromString(com.pranaveda.app.model.Assistants.serializer(), response.body.string())
+        }
+    }
+
     /** Amrita's daily reflection, made personal by the wellness [profile]. */
     suspend fun dailyInsight(profile: JsonObject, localTime: String): DailyInsight = withContext(Dispatchers.IO) {
         val body = PvJson.encodeToString(InsightRequest.serializer(), InsightRequest(profile, localTime))
