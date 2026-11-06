@@ -189,6 +189,8 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
         for (event in events) when (event) {
             is PoseSequence.Event.EnteredPose -> {
                 guide.speak(if (back) Guidance.returnToPose(poses[event.index]) else Guidance.enterPose(poses[event.index]))
+                // Ready by the time this pose ends.
+                guide.prefetch(listOf(Guidance.nextLine(event.index, poses)))
                 showNotice()
             }
             PoseSequence.Event.Finished -> {
@@ -229,10 +231,16 @@ fun GuidedPracticeScreen(result: RecommendationResult, onClose: () -> Unit) {
     ListenForCommands(::obey)
 
     LaunchedEffect(Unit) {
-        poses.firstOrNull()?.let { guide.speak(Guidance.startPose(it)) }
+        poses.firstOrNull()?.let {
+            guide.speak(Guidance.startPose(it))
+            guide.prefetch(listOf(Guidance.nextLine(0, poses)))
+        }
         showNotice()
     }
     PracticeClock(running && !finished) { handle(sequence.advance(it)) }
+    // Pause quiets Amrita too, and Play carries on. (Finishing also stops the
+    // clock; the closing words must still be heard.)
+    LaunchedEffect(running) { if (running) guide.resume() else if (!finished) guide.pause() }
 
     PracticeDialog(onClose) {
         when {
@@ -290,6 +298,8 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
     val practice = practiceStore()
     val guide = rememberSpeechGuide()
     val pacer = remember { BreathPacer(pattern) }
+    // Every cue fetched while they read the pattern, so each lands on its breath.
+    LaunchedEffect(guide) { guide.prefetch(Guidance.breathLines(pattern)) }
     var version by remember { mutableIntStateOf(0) }
     var started by remember { mutableStateOf(false) }
     var running by remember { mutableStateOf(false) }
@@ -359,6 +369,9 @@ fun BreathworkPacerScreen(pattern: BreathworkPattern, result: RecommendationResu
     ListenForCommands(::obey)
 
     PracticeClock(running && !finished) { handle(pacer.advance(it)) }
+    // Pause quiets Amrita too, and Play carries on. (Finishing also stops the
+    // clock; the closing words must still be heard.)
+    LaunchedEffect(running) { if (running) guide.resume() else if (!finished) guide.pause() }
 
     PracticeDialog(onClose) {
         if (finished) {

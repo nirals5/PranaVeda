@@ -202,6 +202,16 @@ object Guidance {
         return if (seconds >= 7) variants[2] else if (seconds >= 5) variants[1] else variants[0]
     }
 
+    /** Everything a breathwork practice says, fetched before it starts so each cue lands on its breath (as the website does). */
+    fun breathLines(pattern: BreathworkPattern): List<String> =
+        (listOf(beginBreathwork(pattern.name, pattern.caution)) +
+            BreathPacer(pattern).steps.map { (phase, seconds) -> cue(phase, seconds) } +
+            breathworkComplete(pattern.name)).distinct()
+
+    /** What is said after the pose at [index]: the next pose, or the close. */
+    fun nextLine(index: Int, poses: List<YogaPose>): String =
+        if (index + 1 < poses.size) enterPose(poses[index + 1]) else RITUAL_COMPLETE
+
     data class Part(val words: String, val pauseAfter: Double)
 
     /** Splits text at its pause markers: the words to say, each followed by a pause in seconds. */

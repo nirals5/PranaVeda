@@ -97,6 +97,8 @@ export default function CoachingDashboard({
   const [breathingPhase, setBreathingPhase] = useState<'inhale' | 'holdFull' | 'exhale' | 'holdEmpty'>('inhale');
   const [breathingTimeRemaining, setBreathingTimeRemaining] = useState(result.breathwork.inhale);
   const [breathingCycleCount, setBreathingCycleCount] = useState(1);
+  // Under way (running or paused), as opposed to waiting at the start.
+  const [breathingStarted, setBreathingStarted] = useState(false);
   const breathingTimerRef = useRef<number | null>(null);
   // Authoritative timer state lives in refs so the interval tick (a plain
   // function StrictMode never double-invokes) drives transitions exactly once.
@@ -105,7 +107,7 @@ export default function CoachingDashboard({
   const remainingRef = useRef(result.breathwork.inhale);
   const cycleRef = useRef(1);
 
-  const { speak, stop: stopSpeech } = useSpeech();
+  const { speak, stop: stopSpeech, pause: pauseSpeech, resume: resumeSpeech } = useSpeech();
   useEffect(() => () => stopSpeech(), [stopSpeech]);
 
   // Load appropriate energy icon based on text
@@ -150,6 +152,7 @@ export default function CoachingDashboard({
         remainingRef.current = b.inhale;
         cycleRef.current = 1;
         setIsBreathingRunning(false);
+        setBreathingStarted(false);
         setBreathingPhase('inhale');
         setBreathingTimeRemaining(b.inhale);
         setBreathingCycleCount(1);
@@ -309,10 +312,24 @@ export default function CoachingDashboard({
       speakVocalPhase(`Beginning ${result.breathwork.name}${result.breathwork.caution ? `. Take care. ${result.breathwork.caution}` : ''}`);
     }
     setIsBreathingRunning(!isBreathingRunning);
+    setBreathingStarted(true);
   };
+
+  // Pause quiets Amrita too, and Play carries on (a line said while paused
+  // waits for Play). Finishing stops the clock as well, but isn't a pause.
+  const practicePaused = (isYogaWizardActive && !isPoseTimerRunning) || (breathingStarted && !isBreathingRunning);
+  useEffect(() => {
+    if (practicePaused) {
+      pauseSpeech();
+      phaseAudioRef.current.player?.pause();
+    } else {
+      resumeSpeech();
+    }
+  }, [practicePaused, pauseSpeech, resumeSpeech]);
 
   const resetBreathing = () => {
     setIsBreathingRunning(false);
+    setBreathingStarted(false);
     phaseRef.current = 'inhale';
     remainingRef.current = result.breathwork.inhale;
     cycleRef.current = 1;
@@ -694,6 +711,7 @@ export default function CoachingDashboard({
                       </div>
                       <button
                         onClick={() => {
+                          stopSpeech();
                           setIsYogaWizardActive(false);
                           setIsPoseTimerRunning(false);
                         }}

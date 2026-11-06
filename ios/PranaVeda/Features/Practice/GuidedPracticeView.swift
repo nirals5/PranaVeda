@@ -46,7 +46,10 @@ struct GuidedPracticeView: View {
         }
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
-            if let first = poses.first { guide.speak(Guidance.startPose(first)) }
+            if let first = poses.first {
+                guide.speak(Guidance.startPose(first))
+                guide.prefetch([Guidance.nextLine(after: 0, in: poses)])
+            }
             showLiveActivity()
             heyAmrita.practiceCommands = { obey($0) }
             WatchHeart.shared.begin()
@@ -60,7 +63,12 @@ struct GuidedPracticeView: View {
             // Closed before the end: nothing is saved on the watch.
             WatchHeart.shared.cancel()
         }
-        .onChange(of: isRunning) { showLiveActivity() }
+        .onChange(of: isRunning) {
+            showLiveActivity()
+            // Pause quiets Amrita too, and Play carries on. (Finishing also
+            // stops the clock; the closing words must still be heard.)
+            if isRunning { guide.resume() } else if !finished { guide.pause() }
+        }
         .task(id: isRunning) {
             guard isRunning else { return }
             await runClock { handle(sequence.advance(by: $0)) }
@@ -139,6 +147,8 @@ struct GuidedPracticeView: View {
             switch event {
             case .enteredPose(let index):
                 guide.speak(direction == .back ? Guidance.returnToPose(poses[index]) : Guidance.enterPose(poses[index]))
+                // Ready by the time this pose ends.
+                guide.prefetch([Guidance.nextLine(after: index, in: poses)])
                 showLiveActivity()
             case .finished:
                 isRunning = false
@@ -199,8 +209,15 @@ struct BreathworkPacerView: View {
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
             heyAmrita.practiceCommands = { obey($0) }
+            // Every cue fetched while they read the pattern, so each lands on its breath.
+            guide.prefetch(Guidance.breathLines(pattern))
         }
-        .onChange(of: isRunning) { showLiveActivity() }
+        .onChange(of: isRunning) {
+            showLiveActivity()
+            // Pause quiets Amrita too, and Play carries on. (Finishing also
+            // stops the clock; the closing words must still be heard.)
+            if isRunning { guide.resume() } else if !finished { guide.pause() }
+        }
         .onDisappear {
             heyAmrita.practiceCommands = nil
             liveActivity.end()
