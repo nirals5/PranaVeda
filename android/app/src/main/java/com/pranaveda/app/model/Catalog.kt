@@ -10,7 +10,27 @@ data class Catalog(
     val breathwork: List<CatalogBreathwork> = emptyList(),
     /** Advanced poses Amrita never offers (G3), for Library → Explore. Empty from servers older than Explore. */
     val explore: List<ExplorePose> = emptyList(),
+    /** Follow-along videos, for Library → Flows and pose pages. Empty from servers older than Flows. */
+    val flows: List<Flow> = emptyList(),
 )
+
+/** One follow-along video (api/_lib/flows.ts), served from media.pranaveda.app. */
+@Serializable
+data class Flow(
+    val id: String,
+    val title: String,
+    val group: String,
+    val minutes: Int,
+    val videoUrl: String,
+    val coverUrl: String,
+    /** Catalog poses it features, by id. */
+    val poses: List<String> = emptyList(),
+)
+
+/** The flows by group, groups in the order the server lists them. */
+fun List<Flow>.grouped(): List<Pair<String, List<Flow>>> = groupBy { it.group }.toList()
+
+fun List<Flow>.featuring(poseId: String): List<Flow> = filter { poseId in it.poses }
 
 /** An explore-only pose: shown with an at-your-own-risk note, never guided, never logged. */
 @Serializable

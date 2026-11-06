@@ -48,6 +48,9 @@ import androidx.lifecycle.viewModelScope
 import com.pranaveda.app.model.Catalog
 import com.pranaveda.app.model.CatalogPose
 import com.pranaveda.app.model.ExplorePose
+import com.pranaveda.app.model.Flow
+import com.pranaveda.app.model.featuring
+import com.pranaveda.app.model.grouped
 import com.pranaveda.app.net.ApiClient
 import com.pranaveda.app.ui.chat.PoseImage
 import com.pranaveda.app.ui.chat.SectionLabel
@@ -90,6 +93,9 @@ fun LibraryScreen(model: CatalogViewModel, conditions: List<String> = emptyList(
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val selected = model.catalog?.poses?.firstOrNull { it.id == selectedId }
     val exploring = model.catalog?.explore?.firstOrNull { it.id == selectedId }
+    val flows = model.catalog?.flows.orEmpty()
+    var playingId by rememberSaveable { mutableStateOf<String?>(null) }
+    flows.firstOrNull { it.id == playingId }?.let { FlowPlayer(it) { playingId = null } }
     BackHandler(enabled = selected != null || exploring != null) { selectedId = null }
 
     Scaffold(
@@ -110,7 +116,7 @@ fun LibraryScreen(model: CatalogViewModel, conditions: List<String> = emptyList(
             val poses = model.catalog?.poses
             val error = model.loadError
             when {
-                selected != null -> PoseDetail(selected)
+                selected != null -> PoseDetail(selected, flows.featuring(selected.id)) { playingId = it.id }
                 exploring != null -> ExploreDetail(exploring, exploring.notFor(conditions))
                 poses != null -> LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 160.dp),
@@ -120,6 +126,18 @@ fun LibraryScreen(model: CatalogViewModel, conditions: List<String> = emptyList(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     items(poses, key = { it.id }) { pose -> Tile(pose) { selectedId = pose.id } }
+                    if (flows.isNotEmpty()) {
+                        item(key = "flows", span = { GridItemSpan(maxLineSpan) }) {
+                            Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Flows", style = Pv.headingLarge, color = Pv.ink)
+                                Text("Short guided sequences to practise along with.", style = Pv.bodySmall, color = Pv.stone700)
+                            }
+                        }
+                        flows.grouped().forEach { (group, inGroup) ->
+                            item(key = "flows-$group", span = { GridItemSpan(maxLineSpan) }) { SectionLabel(group) }
+                            items(inGroup, key = { "flow-${it.id}" }) { flow -> FlowTile(flow) { playingId = flow.id } }
+                        }
+                    }
                     // G3: the advanced poses Amrita never offers, after the library.
                     val explore = model.catalog?.explore.orEmpty()
                     if (explore.isNotEmpty()) {
@@ -236,7 +254,7 @@ private fun ExperiencedOnlyLabel() {
 }
 
 @Composable
-private fun PoseDetail(pose: CatalogPose) {
+private fun PoseDetail(pose: CatalogPose, flows: List<Flow>, onPlay: (Flow) -> Unit) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -255,5 +273,6 @@ private fun PoseDetail(pose: CatalogPose) {
                 }
             }
         }
+        if (flows.isNotEmpty()) PoseFlowLinks(flows, onPlay)
     }
 }
