@@ -30,6 +30,7 @@ struct AccountView: View {
                         if let chat { ExperienceSetting(chat: chat) }
                         if let place { LocationSettings(place: place, arrival: .shared) }
                         if let calendar { CalendarSettings(calendar: calendar) }
+                        AssistantsSettings(saved: saved)
                         PracticeCalendarView(practice: practice, onBegin: onBegin)
                         PracticeTrendsView(practice: practice, health: health)
                         SavedRitualsView(saved: saved)

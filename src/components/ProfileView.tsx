@@ -5,6 +5,7 @@ import PracticeCalendar from './PracticeCalendar';
 import CalendarConnections from './CalendarConnections';
 import WearableConnections from './WearableConnections';
 import LocationSettings from './LocationSettings';
+import AssistantsSettings from './AssistantsSettings';
 import GoogleSignIn from './GoogleSignIn';
 import AppleSignIn from './AppleSignIn';
 import { ACCOUNTS_ENABLED, APPLE_SERVICES_ID } from '../lib/auth';
@@ -357,6 +358,9 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
           ))}
         </ul>
       </section>
+
+      {/* Smart assistants: shown once the Alexa skill is published. */}
+      <AssistantsSettings />
     </div>
   );
 }
