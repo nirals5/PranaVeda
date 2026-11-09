@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CalendarClock, Link2 } from 'lucide-react';
 import { ExternalCalendar, describeCalendar } from '../hooks/useExternalCalendar';
 import { NudgeNotifications } from '../hooks/useNudgeNotifications';
+import { PushNudges } from '../hooks/usePushNudges';
 
 const actionButton =
   'flex-shrink-0 py-2 px-4 rounded-full text-[11px] font-mono uppercase tracking-wider font-bold transition-all cursor-pointer disabled:opacity-60 disabled:cursor-default';
@@ -10,7 +11,15 @@ const quietAction = `${actionButton} text-stone-600 hover:text-stone-900 bg-whit
 
 // Connect an outside calendar so Amrita knows when the user is free. Only
 // busy times are ever read — the copy says so, because it is the whole promise.
-export default function CalendarConnections({ calendar, notifications }: { calendar: ExternalCalendar; notifications: NudgeNotifications }) {
+export default function CalendarConnections({
+  calendar,
+  notifications,
+  push,
+}: {
+  calendar: ExternalCalendar;
+  notifications: NudgeNotifications;
+  push: PushNudges;
+}) {
   const [link, setLink] = useState('');
   const summary = calendar.connected ? describeCalendar(calendar.busy, calendar.now) : null;
 
@@ -31,7 +40,10 @@ export default function CalendarConnections({ calendar, notifications }: { calen
       <h2 className="text-2xl font-serif text-[#2D3436] mt-2">Let Amrita work around your day</h2>
       <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed mt-2 max-w-2xl">
         Connect a calendar and Amrita will suggest practice only in your open time. She sees when you are busy, never
-        what your events are, and nothing is stored outside this device.
+        what your events are.{' '}
+        {push.enabled
+          ? 'With notifications on, your busy times are kept on your account so she can reach you when PranaVeda is closed.'
+          : 'Your busy times stay on this device.'}
       </p>
 
       {summary && (
@@ -113,32 +125,64 @@ export default function CalendarConnections({ calendar, notifications }: { calen
           {calendar.errors.ics && <p role="alert" className="text-[13px] text-[#B4443A] font-sans">{calendar.errors.ics}</p>}
         </li>
 
-        {/* Browser notifications */}
+        {/* Notifications: push when signed in, otherwise from an open tab */}
         <li className="py-5 last:pb-0 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <div className="flex-1 min-w-0 space-y-1">
             <p className="text-[17px] font-serif text-[#2D3436] leading-snug">Notifications</p>
-            <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
-              {!notifications.supported
-                ? 'This browser cannot show notifications. Amrita’s suggestions will appear inside PranaVeda.'
-                : notifications.blocked
+            {push.available ? (
+              <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
+                {push.blocked
                   ? 'Notifications are blocked for this site. Allow them in your browser’s site settings, then turn this on.'
-                  : notifications.enabled
+                  : push.enabled
                     ? calendar.connected
-                      ? 'On. While PranaVeda is open in a tab, Amrita will notify you in free time — at most once every few hours.'
+                      ? 'On. Amrita will notify you in free time, even when PranaVeda is closed — at most once every few hours.'
                       : 'On, but waiting for a calendar. Amrita only notifies you when she can see you are free.'
-                    : 'Let Amrita reach you in free time when PranaVeda is open in another tab. Never during a commitment.'}
-            </p>
+                    : 'Let Amrita reach you in free time, even when PranaVeda is closed. Never during a commitment.'}
+              </p>
+            ) : push.needsHomeScreen ? (
+              <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
+                On iPhone, add PranaVeda to your Home Screen (Share, then Add to Home Screen), open it from there and sign in to get Amrita’s notifications.
+              </p>
+            ) : (
+              <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
+                {!notifications.supported
+                  ? 'This browser cannot show notifications. Amrita’s suggestions will appear inside PranaVeda.'
+                  : notifications.blocked
+                    ? 'Notifications are blocked for this site. Allow them in your browser’s site settings, then turn this on.'
+                    : notifications.enabled
+                      ? calendar.connected
+                        ? 'On. While PranaVeda is open in a tab, Amrita will notify you in free time — at most once every few hours.'
+                        : 'On, but waiting for a calendar. Amrita only notifies you when she can see you are free.'
+                      : 'Let Amrita reach you in free time when PranaVeda is open in another tab. Never during a commitment.'}
+                {push.offerSignIn && !notifications.blocked && ' Sign in to get them even when PranaVeda is closed.'}
+              </p>
+            )}
+            {push.error && <p role="alert" className="text-[13px] text-[#B4443A] font-sans">{push.error}</p>}
           </div>
-          {notifications.supported && !notifications.blocked && (
-            <button
-              type="button"
-              onClick={notifications.enabled ? notifications.disable : notifications.enable}
-              aria-pressed={notifications.enabled}
-              className={notifications.enabled ? quietAction : primaryAction}
-            >
-              {notifications.enabled ? 'Turn off' : 'Turn on'}
-            </button>
-          )}
+          {push.available
+            ? !push.blocked && (
+                <button
+                  type="button"
+                  onClick={push.enabled ? push.disable : push.enable}
+                  disabled={push.pending}
+                  aria-pressed={push.enabled}
+                  className={push.enabled ? quietAction : primaryAction}
+                >
+                  {push.pending ? 'One moment…' : push.enabled ? 'Turn off' : 'Turn on'}
+                </button>
+              )
+            : !push.needsHomeScreen &&
+              notifications.supported &&
+              !notifications.blocked && (
+                <button
+                  type="button"
+                  onClick={notifications.enabled ? notifications.disable : notifications.enable}
+                  aria-pressed={notifications.enabled}
+                  className={notifications.enabled ? quietAction : primaryAction}
+                >
+                  {notifications.enabled ? 'Turn off' : 'Turn on'}
+                </button>
+              )}
         </li>
       </ul>
     </section>

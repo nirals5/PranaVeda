@@ -81,22 +81,49 @@ A nudge only ever appears in open calendar time. It never appears:
 
 **In-app bar.** On the home screen, for example "You have 40 open minutes, until 9:35 PM", with a "Practice now" button that asks Amrita for something that fits. Dismissing it hides it for that opening. It shows on the home screen only, not in chat or other tabs.
 
-**Browser notifications.** Turned on from the "Notifications" row under Profile → Connectors → Calendar, which triggers the browser's permission prompt. On top of the rules above:
+**Notifications.** Turned on from the "Notifications" row under Profile → Connectors → Calendar, which triggers the browser's permission prompt. They work one of two ways.
+
+**Signed in: push notifications.** These arrive even when PranaVeda is closed, on desktop browsers, Android Chrome, and an iPhone or iPad with PranaVeda added to the Home Screen (iOS 16.4 or later).
+
+- **How:** the browser subscribes through a service worker (`public/sw.js`). Every 15 minutes a free Cloudflare cron (`cloudflare/push-ticker`) calls `POST /api/push/tick`. The server checks each subscribed user against the rules above and sends a nudge with the `web-push` library.
+- **What the server keeps:** busy start and end times for today and tomorrow, uploaded by the website while it is open; whether every connected calendar could be read; and when PranaVeda was last on screen. It never receives event titles, places or people. The `push_nudge_state` and `push_subscriptions` tables hold this, and both go with the account.
+- **Calendar link on the account:** if "Keep my places and calendar link on my account" is on, the server also re-reads that link at each check, so a meeting added after PranaVeda was closed still blocks a nudge.
+- **Uploaded busy times expire after a day.** Without a fresh upload, a user is nudged only if the account's calendar link is their only calendar. A Google calendar can only be read by the website, so its busy times must be uploaded.
+- **On top of the rules above:**
+  - nothing is sent while PranaVeda was on screen in the last 15 minutes (the open page reports this every 5 minutes);
+  - at most one nudge per opening;
+  - at least three hours between nudges;
+  - a nudge not delivered within 15 minutes is dropped.
+- **Fail closed:** if a connected calendar could not be read, whether on the device or the account's link at check time, nothing is sent.
+- **Signing out** unsubscribes the browser. A browser that unsubscribes, or clears the site's data, is removed the next time a nudge fails to reach it.
+- **Timing:** with a check every 15 minutes, a nudge can arrive up to 15 minutes into an opening, and a short opening can be missed. The interval keeps the free Neon database asleep between checks.
+
+**Signed out, or before push is set up: notifications from an open tab.** On top of the rules above:
 
 - the tab must have been out of view for at least 15 minutes;
 - at most one notification per free slot;
 - at least three hours between notifications;
 - nothing fires while a ritual is open.
 
-Clicking a notification brings the tab forward and lands on the home screen, where the in-app bar offers "Practice now".
+These are desktop-only in practice (Android Chrome and iPhone Safari do not allow them from a plain web page), and they stop when the tab or browser closes. Browsers slow background tabs, so one can arrive a minute or so late.
 
-Limits of browser notifications:
+Either way, clicking a notification brings PranaVeda forward on the home screen, where the in-app bar offers "Practice now".
 
-- **Desktop browsers only, in practice.** Android Chrome and iPhone Safari do not allow this kind of notification from a plain web page.
-- **The tab must stay open.** Closing the tab or the browser stops them. Browsers slow background tabs, so one can arrive a minute or so late.
-- Reaching users with the app closed needs push notifications, which are not built.
+**Setting up push (free):**
 
-Pacing values are constants: the 15-minute and 3-hour rules at the top of `src/hooks/useNudgeNotifications.ts`, and the 10-minute, waking-hours, and rest-after-practice rules beside `findOpenSlot` in `src/hooks/useExternalCalendar.ts`.
+1. Generate a key pair once with `npx web-push generate-vapid-keys`. Set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in Vercel. Changing the pair later stops every existing subscription.
+2. Set `PUSH_TICK_SECRET` in Vercel to a long random string (for example `openssl rand -hex 32`), then redeploy.
+3. Run the database migration (`npm run db:migrate`, `0011_push_nudges`).
+4. Deploy the cron from `cloudflare/push-ticker` with the Cloudflare account that holds pranaveda.app:
+   - `npx wrangler login`
+   - `npx wrangler secret put PUSH_TICK_SECRET` (the same value)
+   - `npx wrangler deploy`
+
+   Workers' free plan includes cron triggers. The Worker's logs show each check's result: `{"users":…,"sent":…,"removed":…}`.
+
+Without the keys, `/api/push/key` answers 503 and the Notifications row offers tab notifications as before.
+
+Pacing values are constants: the 15-minute and 3-hour rules at the top of `src/hooks/useNudgeNotifications.ts`, and the 10-minute, waking-hours, and rest-after-practice rules beside `findOpenSlot` in `src/hooks/useExternalCalendar.ts`. Push uses the same values in `api/_lib/pushRules.ts`, worked out in the user's own time zone (the account's `timezone`).
 
 ### Calendar and free-time reminders in the apps
 
@@ -389,6 +416,8 @@ Signed in, the server (Neon Postgres) also stores:
 | Practice history, including heart readings and ritual snapshots | `practice_log_entries` |
 | Saved rituals, and markers for removed ones (no ritual content) | `saved_rituals` |
 | Saved places and the private calendar link, only if the user turns that on; encrypted | `account_connections` |
+| Browsers with push nudges on (push service address and keys) | `push_subscriptions` |
+| For push nudges: busy start/end times for today and tomorrow, whether calendars could be read, when PranaVeda was last on screen, the last nudge | `push_nudge_state` |
 
 Everything is removed when the account is deleted.
 
@@ -411,6 +440,7 @@ Tested in a browser with simulated data:
 - The private calendar link reader (recurring events, time zones, deleted and moved occurrences, blocked addresses) and the connect flow.
 - The in-app nudge appearing when free and disappearing when busy.
 - Browser notification rules and one end-to-end notification, using a stand-in for the real notification.
+- Push nudges: the rules in the user's time zone (`tests/pushRules.test.ts`), and subscribing, uploads, the 15-minute check, one nudge per opening and removal of gone browsers against the dev database with a stand-in push service (`tests/push.integration.test.ts`).
 - The Bluetooth and Google Health flows, session heart-rate saving, the Trends card, and the summary sent to Amrita, using a simulated strap and simulated Google Health responses.
 - Location: place matching, saving spots, the place-aware suggestion, and the chat request carrying only the kind of place, using a simulated position.
 
@@ -424,6 +454,6 @@ Not yet tested against the real thing:
 - Google Calendar and Google Health connectors with a real client ID. The Google Health field names and filters come from Google's documentation, not a live call.
 - Sign in with Apple (needs an Apple Developer account).
 - A real Bluetooth heart-rate device.
-- A real system notification appearing on screen.
+- A real system notification appearing on screen, including a real push notification through a browser's push service and the Cloudflare cron.
 - Location with a real device position and the browser's real permission prompt.
 - Amrita's replies using calendar, wearable and location context with the live model.

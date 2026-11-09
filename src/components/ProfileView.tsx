@@ -15,6 +15,7 @@ import { HeartRateMonitor } from '../hooks/useHeartRateMonitor';
 import { WearableHealth } from '../hooks/useWearableHealth';
 import { ExternalCalendar } from '../hooks/useExternalCalendar';
 import { NudgeNotifications } from '../hooks/useNudgeNotifications';
+import { PushNudges } from '../hooks/usePushNudges';
 import { ConnectionsSync } from '../hooks/useConnectionsSync';
 
 interface ProfileViewProps {
@@ -24,6 +25,7 @@ interface ProfileViewProps {
   streak: number;
   calendar: ExternalCalendar;
   notifications: NudgeNotifications;
+  push: PushNudges;
   heart: HeartRateMonitor;
   health: WearableHealth;
   place: Place;
@@ -82,7 +84,7 @@ const CONNECTORS: {
   },
 ];
 
-export default function ProfileView({ profile, auth, practiceLog, streak, calendar, notifications, heart, health, place, connectionsSync, onOpenRitual, onStartPractice, onExperienceChange }: ProfileViewProps) {
+export default function ProfileView({ profile, auth, practiceLog, streak, calendar, notifications, push, heart, health, place, connectionsSync, onOpenRitual, onStartPractice, onExperienceChange }: ProfileViewProps) {
   const [section, setSection] = useState<'connectors' | 'calendar' | 'wearables' | 'location'>('connectors');
   const [savingExperience, setSavingExperience] = useState(false);
   const [experienceNotice, setExperienceNotice] = useState<string | null>(null);
@@ -157,7 +159,7 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
           {backToConnectors}
         </div>
         <div className="w-full max-w-5xl mx-auto px-5 sm:px-6 pb-2">
-          <CalendarConnections calendar={calendar} notifications={notifications} />
+          <CalendarConnections calendar={calendar} notifications={notifications} push={push} />
         </div>
         <PracticeCalendar entries={practiceLog} streak={streak} onOpenRitual={onOpenRitual} onStartPractice={onStartPractice} />
       </div>
