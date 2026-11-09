@@ -147,8 +147,8 @@ final class CalendarStore: NSObject {
     /// planned before. Starts 15 minutes from now, as the website waits for
     /// a tab to have been out of view that long.
     func planReminders(now: Date = Date()) {
-        noteShown(now: now)
         cancelReminders()
+        noteShown(now: now)
         guard remindersOn, enabled, !blocked, readAt != nil else { return }
         let calendar = Calendar.current
         let end = calendar.date(byAdding: .day, value: 2, to: calendar.startOfDay(for: now))!
@@ -197,12 +197,11 @@ final class CalendarStore: NSObject {
         defaults.set(try? JSONEncoder().encode(planned.filter { !dropped.contains($0) }), forKey: Self.plannedKey)
     }
 
+    /// By the planned keys, at once: a re-plan reuses them, so a removal
+    /// that waited for the pending list would land after the new reminders.
     private func cancelReminders() {
-        let center = UNUserNotificationCenter.current()
-        center.getPendingNotificationRequests { requests in
-            let ids = requests.map(\.identifier).filter { $0.hasPrefix(Self.idPrefix) }
-            center.removePendingNotificationRequests(withIdentifiers: ids)
-        }
+        let planned = defaults.data(forKey: Self.plannedKey).flatMap { try? JSONDecoder().decode([PlannedReminder].self, from: $0) } ?? []
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: planned.map { Self.idPrefix + $0.key })
     }
 
     // MARK: In the background
