@@ -11,7 +11,9 @@ import { isValidNonce, issueNonce } from './_lib/nonce.js';
 import { RefreshError, issueSession, revokeSession, rotateSession } from './_lib/refresh.js';
 import type { SessionTokens } from './_lib/refresh.js';
 import { dbRefreshStore } from './_lib/refreshStore.js';
-import { connectionsKey } from './_lib/tokens.js';
+import { connectionsKey, verifyAccessToken } from './_lib/tokens.js';
+import { alexaLinkFor, alexaLinked, unlinkAlexa } from './_lib/alexaLinks.js';
+import { alexaClient, clientCredentials, issueCode, readAuthorizeRequest, redeemCode, redirectWith, sameClient } from './_lib/oauth.js';
 import {
   AccountExistsError,
   appleGrantsFor,
@@ -35,6 +37,8 @@ import type { PublicUser } from './_lib/users.js';
 
 const app = express();
 app.use(express.json({ limit: '32kb' }));
+// Amazon posts to /api/oauth/token as a form.
+app.use(express.urlencoded({ extended: false, limit: '8kb' }));
 
 type Handler = (req: Request, res: Response) => Promise<unknown>;
 
@@ -177,7 +181,7 @@ app.post(
 
     let tokens;
     try {
-      tokens = await rotateSession(dbRefreshStore, presented);
+      tokens = await rotateSession(dbRefreshStore, presented, new Date(), ['web', 'ios', 'android']);
     } catch (err) {
       if (!(err instanceof RefreshError)) throw err;
       if (isWeb(req)) clearSessionCookies(req, res);
@@ -260,6 +264,104 @@ app.delete(
     res.status(204).end();
   })
 );
+
+// ======================== Alexa account linking (OAuth) ========================
+//
+// The Alexa app opens /api/oauth/authorize; the website's /link/alexa page
+// signs the person in and asks; Amazon trades the code at /api/oauth/token.
+// The skill's tokens are for the 'alexa' audience only (api/_lib/tokens.ts).
+
+app.get('/api/oauth/authorize', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const read = readAuthorizeRequest(req.query as Record<string, unknown>);
+  if ('error' in read) {
+    if (!read.redirectUri) return res.status(400).type('text/plain').send(`This link request cannot be used (${read.error}).`);
+    return res.redirect(302, redirectWith(read.redirectUri, { error: read.error, state: read.state }));
+  }
+  const query = new URLSearchParams({ response_type: 'code', client_id: read.clientId, redirect_uri: read.redirectUri, state: read.state, scope: read.scope.join(' ') });
+  res.redirect(302, `/link/alexa?${query}`);
+});
+
+// The person's answer on /link/alexa. Answers with where to send the browser.
+app.post(
+  '/api/oauth/authorize',
+  route(async (req, res) => {
+    if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const read = readAuthorizeRequest(req.body ?? {});
+    if ('error' in read) {
+      if (!read.redirectUri) return res.status(400).json({ error: read.error });
+      return res.json({ redirect: redirectWith(read.redirectUri, { error: read.error, state: read.state }) });
+    }
+    if (req.body?.decision !== 'allow') return res.json({ redirect: redirectWith(read.redirectUri, { error: 'access_denied', state: read.state }) });
+    const code = await issueCode({ userId: user.id, clientId: read.clientId, redirectUri: read.redirectUri, scope: read.scope });
+    res.json({ redirect: redirectWith(read.redirectUri, { code, state: read.state }) });
+  })
+);
+
+const tokenError = (res: Response, error: string, status = 400) => res.status(status).json({ error });
+
+app.post(
+  '/api/oauth/token',
+  route(async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const expected = alexaClient();
+    const given = clientCredentials(req.headers.authorization, req.body ?? {});
+    if (!expected || !given || !sameClient(given, expected)) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="pranaveda"');
+      return tokenError(res, 'invalid_client', 401);
+    }
+    const body = req.body ?? {};
+    let tokens;
+    if (body.grant_type === 'authorization_code') {
+      if (typeof body.code !== 'string' || typeof body.redirect_uri !== 'string') return tokenError(res, 'invalid_request');
+      const grant = await redeemCode(body.code, expected.id, body.redirect_uri);
+      if (!grant || !(await getUser(grant.userId))) return tokenError(res, 'invalid_grant');
+      tokens = await issueSession(dbRefreshStore, { userId: grant.userId, client: 'alexa', aud: 'alexa', scope: grant.scope });
+      await recordSession(tokens.sessionId, grant.userId, 'alexa', { deviceClass: 'speaker', os: null, osVersion: null, browser: null, deviceModel: null, appVersion: null });
+    } else if (body.grant_type === 'refresh_token') {
+      if (typeof body.refresh_token !== 'string' || !body.refresh_token) return tokenError(res, 'invalid_request');
+      try {
+        tokens = await rotateSession(dbRefreshStore, body.refresh_token, new Date(), ['alexa']);
+      } catch (err) {
+        if (!(err instanceof RefreshError)) throw err;
+        return tokenError(res, 'invalid_grant');
+      }
+      await touchSession(tokens.sessionId);
+    } else {
+      return tokenError(res, 'unsupported_grant_type');
+    }
+    const { scope } = await verifyAccessToken(tokens.accessToken, 'alexa');
+    res.json({ access_token: tokens.accessToken, token_type: 'Bearer', expires_in: tokens.expiresIn, refresh_token: tokens.refreshToken, scope: scope.join(' ') });
+  })
+);
+
+// The Smart assistants card: is the skill linked, and can it notify?
+app.get(
+  '/api/me/alexa',
+  route(async (req, res) => {
+    const user = await currentUser(req, res);
+    if (!user) return;
+    const linked = await alexaLinked(user.id);
+    res.json({ linked, notifications: linked ? ((await alexaLinkFor(user.id))?.notifications ?? false) : false });
+  })
+);
+
+app.delete(
+  '/api/me/alexa',
+  route(async (req, res) => {
+    if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
+    const user = await currentUser(req, res);
+    if (!user) return;
+    await unlinkAlexa(user.id);
+    res.status(204).end();
+  })
+);
+
+app.use('/api/oauth', (_req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
 
 // Scoped to this function's own prefix: in local dev this app is mounted
 // inside the main one and must let every other path fall through.

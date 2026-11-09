@@ -11,6 +11,8 @@
   "rewrites": [
     { "source": "/api/auth/:path*", "destination": "/api/auth" },
     { "source": "/api/me", "destination": "/api/auth" },
+    { "source": "/api/me/:path*", "destination": "/api/auth" },
+    { "source": "/api/oauth/:path*", "destination": "/api/auth" },
     { "source": "/api/sync/:path*", "destination": "/api/sync" },
     { "source": "/api/push/:path*", "destination": "/api/push" },
     { "source": "/api/:path*", "destination": "/api/index" },

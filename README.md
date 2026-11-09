@@ -86,7 +86,7 @@ A nudge only ever appears in open calendar time. It never appears:
 **Signed in: push notifications.** These arrive even when PranaVeda is closed, on desktop browsers, Android Chrome, and an iPhone or iPad with PranaVeda added to the Home Screen (iOS 16.4 or later).
 
 - **How:** the browser subscribes through a service worker (`public/sw.js`). Every 15 minutes a free Cloudflare cron (`cloudflare/push-ticker`) calls `POST /api/push/tick`. The server checks each subscribed user against the rules above and sends a nudge with the `web-push` library.
-- **What the server keeps:** busy start and end times for today and tomorrow, uploaded by the website while it is open; whether every connected calendar could be read; and when PranaVeda was last on screen. It never receives event titles, places or people. The `push_nudge_state` and `push_subscriptions` tables hold this, and both go with the account.
+- **What the server keeps:** busy start and end times for today and tomorrow, uploaded by the website while it is open (also while Alexa is linked); whether every connected calendar could be read; and when PranaVeda was last on screen. It never receives event titles, places or people. The `push_nudge_state` and `push_subscriptions` tables hold this, and both go with the account.
 - **Calendar link on the account:** if "Keep my places and calendar link on my account" is on, the server also re-reads that link at each check, so a meeting added after PranaVeda was closed still blocks a nudge.
 - **Uploaded busy times expire after a day.** Without a fresh upload, a user is nudged only if the account's calendar link is their only calendar. A Google calendar can only be read by the website, so its busy times must be uploaded.
 - **On top of the rules above:**
@@ -153,7 +153,7 @@ Practices marked `where_shown = explore_only` in the Practice Library (Headstand
 
 ### Alexa skill
 
-"Alexa, open Prana Veda" gives a short reflection for this part of the day, then offers a guided breath or a daily reminder. This is Phase 1.5a: there is no account linking, so the skill never knows who is listening and never says anything personal.
+"Alexa, open Prana Veda" gives a short reflection for this part of the day, then offers a guided breath or a daily reminder. Without account linking, the skill never knows who is listening and never says anything personal. Linked to a PranaVeda account (Phase 1.5b, below), it greets the person by name with their open time and practice history, and Alexa can notify them when free time opens.
 
 - **What it does:**
   - **Open:** a one- or two-sentence reflection for the morning, afternoon or evening where the Echo is, then "a short breathing practice, or a daily reminder?".
@@ -177,7 +177,55 @@ Practices marked `where_shown = explore_only` in the Practice Library (Headstand
 
 The ASK CLI can deploy the same `alexa/skill-package/` folder instead of pasting.
 
-**Not yet (Phase 1.5b):** account linking, so the skill can speak a person's own nudges.
+#### Linking an account (Phase 1.5b)
+
+In the Alexa app, the skill's page has **Link account**. It opens `pranaveda.app/link/alexa`, where the person signs in (Google or Apple) and chooses **Allow** or **Not now**.
+
+- **What a linked person hears on opening:**
+  - "Good evening, Hetan.", using the first word of the account's display name;
+  - the reflection, as before;
+  - their open time, for example "You have 40 open minutes, until 3:00 PM.", or "Your calendar is busy until 1:15 PM.";
+  - when they last practised, for example "You last practised yesterday, and 3 times this past week.";
+  - then the usual offer of a breath or a reminder. The card in the Alexa app shows the same lines.
+- **Never said:** event titles, the wellness profile, conditions or anything about health. A speaker is heard by the whole room, and the consent page says so.
+- **Where the open time comes from:** the same busy times as push nudges (`push_nudge_state`, plus the account's calendar link read at that moment). While Alexa is linked, the website uploads busy times even with website notifications off. Without a calendar the server can trust, the open-time line is left out rather than guessed. A slow calendar link is skipped after 2.5 seconds, to stay within Alexa's 8-second limit.
+- **The link ended on the website:** Alexa's token is refused, so the skill says the usual reflection, asks the person to link again, and shows Amazon's link card.
+- **Alexa notifications:** the 15-minute push check (`runTick`) also covers people who allowed PranaVeda notifications in the Alexa app.
+  - It sends Amazon's `AMAZON.MessageAlert.Activated` event, so the Echo lights up and says "You have one new message from Amrita". "Alexa, open Prana Veda" then gives the open time.
+  - It follows the same rules as push nudges, and one opening is one nudge, whichever way it arrives.
+  - An event expires after 15 minutes.
+  - If Amazon refuses a person (notifications turned off), they are left out until Amazon says they turned them back on.
+  - Amazon's event schemas have nothing for wellness, so a message alert is the closest fit. Amazon's certification may question it.
+- **How linking works:** PranaVeda is an OAuth 2.0 authorization server with one client, the skill (authorization-code grant). The routes are in `api/auth.ts`, and the checks and codes in `api/_lib/oauth.ts`.
+  - `GET /api/oauth/authorize` checks the client and that the redirect address is one of Amazon's three (`pitangui.amazon.com`, `layla.amazon.com` or `alexa.amazon.co.jp`, path `/api/skill/link/<vendor id>`, matched exactly). It then sends the browser to `/link/alexa`. A bad client or address is refused on the spot; other mistakes go back to Amazon.
+  - `POST /api/oauth/authorize` (signed in, same site) records the answer. It issues a code that is single-use, kept only as a hash in `oauth_codes`, and expires in 5 minutes.
+  - `POST /api/oauth/token` accepts the skill's credentials by HTTP Basic or in the form. It trades a code, or a refresh token, for a session on client `alexa`, audience `alexa` and device class `speaker`.
+  - Alexa's access tokens are refused by every app endpoint, and app tokens by the skill. Each refresh endpoint rotates only its own kind of token.
+- **Skill events** (subscribed in `skill.json`):
+  - account linked, and notifications allowed or withdrawn, are recorded in `alexa_links`;
+  - disabling the skill forgets the Alexa account;
+  - Amazon may send these up to an hour late, so they are accepted that old (other requests: 150 seconds).
+- **Unlinking:** **Unlink** on the Smart assistants card (Profile) ends the skill's sessions and forgets the Alexa account. Deleting the PranaVeda account does the same.
+- **Code:** linked requests load `api/_lib/alexaPersonal.ts` (database) only when a linked token arrives. Notifications are sent by `api/_lib/alexaEvents.ts`.
+
+**Setting up linking (free):**
+
+1. Make a client ID (for example `alexa-skill`) and a long random secret. Set them in Vercel as `ALEXA_OAUTH_CLIENT_ID` and `ALEXA_OAUTH_CLIENT_SECRET`.
+2. In the Alexa developer console, go to **Build → Account Linking** and turn on "Do you allow users to create an account or link to an existing account with you?".
+   - **Auth Code Grant**.
+   - **Web Authorization URI:** `https://pranaveda.app/api/oauth/authorize`.
+   - **Access Token URI:** `https://pranaveda.app/api/oauth/token`.
+   - **Client ID** and **Secret:** from step 1.
+   - **Authentication Scheme:** HTTP Basic.
+   - **Scope:** `nudges`.
+   - **Domain list:** leave empty.
+   - **Default Access Token Expiration Time:** leave empty (the server sends 900 seconds).
+   - Save.
+3. Optional: copy the vendor ID from the **Alexa Redirect URLs** on that page (the last part) into `ALEXA_VENDOR_ID`.
+4. **Build → Permissions:** turn on **Alexa Notifications**. Copy the skill's **Client ID** and **Client Secret** shown there ("Alexa Skill Messaging") into `ALEXA_EVENTS_CLIENT_ID` and `ALEXA_EVENTS_CLIENT_SECRET`.
+5. Deploy `skill.json` with the ASK CLI, or add the same `events` block in the console's manifest editor. It holds the message-alert publication and the three subscriptions.
+6. Redeploy on Vercel. Then, in the Alexa app: PranaVeda → **Settings** → **Link account**. For notifications: PranaVeda → **Settings** → **Manage permissions** → **Alexa Notifications**.
+7. `ALEXA_EVENTS_STAGE` stays `development` (only the developer account's devices) until Amazon certifies the skill, then becomes `live`.
 
 ### Wearables
 
@@ -418,6 +466,8 @@ Signed in, the server (Neon Postgres) also stores:
 | Saved places and the private calendar link, only if the user turns that on; encrypted | `account_connections` |
 | Browsers with push nudges on (push service address and keys) | `push_subscriptions` |
 | For push nudges: busy start/end times for today and tomorrow, whether calendars could be read, when PranaVeda was last on screen, the last nudge | `push_nudge_state` |
+| Linked Alexa account (Amazon's ID for the person) and whether Alexa notifications are allowed | `alexa_links` |
+| Single-use Alexa linking codes, stored hashed, for 5 minutes | `oauth_codes` |
 
 Everything is removed when the account is deleted.
 

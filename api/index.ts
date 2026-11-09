@@ -2,6 +2,7 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { authenticate } from './_lib/auth.js';
+import { verifyAccessToken } from './_lib/tokens.js';
 import { CalendarLinkError, fetchCalendarText, icsBusyIntervals } from './_lib/calendar.js';
 import { applyProfileChanges, loadAccountProfile } from './_lib/profiles.js';
 import { moveUpFor, moveUpPrompt, recentPracticeDates } from './_lib/moveUp.js';
@@ -2452,8 +2453,8 @@ app.get('/api/catalog', async (req, res) => {
 });
 // ================================ Alexa skill =================================
 //
-// Phase 1.5a: no account linking, nothing personal (api/_lib/alexa.ts). Alexa
-// cuts a skill off after about 8 seconds, so nothing here waits long on Claude.
+// Nothing personal unless the skill is linked (api/_lib/alexa.ts, README).
+// Alexa cuts a skill off after about 8 seconds, so nothing here waits long.
 
 const alexaCerts = new Map<string, { pem: string; until: number }>();
 async function fetchAlexaChain(url: string): Promise<string> {
@@ -2526,7 +2527,30 @@ const alexaDeps: AlexaDeps = {
     });
     return res.status;
   },
+  // Linked: the database is loaded only now, so chat and the rest never load it.
+  personal: async (body, zone) => {
+    const token = body?.context?.System?.user?.accessToken;
+    if (typeof token !== 'string' || !token) return undefined;
+    const userId = await alexaUserFrom(token);
+    if (!userId) return null;
+    const { personalFor } = await import('./_lib/alexaPersonal.js');
+    return personalFor(userId, body?.context?.System?.user?.userId, zone);
+  },
+  skillEvent: async (body) => {
+    const token = body?.context?.System?.user?.accessToken;
+    const userId = typeof token === 'string' && token ? await alexaUserFrom(token) : undefined;
+    const { recordSkillEvent } = await import('./_lib/alexaPersonal.js');
+    await recordSkillEvent(body, userId ?? undefined);
+  },
 };
+
+async function alexaUserFrom(token: string): Promise<string | undefined> {
+  try {
+    return (await verifyAccessToken(token, 'alexa')).userId;
+  } catch {
+    return undefined;
+  }
+}
 
 // Only Amazon, only for this skill (ALEXA_SKILL_ID), only fresh requests.
 app.post('/api/alexa', express.raw({ type: '*/*', limit: '256kb' }), async (req, res) => {

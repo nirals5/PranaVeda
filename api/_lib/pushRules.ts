@@ -90,7 +90,7 @@ export function openSlotAt(busy: Busy, now: number, lastPracticeAt: number | nul
 
 // The busy times to trust right now, or null to stay quiet. Fail closed: a
 // calendar that could not be read means no nudge.
-function busyNow({ now, state, linkBusy }: NudgeInput): Busy | null {
+export function busyNow({ now, state, linkBusy }: Pick<NudgeInput, 'now' | 'state' | 'linkBusy'>): Busy | null {
   if (!state.trusted || linkBusy === null) return null;
   const uploadFresh =
     state.busy !== null &&

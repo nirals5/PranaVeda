@@ -16,6 +16,7 @@ import { WearableHealth } from '../hooks/useWearableHealth';
 import { ExternalCalendar } from '../hooks/useExternalCalendar';
 import { NudgeNotifications } from '../hooks/useNudgeNotifications';
 import { PushNudges } from '../hooks/usePushNudges';
+import { AlexaLink } from '../hooks/useAlexaLink';
 import { ConnectionsSync } from '../hooks/useConnectionsSync';
 
 interface ProfileViewProps {
@@ -26,6 +27,7 @@ interface ProfileViewProps {
   calendar: ExternalCalendar;
   notifications: NudgeNotifications;
   push: PushNudges;
+  alexaLink: AlexaLink;
   heart: HeartRateMonitor;
   health: WearableHealth;
   place: Place;
@@ -84,7 +86,7 @@ const CONNECTORS: {
   },
 ];
 
-export default function ProfileView({ profile, auth, practiceLog, streak, calendar, notifications, push, heart, health, place, connectionsSync, onOpenRitual, onStartPractice, onExperienceChange }: ProfileViewProps) {
+export default function ProfileView({ profile, auth, practiceLog, streak, calendar, notifications, push, alexaLink, heart, health, place, connectionsSync, onOpenRitual, onStartPractice, onExperienceChange }: ProfileViewProps) {
   const [section, setSection] = useState<'connectors' | 'calendar' | 'wearables' | 'location'>('connectors');
   const [savingExperience, setSavingExperience] = useState(false);
   const [experienceNotice, setExperienceNotice] = useState<string | null>(null);
@@ -159,7 +161,7 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
           {backToConnectors}
         </div>
         <div className="w-full max-w-5xl mx-auto px-5 sm:px-6 pb-2">
-          <CalendarConnections calendar={calendar} notifications={notifications} push={push} />
+          <CalendarConnections calendar={calendar} notifications={notifications} push={push} alexaLinked={alexaLink.linked} />
         </div>
         <PracticeCalendar entries={practiceLog} streak={streak} onOpenRitual={onOpenRitual} onStartPractice={onStartPractice} />
       </div>
@@ -362,7 +364,7 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
       </section>
 
       {/* Smart assistants: shown once the Alexa skill is published. */}
-      <AssistantsSettings />
+      <AssistantsSettings alexaLink={alexaLink} />
     </div>
   );
 }

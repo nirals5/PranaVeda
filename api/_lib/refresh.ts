@@ -105,10 +105,17 @@ export async function issueSession(store: RefreshStore, session: NewSession, now
   return tokensFor(row, token, now);
 }
 
-export async function rotateSession(store: RefreshStore, presented: string, now: Date = new Date()): Promise<SessionTokens> {
+// `clients`: only these may refresh here, so the apps' endpoint never
+// rotates the skill's token and the skill's never rotates an app's.
+export async function rotateSession(
+  store: RefreshStore,
+  presented: string,
+  now: Date = new Date(),
+  clients?: readonly Client[]
+): Promise<SessionTokens> {
   const tokenHash = hashToken(presented);
   let row = await store.findByHash(tokenHash);
-  if (!row || row.revokedAt) throw new RefreshError('invalid');
+  if (!row || row.revokedAt || (clients && !clients.includes(row.client))) throw new RefreshError('invalid');
   if (row.expiresAt.getTime() <= now.getTime()) throw new RefreshError('expired');
 
   if (!row.rotatedAt) {

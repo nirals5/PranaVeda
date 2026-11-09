@@ -51,6 +51,13 @@ describe('issueSession', () => {
 });
 
 describe('rotateSession', () => {
+  it('refuses, and leaves untouched, a token from a client not allowed at that endpoint', async () => {
+    const tokens = await issueSession(store, session, now);
+    expect(await reasonOf(rotateSession(store, tokens.refreshToken, now, ['alexa']))).toBe('invalid');
+    expect(store.rows[0].rotatedAt).toBeNull();
+    expect(await reasonOf(rotateSession(store, tokens.refreshToken, now, ['web', 'ios', 'android']))).toBe('accepted');
+  });
+
   it('returns a new refresh token in the same family with a renewed expiry', async () => {
     const first = await issueSession(store, session, now);
     const at = later(now, 60_000);

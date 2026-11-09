@@ -1,9 +1,12 @@
 import { X509Certificate, createVerify } from 'node:crypto';
 import { rootCertificates } from 'node:tls';
+import { type Busy, formatTime, mergeBusy } from './pushRules.js';
 
-// The Alexa skill (Phase 1.5a): no account linking, so Alexa never says who is
-// speaking and nothing personal is ever spoken. A speaker is heard by the
-// whole room. Pure pieces live here; the route is in api/index.ts.
+// The Alexa skill. Unlinked, Alexa never knows who is speaking and nothing
+// personal is spoken. Linked (Phase 1.5b), it greets the person by name and
+// says their open time and when they last practised, never more: a speaker
+// is heard by the whole room. Pure pieces live here; the route is in
+// api/index.ts.
 //
 // Amazon's rules for a skill on its own endpoint ("Host a custom skill as a
 // web service"): every request is signed, and anything that fails a check
@@ -13,6 +16,9 @@ import { rootCertificates } from 'node:tls';
 
 // A request older or newer than this is a replay (Amazon allows 150 s).
 export const MAX_SKEW_MS = 150 * 1000;
+// Skill events (account linked, notifications allowed) can arrive up to an
+// hour after they happened.
+export const MAX_EVENT_AGE_MS = 60 * 60 * 1000;
 
 // https://s3.amazonaws.com(:443)/echo.api/… — the only place Amazon keeps its
 // signing certificates. Case is ignored for the scheme and host, and the path
@@ -94,7 +100,8 @@ export async function verifyAlexaRequest(input: VerifyInput): Promise<string | u
     return 'body';
   }
   const at = Date.parse(body?.request?.timestamp ?? '');
-  if (!Number.isFinite(at) || Math.abs(now.getTime() - at) > MAX_SKEW_MS) return 'timestamp';
+  const skew = String(body?.request?.type ?? '').startsWith('AlexaSkillEvent.') ? MAX_EVENT_AGE_MS : MAX_SKEW_MS;
+  if (!Number.isFinite(at) || Math.abs(now.getTime() - at) > skew) return 'timestamp';
   const appId = body?.context?.System?.application?.applicationId ?? body?.session?.application?.applicationId;
   if (input.skillId && appId !== input.skillId) return 'skill id';
   return undefined;
@@ -249,6 +256,55 @@ export function partOfDay(now: Date, timeZone?: string): { date: string; part?: 
 const NOT_FOR_A_SPEAKER = /\b(diagnos\w*|disease|illness|symptom\w*|medication|medicine|pregnan\w*|blood pressure|injur\w*|pain|anxiety|depress\w*|weight|cure\w*|treat\w*)\b/i;
 export const speakerSafe = (text: string) => !NOT_FOR_A_SPEAKER.test(text) && text.length <= 300;
 
+// ------------------------------- Linked: personal -------------------------------
+
+// What a linked person hears on opening. Each line is optional.
+export type Personal = { name?: string | null; free?: string; history?: string };
+
+export function greeting(name: string | null | undefined, part: PartOfDay | undefined): string {
+  const first = (name ?? '').trim().split(/\s+/)[0]?.slice(0, 40) ?? '';
+  const hello = part ? `Good ${part}` : 'Hello';
+  return first ? `${hello}, ${first}.` : `${hello}.`;
+}
+
+// Open time from busy start and end times, in the person's zone. Undefined
+// when no calendar can be trusted (nothing is said rather than a guess).
+export function freeTimeLine(busy: Busy | null | undefined, now: number, timeZone: string): string | undefined {
+  if (!busy) return undefined;
+  const merged = mergeBusy(busy);
+  const current = merged.find(([s, e]) => s <= now && now < e);
+  if (current) return `Your calendar is busy until ${formatTime(current[1], timeZone)}.`;
+  const next = merged.find(([s]) => s > now);
+  const today = (ms: number) => localDate(ms, timeZone);
+  if (!next || today(next[0]) !== today(now)) return 'Your calendar is open for the rest of today.';
+  const minutes = Math.floor((next[0] - now) / 60000);
+  const at = formatTime(next[0], timeZone);
+  if (minutes < 10) return `Your next commitment is at ${at}.`;
+  return minutes <= 90 ? `You have ${minutes} open minutes, until ${at}.` : `You're free until ${at}.`;
+}
+
+function localDate(ms: number, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ms);
+}
+
+// Days between two local dates (YYYY-MM-DD), ignoring daylight saving.
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
+
+export function historyLine(lastAt: number | null, weekCount: number, now: number, timeZone: string): string {
+  if (lastAt === null) return 'Your first practice is waiting whenever you are ready.';
+  const days = daysBetween(localDate(lastAt, timeZone), localDate(now, timeZone));
+  if (days >= 7) return "It's been a little while since your last practice. A gentle return is always welcome.";
+  const when =
+    days <= 0
+      ? 'You practised earlier today'
+      : days === 1
+        ? 'You last practised yesterday'
+        : `You last practised on ${new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'long' }).format(lastAt)}`;
+  return weekCount >= 2 ? `${when}, and ${weekCount} times this past week.` : `${when}.`;
+}
+
+export const RELINK = 'To hear your own free time again, link your PranaVeda account in the Alexa app.';
+
 // ------------------------------ Handling a request ------------------------------
 
 export type AlexaDeps = {
@@ -258,6 +314,11 @@ export type AlexaDeps = {
   timeZone: (apiEndpoint: string, deviceId: string, token: string) => Promise<string | undefined>;
   // POST /v1/alerts/reminders; resolves to the HTTP status.
   createReminder: (apiEndpoint: string, token: string, body: unknown) => Promise<number>;
+  // A linked person's lines: undefined when the skill is not linked, null
+  // when the link was ended (the token is no longer accepted).
+  personal?: (body: any, timeZone: string | undefined) => Promise<Personal | null | undefined>;
+  // AlexaSkillEvent.* (linked, notifications allowed or not, disabled).
+  skillEvent?: (body: any) => Promise<void>;
   now?: () => Date;
 };
 
@@ -299,12 +360,27 @@ export async function handleAlexa(body: any, deps: AlexaDeps): Promise<unknown> 
       const zone = await deps
         .timeZone(system.apiEndpoint, system.device?.deviceId, system.apiAccessToken)
         .catch(() => undefined);
-      const reflection = await deps.reflection(partOfDay(now, zone));
-      return speak(`${say(reflection)} ${pause(1)} ${say(OFFER)}`, {
+      const when = partOfDay(now, zone);
+      const [reflection, personal] = await Promise.all([
+        deps.reflection(when),
+        deps.personal ? deps.personal(body, zone).catch(() => undefined) : Promise.resolve(undefined),
+      ]);
+      if (personal === null) {
+        return speak(`${say(reflection)} ${pause(1)} ${say(RELINK)} ${say(OFFER)}`, {
+          reprompt: say(OFFER),
+          end: false,
+          attributes: { offer: 'choice' satisfies Offer },
+          card: { type: 'LinkAccount' },
+        });
+      }
+      const lines = personal ? [personal.free, personal.history].filter((l): l is string => !!l) : [];
+      const hello = personal ? `${say(greeting(personal.name, when.part))} ` : '';
+      const mine = lines.length ? ` ${pause(1)} ${lines.map(say).join(' ')}` : '';
+      return speak(`${hello}${say(reflection)}${mine} ${pause(1)} ${say(OFFER)}`, {
         reprompt: say(OFFER),
         end: false,
         attributes: { offer: 'choice' satisfies Offer },
-        card: { type: 'Simple', title: 'PranaVeda', content: `${reflection}\n\n${DISCLAIMER}` },
+        card: { type: 'Simple', title: 'PranaVeda', content: [reflection, ...lines, DISCLAIMER].join('\n\n') },
       });
     }
     case 'IntentRequest': {
@@ -343,6 +419,13 @@ export async function handleAlexa(body: any, deps: AlexaDeps): Promise<unknown> 
       if (request.name === 'AskFor' && request.payload?.status === 'ACCEPTED' && hhmm) return setReminder(body, hhmm, deps, false);
       return speak(say('No problem. You can allow reminders for Prana Veda in the Alexa app any time.'));
     }
+    case 'AlexaSkillEvent.ProactiveSubscriptionChanged':
+    case 'AlexaSkillEvent.SkillAccountLinked':
+    case 'AlexaSkillEvent.SkillDisabled':
+    case 'AlexaSkillEvent.SkillPermissionAccepted':
+    case 'AlexaSkillEvent.SkillPermissionChanged':
+      await deps.skillEvent?.(body);
+      return end();
     case 'SessionEndedRequest':
       return end();
     default:

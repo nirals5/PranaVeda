@@ -5,18 +5,26 @@
         "en-US": {
           "name": "PranaVeda",
           "summary": "A calm moment with Amrita: a daily reflection, a guided breath, and a daily reminder to practise.",
-          "description": "PranaVeda brings Amrita, a gentle Ayurvedic mentor, to your Echo. Open it for a short reflection for this part of the day. Ask for a breathing practice and Amrita guides one minute of calm breathing. Ask for a daily reminder and Alexa reminds you to take a moment for practice. PranaVeda offers general wellness guidance, not medical advice.",
+          "description": "PranaVeda brings Amrita, a gentle Ayurvedic mentor, to your Echo. Open it for a short reflection for this part of the day. Ask for a breathing practice and Amrita guides one minute of calm breathing. Ask for a daily reminder and Alexa reminds you to take a moment for practice. Link your PranaVeda account and Amrita greets you by name with your open time and when you last practised, and Alexa can let you know when free time opens. PranaVeda offers general wellness guidance, not medical advice.",
           "examplePhrases": [
             "Alexa, open Prana Veda",
             "Alexa, ask Prana Veda for a breathing practice",
             "Alexa, ask Prana Veda to remind me every evening at seven"
           ],
-          "keywords": ["yoga", "ayurveda", "breathing", "wellness", "calm"]
+          "keywords": [
+            "yoga",
+            "ayurveda",
+            "breathing",
+            "wellness",
+            "calm"
+          ]
         }
       },
       "isAvailableWorldwide": false,
-      "distributionCountries": ["US"],
-      "testingInstructions": "No account linking. Say: open Prana Veda; ask Prana Veda for a breathing practice; ask Prana Veda to remind me every evening at seven (asks for reminder permission the first time).",
+      "distributionCountries": [
+        "US"
+      ],
+      "testingInstructions": "Works without linking: open Prana Veda; ask Prana Veda for a breathing practice; ask Prana Veda to remind me every evening at seven (asks for reminder permission the first time). To test linking, sign in at pranaveda.app with a test account, then link from the skill's page in the Alexa app; opening the skill then greets by name with open time and practice history.",
       "category": "HEALTH_AND_FITNESS"
     },
     "apis": {
@@ -27,13 +35,42 @@
         }
       }
     },
-    "permissions": [{ "name": "alexa::alerts:reminders:skill:readwrite" }],
+    "permissions": [
+      {
+        "name": "alexa::alerts:reminders:skill:readwrite"
+      },
+      {
+        "name": "alexa::devices:all:notifications:write"
+      }
+    ],
     "privacyAndCompliance": {
       "allowsPurchases": false,
-      "usesPersonalInfo": false,
+      "usesPersonalInfo": true,
       "isChildDirected": false,
       "isExportCompliant": true,
       "containsAds": false
+    },
+    "events": {
+      "endpoint": {
+        "uri": "https://pranaveda.app/api/alexa",
+        "sslCertificateType": "Trusted"
+      },
+      "publications": [
+        {
+          "eventName": "AMAZON.MessageAlert.Activated"
+        }
+      ],
+      "subscriptions": [
+        {
+          "eventName": "SKILL_PROACTIVE_SUBSCRIPTION_CHANGED"
+        },
+        {
+          "eventName": "SKILL_ACCOUNT_LINKED"
+        },
+        {
+          "eventName": "SKILL_DISABLED"
+        }
+      ]
     }
   },
   "manifestVersion": "1.0"

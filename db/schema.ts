@@ -190,6 +190,23 @@ export const pushNudgeState = pgTable('push_nudge_state', {
   lastNotifiedAt: timestamptz('last_notified_at'),
 });
 
+// The Alexa account behind a linked skill, so the 15-minute check can send
+// that person an Alexa notification. `alexaUserId` arrives with every request
+// from the skill; `notifications` follows what the person allowed in the
+// Alexa app (Amazon tells the skill when it changes).
+export const alexaLinks = pgTable(
+  'alexa_links',
+  {
+    userId: uuid('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    alexaUserId: text('alexa_user_id').notNull(),
+    notifications: boolean('notifications').notNull().default(false),
+    updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('alexa_links_alexa_user_id_key').on(t.alexaUserId)]
+);
+
 // Finished practices, for signed-in users. Append-only: an entry is never
 // changed or removed (except with the account), and its id is made on the
 // device, so uploading the same entry twice is harmless. `seq` is the order

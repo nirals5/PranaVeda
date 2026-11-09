@@ -9,7 +9,10 @@ import app from '../api/index.js';
 import {
   BREATH,
   REMINDERS_SCOPE,
+  freeTimeLine,
+  greeting,
   handleAlexa,
+  historyLine,
   partOfDay,
   reminderRequest,
   reminderTime,
@@ -151,6 +154,14 @@ describe('verifying a request from Amazon', () => {
     expect(await verifyWith(other)).toBe('skill id');
   });
 
+  it('lets a skill event (account linked, notifications turned on) be up to an hour old, as Amazon sends them', async () => {
+    const event = (age: number, type = 'AlexaSkillEvent.ProactiveSubscriptionChanged') =>
+      Buffer.from(JSON.stringify(alexaBody({ type, timestamp: new Date(Date.now() - age).toISOString() })));
+    expect(await verifyWith(event(30 * 60 * 1000))).toBeUndefined();
+    expect(await verifyWith(event(61 * 60 * 1000))).toBe('timestamp');
+    expect(await verifyWith(event(30 * 60 * 1000, 'LaunchRequest'))).toBe('timestamp');
+  });
+
   it('answers unsigned requests to /api/alexa with 400 and says nothing', async () => {
     const res = await request(app).post('/api/alexa').set('Content-Type', 'application/json').send(JSON.stringify(alexaBody({ type: 'LaunchRequest' })));
     expect(res.status).toBe(400);
@@ -168,6 +179,50 @@ describe('what the skill says', () => {
     expect(ssml(reply)).toContain('a short breathing practice, or a daily reminder');
     expect(reply.response.shouldEndSession).toBe(false);
     expect(reply.response.card.content).toContain('not medical advice');
+  });
+
+  it('greets a linked person by name, with their free time and practice history', async () => {
+    const seen: unknown[] = [];
+    const { deps } = fakeDeps({
+      personal: async (body, zone) => (seen.push([body.context.System.user.accessToken, zone]), { name: 'Hetan', free: 'You have 40 open minutes, until 12:40 PM.', history: 'You last practised yesterday.' }),
+    });
+    const body = alexaBody({ type: 'LaunchRequest' });
+    body.context.System.user = { userId: 'amzn1.ask.account.A', accessToken: 'linked-token' } as any;
+    const reply: any = await handleAlexa(body, deps);
+    expect(seen).toEqual([['linked-token', 'America/Los_Angeles']]);
+    const said = ssml(reply);
+    expect(said.indexOf('Good afternoon, Hetan.')).toBe(7); // right after <speak>
+    expect(said).toContain('You have 40 open minutes, until 12:40 PM.');
+    expect(said).toContain('You last practised yesterday.');
+    expect(said.indexOf('Let the evening settle')).toBeLessThan(said.indexOf('40 open minutes'));
+    expect(said).toContain('a short breathing practice, or a daily reminder');
+    expect(reply.response.card.content).toContain('40 open minutes');
+  });
+
+  it('opens as before when not linked, and asks to link again when the link was ended on the website', async () => {
+    const { deps } = fakeDeps({ personal: async () => undefined });
+    const unlinked: any = await handleAlexa(alexaBody({ type: 'LaunchRequest' }), deps);
+    expect(ssml(unlinked)).not.toContain('Good');
+    expect(unlinked.response.card.type).toBe('Simple');
+
+    const ended: any = await handleAlexa(alexaBody({ type: 'LaunchRequest' }), fakeDeps({ personal: async () => null }).deps);
+    expect(ssml(ended)).toContain('link your PranaVeda account in the Alexa app');
+    expect(ended.response.card).toEqual({ type: 'LinkAccount' });
+  });
+
+  it('still opens when the personal lines fail', async () => {
+    const { deps } = fakeDeps({ personal: () => Promise.reject(new Error('db down')) });
+    const reply: any = await handleAlexa(alexaBody({ type: 'LaunchRequest' }), deps);
+    expect(ssml(reply)).toContain('Let the evening settle gently around you.');
+  });
+
+  it('hands skill events to be recorded, and says nothing', async () => {
+    const events: unknown[] = [];
+    const { deps } = fakeDeps({ skillEvent: async (body) => void events.push(body.request.type) });
+    for (const type of ['AlexaSkillEvent.ProactiveSubscriptionChanged', 'AlexaSkillEvent.SkillAccountLinked', 'AlexaSkillEvent.SkillDisabled']) {
+      expect(await handleAlexa(alexaBody({ type }), deps)).toEqual({ version: '1.0', response: {} });
+    }
+    expect(events).toEqual(['AlexaSkillEvent.ProactiveSubscriptionChanged', 'AlexaSkillEvent.SkillAccountLinked', 'AlexaSkillEvent.SkillDisabled']);
   });
 
   it('still opens when the time zone cannot be read', async () => {
@@ -273,6 +328,37 @@ describe('pieces', () => {
     expect(partOfDay(NOW, 'Asia/Kolkata')).toEqual({ date: '2026-10-30', part: 'morning' });
     expect(partOfDay(NOW, 'America/New_York')).toEqual({ date: '2026-10-29', part: 'afternoon' });
     expect(partOfDay(NOW, 'Not/AZone')).toEqual({ date: '2026-10-29' });
+  });
+
+  it('greets by first name for the part of the day', () => {
+    expect(greeting('Hetan Shah', 'morning')).toBe('Good morning, Hetan.');
+    expect(greeting(null, 'evening')).toBe('Good evening.');
+    expect(greeting('Hetan', undefined)).toBe('Hello, Hetan.');
+    expect(greeting('  ', undefined)).toBe('Hello.');
+  });
+
+  it('says how much open time there is, from busy times in the person\'s zone', () => {
+    const zone = 'America/Los_Angeles';
+    const at = (hhmm: string) => Date.parse(`2026-10-29T${hhmm}:00-07:00`);
+    const now = NOW.getTime(); // noon
+    expect(freeTimeLine([[at('12:40'), at('13:30')]], now, zone)).toBe('You have 40 open minutes, until 12:40 PM.');
+    expect(freeTimeLine([[at('15:00'), at('16:00')]], now, zone)).toBe("You're free until 3:00 PM.");
+    expect(freeTimeLine([[at('12:05'), at('13:00')]], now, zone)).toBe('Your next commitment is at 12:05 PM.');
+    expect(freeTimeLine([[at('11:30'), at('12:30')], [at('12:30'), at('13:15')]], now, zone)).toBe('Your calendar is busy until 1:15 PM.');
+    expect(freeTimeLine([], now, zone)).toBe('Your calendar is open for the rest of today.');
+    expect(freeTimeLine([[at('11:00'), at('11:30')]], now, zone)).toBe('Your calendar is open for the rest of today.');
+    expect(freeTimeLine(null, now, zone)).toBeUndefined();
+  });
+
+  it('says when the person last practised, in their own days', () => {
+    const zone = 'America/Los_Angeles';
+    const now = NOW.getTime(); // Thursday noon
+    const day = 24 * 60 * 60 * 1000;
+    expect(historyLine(now - 2 * 60 * 60 * 1000, 1, now, zone)).toBe('You practised earlier today.');
+    expect(historyLine(now - day, 3, now, zone)).toBe('You last practised yesterday, and 3 times this past week.');
+    expect(historyLine(now - 3 * day, 1, now, zone)).toBe('You last practised on Monday.');
+    expect(historyLine(now - 10 * day, 0, now, zone)).toBe("It's been a little while since your last practice. A gentle return is always welcome.");
+    expect(historyLine(null, 0, now, zone)).toBe('Your first practice is waiting whenever you are ready.');
   });
 
   it('keeps health words out of what a speaker says', () => {
