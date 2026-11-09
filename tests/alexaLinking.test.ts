@@ -53,6 +53,13 @@ describe('the request to link', () => {
     expect(readAuthorizeRequest(query())).toEqual({ ok: false, error: 'linking_unavailable' });
   });
 
+  it("keeps Amazon's state whole, however long (it is over 1,000 characters and signed)", () => {
+    useClient();
+    const state = `Amase${'eyJ2YWxpZGF0aW9uQ29kZSI6'.repeat(80)}+/=AAAACfdYGTDq`;
+    expect(readAuthorizeRequest(query({ state }))).toMatchObject({ ok: true, state });
+    expect(readAuthorizeRequest(query({ state: 'x'.repeat(8193) }))).toEqual({ ok: false, error: 'invalid_request' });
+  });
+
   it('sends other mistakes back to Amazon, with the state', () => {
     useClient();
     expect(readAuthorizeRequest(query({ response_type: 'token' }))).toEqual({ ok: false, error: 'unsupported_response_type', redirectUri: REDIRECT, state: 'abc' });

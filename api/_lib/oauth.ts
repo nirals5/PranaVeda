@@ -10,6 +10,7 @@ const { oauthCodes } = schema;
 
 export const ALEXA_SCOPES = ['nudges'] as const;
 const CODE_TTL_MS = 5 * 60 * 1000;
+const MAX_STATE = 8192;
 
 export interface OAuthClient {
   id: string;
@@ -60,7 +61,10 @@ export function readAuthorizeRequest(q: Record<string, unknown>): AuthorizeReque
   if (str(q.client_id) !== client.id) return { ok: false, error: 'invalid_client' };
   const redirectUri = str(q.redirect_uri);
   if (!validRedirect(redirectUri)) return { ok: false, error: 'invalid_redirect_uri' };
-  const state = str(q.state).slice(0, 1024);
+  // Amazon's state is signed and over a thousand characters: it must come
+  // back exactly as sent, so it is never shortened, only refused when absurd.
+  const state = str(q.state);
+  if (state.length > MAX_STATE) return { ok: false, error: 'invalid_request' };
   const back = (error: string) => ({ ok: false as const, error, redirectUri, state });
   if (q.response_type !== 'code') return back('unsupported_response_type');
   const scope = str(q.scope).split(/\s+/).filter(Boolean);

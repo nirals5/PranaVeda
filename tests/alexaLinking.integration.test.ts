@@ -38,6 +38,12 @@ describe('the link request from the Alexa app', () => {
     expect(to.searchParams.get('redirect_uri')).toBe(REDIRECT);
   });
 
+  it("carries Amazon's long state to the page and back unchanged", async () => {
+    const state = `Amas${'eyJ2YWxpZGF0aW9uQ29kZSI6Ik'.repeat(60)}+/==`;
+    const res = await request(authApp).get('/api/oauth/authorize').query({ response_type: 'code', client_id: CLIENT, redirect_uri: REDIRECT, state, scope: 'nudges' });
+    expect(new URL(res.headers.location, 'https://pranaveda.app').searchParams.get('state')).toBe(state);
+  });
+
   it('is refused on the spot for a stranger’s address, and sent back to Amazon for other mistakes', async () => {
     const bad = await request(authApp).get('/api/oauth/authorize').query({ response_type: 'code', client_id: CLIENT, redirect_uri: 'https://evil.example/cb', state: 's1' });
     expect(bad.status).toBe(400);
