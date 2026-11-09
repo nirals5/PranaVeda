@@ -191,3 +191,26 @@ export async function fetchPracticesAfter<E>(cursor: number): Promise<{ entries:
   const { response } = await fetchWithSession(`/api/sync/practice-log?after=${cursor}`, { method: 'GET' });
   return response.ok ? response.json() : null;
 }
+
+// Push nudges (api/push.ts). Each returns whether the server took it.
+export async function savePushSubscription(subscription: PushSubscriptionJSON): Promise<boolean> {
+  const { response } = await fetchWithSession('/api/push/subscription', json('PUT', { subscription }));
+  return response.ok;
+}
+
+export async function removePushSubscription(endpoint: string): Promise<boolean> {
+  const { response } = await fetchWithSession('/api/push/subscription', json('DELETE', { endpoint }));
+  return response.ok;
+}
+
+export interface PushCalendarUpload {
+  trusted: boolean;
+  google: boolean;
+  busy?: [number, number][];
+  coveredUntil?: number;
+}
+
+export async function sendPushState(state: { seen?: boolean; calendar?: PushCalendarUpload }): Promise<boolean> {
+  const { response } = await fetchWithSession('/api/push/state', json('PUT', state));
+  return response.ok;
+}

@@ -25,6 +25,7 @@ import { useExternalCalendar, describeCalendar } from './hooks/useExternalCalend
 import FreeTimeNudge from './components/FreeTimeNudge';
 import ProfileOfferBar from './components/ProfileOfferBar';
 import { useNudgeNotifications } from './hooks/useNudgeNotifications';
+import { usePushNudges } from './hooks/usePushNudges';
 import { useHeartRateMonitor } from './hooks/useHeartRateMonitor';
 import { useWearableHealth, buildHealthContext } from './hooks/useWearableHealth';
 import { usePlace, PLACE_SUGGESTION } from './hooks/usePlace';
@@ -98,17 +99,20 @@ export default function App() {
   };
   usePracticeSync(auth, practiceLog, mergePractices, retainPractices);
   const lastPracticeAt = practiceLog.length ? Date.parse(practiceLog[practiceLog.length - 1].completedAt) : null;
+  // Land on the home screen, where the in-app nudge offers the practice.
+  const openFromNudge = () => {
+    setCurrentView('coach');
+    setShowHome(true);
+  };
+  const push = usePushNudges({ auth, calendar, onOpen: openFromNudge });
   const notifications = useNudgeNotifications({
     connected: calendar.connected,
     busy: calendar.busy,
     now: calendar.now,
     lastPracticeAt,
-    suppressed: currentResult !== null,
-    // Land on the home screen, where the in-app nudge offers the practice.
-    onOpen: () => {
-      setCurrentView('coach');
-      setShowHome(true);
-    },
+    // With push on, the server sends them instead.
+    suppressed: currentResult !== null || push.enabled,
+    onOpen: openFromNudge,
   });
   // Bookmarked rituals: on this device, and in the account while signed in.
   const { saved: savedPractices, save: saveRitual, remove: removeSavedRitual } = useSavedRituals(auth);
@@ -395,6 +399,7 @@ export default function App() {
                 streak={streak}
                 calendar={calendar}
                 notifications={notifications}
+                push={push}
                 heart={heart}
                 health={health}
                 place={place}

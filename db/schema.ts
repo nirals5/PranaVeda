@@ -154,6 +154,42 @@ export const accountConnections = pgTable('account_connections', {
   updatedAt: timestamptz('updated_at').notNull().defaultNow(),
 });
 
+// Push nudges (api/push.ts). One row per browser that turned them on; a
+// signed-in user can have several. The endpoint is the push service's address
+// for that browser, and the keys encrypt what is sent to it.
+export const pushSubscriptions = pgTable(
+  'push_subscriptions',
+  {
+    endpoint: text('endpoint').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('push_subscriptions_user_id_idx').on(t.userId)]
+);
+
+// What the push check needs to know about a user between visits: busy times
+// only (start and end, never what an event is), whether those were complete,
+// when PranaVeda was last on screen, and the last nudge sent.
+export const pushNudgeState = pgTable('push_nudge_state', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  busy: jsonb('busy').$type<[number, number][]>(),
+  // False when a connected calendar could not be read: then no nudge at all.
+  trusted: boolean('trusted').notNull().default(false),
+  // A Google calendar is connected, which the server cannot read itself.
+  google: boolean('google').notNull().default(false),
+  uploadedAt: timestamptz('uploaded_at'),
+  coveredUntil: timestamptz('covered_until'),
+  seenAt: timestamptz('seen_at'),
+  lastSlotKey: text('last_slot_key'),
+  lastNotifiedAt: timestamptz('last_notified_at'),
+});
+
 // Finished practices, for signed-in users. Append-only: an entry is never
 // changed or removed (except with the account), and its id is made on the
 // device, so uploading the same entry twice is harmless. `seq` is the order

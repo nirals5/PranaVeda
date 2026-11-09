@@ -5,12 +5,14 @@
   "functions": {
     "api/index.ts": { "maxDuration": 60 },
     "api/auth.ts": { "maxDuration": 15 },
-    "api/sync.ts": { "maxDuration": 15 }
+    "api/sync.ts": { "maxDuration": 15 },
+    "api/push.ts": { "maxDuration": 60 }
   },
   "rewrites": [
     { "source": "/api/auth/:path*", "destination": "/api/auth" },
     { "source": "/api/me", "destination": "/api/auth" },
     { "source": "/api/sync/:path*", "destination": "/api/sync" },
+    { "source": "/api/push/:path*", "destination": "/api/push" },
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/support", "destination": "/support.html" },
