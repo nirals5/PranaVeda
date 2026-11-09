@@ -207,6 +207,16 @@ export const alexaLinks = pgTable(
   (t) => [uniqueIndex('alexa_links_alexa_user_id_key').on(t.alexaUserId)]
 );
 
+// What a person chose for Alexa notifications in the Alexa app, by Amazon's ID
+// for them. Amazon can say so before the skill knows whose Alexa it is (the
+// events come out of order, up to an hour late), so the choice is kept here
+// and applied to `alexa_links` once it does.
+export const alexaNotificationChoices = pgTable('alexa_notification_choices', {
+  alexaUserId: text('alexa_user_id').primaryKey(),
+  notifications: boolean('notifications').notNull(),
+  updatedAt: timestamptz('updated_at').notNull().defaultNow(),
+});
+
 // Finished practices, for signed-in users. Append-only: an entry is never
 // changed or removed (except with the account), and its id is made on the
 // device, so uploading the same entry twice is harmless. `seq` is the order

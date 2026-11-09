@@ -96,6 +96,8 @@ A nudge only ever appears in open calendar time. It never appears:
   - a nudge not delivered within 15 minutes is dropped.
 - **Fail closed:** if a connected calendar could not be read, whether on the device or the account's link at check time, nothing is sent.
 - **Signing out** unsubscribes the browser. A browser that unsubscribes, or clears the site's data, is removed the next time a nudge fails to reach it.
+- **Logs:** each nudge logs its outcome per channel, without ids: `[push] nudge: web ok; alexa ok` (or `failed`, `gone`, `off`). A failure says why: `[push] send failed: …`, `[alexa] notifications not configured`, `[alexa] skill sign-in for notifications refused: 401 invalid_client`, or `[alexa] notification failed: <status> <Amazon's reason>`. The Cloudflare Worker logs each check's totals (`push tick {"users":…,"sent":…}`); its logging is set in `wrangler.toml`, so a deploy keeps it on.
+- **On a Mac,** Chrome shows notifications only if macOS allows it: System Settings → Notifications → Google Chrome.
 - **Timing:** with a check every 15 minutes, a nudge can arrive up to 15 minutes into an opening, and a short opening can be missed. The interval keeps the free Neon database asleep between checks.
 
 **Signed out, or before push is set up: notifications from an open tab.** On top of the rules above:
@@ -204,6 +206,8 @@ In the Alexa app, the skill's page has **Link account**. It opens `pranaveda.app
 - **Skill events** (subscribed in `skill.json`):
   - account linked, and notifications allowed or withdrawn, are recorded in `alexa_links`;
   - disabling the skill forgets the Alexa account;
+  - a notifications choice that arrives before the skill knows whose Alexa it is (events come out of order) is kept in `alexa_notification_choices` and applied when the link is recorded;
+  - each event is logged with what was done (`[alexa] AlexaSkillEvent.…: notifications on`), without ids;
   - Amazon may send these up to an hour late, so they are accepted that old (other requests: 150 seconds).
 - **Unlinking:** **Unlink** on the Smart assistants card (Profile) ends the skill's sessions and forgets the Alexa account. Deleting the PranaVeda account does the same.
 - **Code:** linked requests load `api/_lib/alexaPersonal.ts` (database) only when a linked token arrives. Notifications are sent by `api/_lib/alexaEvents.ts`.
@@ -467,6 +471,7 @@ Signed in, the server (Neon Postgres) also stores:
 | Browsers with push nudges on (push service address and keys) | `push_subscriptions` |
 | For push nudges: busy start/end times for today and tomorrow, whether calendars could be read, when PranaVeda was last on screen, the last nudge | `push_nudge_state` |
 | Linked Alexa account (Amazon's ID for the person) and whether Alexa notifications are allowed | `alexa_links` |
+| Alexa notifications choice, by Amazon's ID for the person, until the skill knows whose it is | `alexa_notification_choices` |
 | Single-use Alexa linking codes, stored hashed, for 5 minutes | `oauth_codes` |
 
 Everything is removed when the account is deleted.
@@ -498,12 +503,14 @@ Tested against the real thing:
 
 - Google sign-in with a real client ID, locally: account, session and timezone recorded, and the session restored on a later visit.
 - Amrita with the live model, signed in and signed out: profile updates saved to the account, and returned to the device for a guest.
+- Push nudges in production (9 November 2026): the Cloudflare cron's check sent a real nudge through Google's push service to Chrome on a Mac, and it appeared on screen. It only appeared once Chrome was allowed to notify in macOS System Settings → Notifications.
+- Alexa account linking in production (9 November 2026): linked from the Alexa app with Google sign-in. Opening the skill then said "Good afternoon, Hetan.", the reflection, "Your calendar is open for the rest of today." and "You last practised on Friday."
 
 Not yet tested against the real thing:
 
 - Google Calendar and Google Health connectors with a real client ID. The Google Health field names and filters come from Google's documentation, not a live call.
 - Sign in with Apple (needs an Apple Developer account).
 - A real Bluetooth heart-rate device.
-- A real system notification appearing on screen, including a real push notification through a browser's push service and the Cloudflare cron.
+- An Alexa notification reaching a real Echo. The 9 November check sent one, but nothing showed on the Echo or in the Alexa app, and Amazon's answer was not logged then. The per-channel log line (Free-time nudges → Logs) now records it.
 - Location with a real device position and the browser's real permission prompt.
 - Amrita's replies using calendar, wearable and location context with the live model.

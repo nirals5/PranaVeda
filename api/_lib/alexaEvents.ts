@@ -40,9 +40,11 @@ async function skillToken(clientId: string, secret: string, now: number, fetcher
     body: new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId, client_secret: secret, scope: 'alexa::proactive_events' }).toString(),
     signal: AbortSignal.timeout(5000),
   });
-  if (!res.ok) return null;
-  const body: any = await res.json();
-  if (typeof body?.access_token !== 'string') return null;
+  const body: any = await res.json().catch(() => null);
+  if (!res.ok || typeof body?.access_token !== 'string') {
+    console.error(`[alexa] skill sign-in for notifications refused: ${res.status} ${body?.error ?? ''}`.trim());
+    return null;
+  }
   // A minute early, so a token never runs out mid-check.
   tokens.set(clientId, { token: body.access_token, until: now + (Number(body.expires_in) || 3600) * 1000 - 60_000 });
   return body.access_token;
@@ -54,7 +56,10 @@ export const alexaEventsConfigured = () => !!(process.env.ALEXA_EVENTS_CLIENT_ID
 export async function sendAlexaNudge(alexaUserId: string, slotKey: string, now: number = Date.now(), fetcher: Fetcher = fetch): Promise<SendResult> {
   const clientId = process.env.ALEXA_EVENTS_CLIENT_ID;
   const secret = process.env.ALEXA_EVENTS_CLIENT_SECRET;
-  if (!clientId || !secret) return 'failed';
+  if (!clientId || !secret) {
+    console.error('[alexa] notifications not configured (ALEXA_EVENTS_CLIENT_ID / _SECRET)');
+    return 'failed';
+  }
   try {
     const token = await skillToken(clientId, secret, now, fetcher);
     if (!token) return 'failed';
@@ -68,8 +73,12 @@ export async function sendAlexaNudge(alexaUserId: string, slotKey: string, now: 
     });
     if (res.ok) return 'ok';
     if (res.status === 401) tokens.delete(clientId);
-    if (res.status === 403) return 'gone';
-    console.error('[alexa] notification failed:', res.status);
+    const reason = res.ok ? '' : (await res.text().catch(() => '')).slice(0, 200);
+    if (res.status === 403) {
+      console.warn('[alexa] notification refused for this person (notifications off?):', reason);
+      return 'gone';
+    }
+    console.error('[alexa] notification failed:', res.status, reason);
     return 'failed';
   } catch (err: any) {
     console.error('[alexa] notification failed:', err?.message || err);

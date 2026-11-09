@@ -4,12 +4,16 @@ import { getDb, schema } from './db.js';
 // Which Alexa account is linked to which person, and whether they allowed
 // Alexa notifications. Ending the link also ends the skill's sessions.
 
-const { alexaLinks, refreshTokens, sessions } = schema;
+const { alexaLinks, alexaNotificationChoices, refreshTokens, sessions } = schema;
 
 // Every request from a linked skill carries both ids. An Alexa account can be
 // linked to one person at a time: a new link takes it over.
 export async function rememberAlexaUser(userId: string, alexaUserId: string, notifications?: boolean): Promise<void> {
   const db = getDb();
+  if (notifications === undefined) {
+    const [choice] = await db.select().from(alexaNotificationChoices).where(eq(alexaNotificationChoices.alexaUserId, alexaUserId)).limit(1);
+    notifications = choice?.notifications;
+  }
   await db.delete(alexaLinks).where(and(eq(alexaLinks.alexaUserId, alexaUserId), ne(alexaLinks.userId, userId)));
   const set = { alexaUserId, updatedAt: new Date(), ...(notifications === undefined ? {} : { notifications }) };
   await db
@@ -18,13 +22,22 @@ export async function rememberAlexaUser(userId: string, alexaUserId: string, not
     .onConflictDoUpdate({ target: alexaLinks.userId, set });
 }
 
-export async function setAlexaNotifications(alexaUserId: string, on: boolean): Promise<void> {
-  await getDb().update(alexaLinks).set({ notifications: on, updatedAt: new Date() }).where(eq(alexaLinks.alexaUserId, alexaUserId));
+// Returns whether a linked person was updated (false: kept until Alexa is known).
+export async function setAlexaNotifications(alexaUserId: string, on: boolean): Promise<boolean> {
+  const db = getDb();
+  const at = new Date();
+  await db
+    .insert(alexaNotificationChoices)
+    .values({ alexaUserId, notifications: on, updatedAt: at })
+    .onConflictDoUpdate({ target: alexaNotificationChoices.alexaUserId, set: { notifications: on, updatedAt: at } });
+  const updated = await db.update(alexaLinks).set({ notifications: on, updatedAt: at }).where(eq(alexaLinks.alexaUserId, alexaUserId)).returning({ userId: alexaLinks.userId });
+  return updated.length > 0;
 }
 
 // The skill was disabled in the Alexa app.
 export async function forgetAlexaUser(alexaUserId: string): Promise<void> {
   await getDb().delete(alexaLinks).where(eq(alexaLinks.alexaUserId, alexaUserId));
+  await getDb().delete(alexaNotificationChoices).where(eq(alexaNotificationChoices.alexaUserId, alexaUserId));
 }
 
 export async function alexaLinkFor(userId: string): Promise<{ alexaUserId: string; notifications: boolean } | null> {
@@ -51,5 +64,6 @@ export async function unlinkAlexa(userId: string, now = new Date()): Promise<voi
     .set({ revokedAt: now, successorEnc: null })
     .where(and(eq(refreshTokens.userId, userId), eq(refreshTokens.client, 'alexa')));
   await db.delete(sessions).where(and(eq(sessions.userId, userId), eq(sessions.client, 'alexa')));
-  await db.delete(alexaLinks).where(eq(alexaLinks.userId, userId));
+  const gone = await db.delete(alexaLinks).where(eq(alexaLinks.userId, userId)).returning({ alexaUserId: alexaLinks.alexaUserId });
+  for (const { alexaUserId } of gone) await db.delete(alexaNotificationChoices).where(eq(alexaNotificationChoices.alexaUserId, alexaUserId));
 }

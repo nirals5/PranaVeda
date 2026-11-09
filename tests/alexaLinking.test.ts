@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clientCredentials, readAuthorizeRequest, validRedirect } from '../api/_lib/oauth.js';
 import { messageAlert, sendAlexaNudge } from '../api/_lib/alexaEvents.js';
 
@@ -122,5 +122,19 @@ describe('Alexa notifications', () => {
     expect(urls[1]).toBe('https://api.amazonalexa.com/v1/proactiveEvents');
     delete process.env.ALEXA_EVENTS_CLIENT_ID;
     expect(await sendAlexaNudge('amzn1.ask.account.A', 'k1', NOW, fetcher)).toBe('failed');
+  });
+
+  it('say in the log why nothing could be sent, never silently', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    delete process.env.ALEXA_EVENTS_CLIENT_ID;
+    expect(await sendAlexaNudge('amzn1.ask.account.A', 'k1', NOW, async () => new Response(null))).toBe('failed');
+    expect(String(errors.mock.calls.at(-1))).toContain('not configured');
+
+    process.env.ALEXA_EVENTS_CLIENT_ID = 'amzn1.application-oa2-client.z';
+    process.env.ALEXA_EVENTS_CLIENT_SECRET = 'wrong';
+    const refused = async () => new Response(JSON.stringify({ error: 'invalid_client', error_description: 'Client authentication failed' }), { status: 401 });
+    expect(await sendAlexaNudge('amzn1.ask.account.A', 'k1', NOW, refused)).toBe('failed');
+    expect(String(errors.mock.calls.at(-1))).toContain('401 invalid_client');
+    errors.mockRestore();
   });
 });
