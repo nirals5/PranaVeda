@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AssistantsSettings from '../src/components/AssistantsSettings';
@@ -38,5 +38,22 @@ describe('Smart assistants card (website)', () => {
     const { container } = render(createElement(AssistantsSettings));
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(container.innerHTML).toBe('');
+  });
+
+  it('says when Alexa is linked to this account, and can end the link', async () => {
+    vi.stubGlobal('fetch', reply({ alexa: null }));
+    const unlink = vi.fn(async () => true);
+    render(createElement(AssistantsSettings, { alexaLink: { linked: true, notifications: true, pending: false, unlink } }));
+    expect(await screen.findByText(/linked to this account/i)).toBeTruthy();
+    expect(screen.getByText(/notifications are on/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /unlink/i }));
+    expect(unlink).toHaveBeenCalled();
+  });
+
+  it('does not mention linking when Alexa is not linked', async () => {
+    vi.stubGlobal('fetch', reply({ alexa: { url: 'https://www.amazon.com/dp/B0EXAMPLE1', phrases: ['Alexa, open Prana Veda'] } }));
+    render(createElement(AssistantsSettings, { alexaLink: { linked: false, notifications: false, pending: false, unlink: async () => true } }));
+    await screen.findByRole('link', { name: /enable in the alexa app/i });
+    expect(screen.queryByRole('button', { name: /unlink/i })).toBeNull();
   });
 });

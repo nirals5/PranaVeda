@@ -214,3 +214,28 @@ export async function sendPushState(state: { seen?: boolean; calendar?: PushCale
   const { response } = await fetchWithSession('/api/push/state', json('PUT', state));
   return response.ok;
 }
+
+// Alexa account linking (api/auth.ts /api/oauth/*, /api/me/alexa).
+export interface AlexaLinkStatus {
+  linked: boolean;
+  notifications: boolean;
+}
+
+export async function fetchAlexaLink(): Promise<AlexaLinkStatus | null> {
+  const { response } = await fetchWithSession('/api/me/alexa', { method: 'GET' });
+  return response.ok ? response.json() : null;
+}
+
+export async function unlinkAlexaAccount(): Promise<boolean> {
+  const { response } = await fetchWithSession('/api/me/alexa', json('DELETE'));
+  return response.ok;
+}
+
+// The person's answer on /link/alexa: where to send the browser next (back to
+// Amazon), or null when the request cannot be used.
+export async function answerAlexaLink(request: Record<string, string>, decision: 'allow' | 'deny'): Promise<string | null> {
+  const { response } = await fetchWithSession('/api/oauth/authorize', json('POST', { ...request, decision }));
+  if (!response.ok) return null;
+  const body = await response.json().catch(() => null);
+  return typeof body?.redirect === 'string' ? body.redirect : null;
+}

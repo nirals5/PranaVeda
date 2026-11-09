@@ -15,10 +15,12 @@ export default function CalendarConnections({
   calendar,
   notifications,
   push,
+  alexaLinked = false,
 }: {
   calendar: ExternalCalendar;
   notifications: NudgeNotifications;
   push: PushNudges;
+  alexaLinked?: boolean;
 }) {
   const [link, setLink] = useState('');
   const summary = calendar.connected ? describeCalendar(calendar.busy, calendar.now) : null;
@@ -43,7 +45,9 @@ export default function CalendarConnections({
         what your events are.{' '}
         {push.enabled
           ? 'With notifications on, your busy times are kept on your account so she can reach you when PranaVeda is closed.'
-          : 'Your busy times stay on this device.'}
+          : alexaLinked
+            ? 'With Alexa linked, your busy times are kept on your account so Alexa can tell you your open time.'
+            : 'Your busy times stay on this device.'}
       </p>
 
       {summary && (

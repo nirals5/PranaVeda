@@ -31,9 +31,11 @@ interface Options {
   auth: Auth;
   calendar: ExternalCalendar;
   onOpen: () => void;
+  // Alexa is linked: the server needs busy times for what Alexa says and sends.
+  alexaLinked?: boolean;
 }
 
-export function usePushNudges({ auth, calendar, onOpen }: Options) {
+export function usePushNudges({ auth, calendar, onOpen, alexaLinked = false }: Options) {
   const signedIn = auth.status === 'user';
   const [serverKey, setServerKey] = useState<string | null>(null);
   const [subscribed, setSubscribed] = useState(false);
@@ -47,6 +49,7 @@ export function usePushNudges({ auth, calendar, onOpen }: Options) {
 
   const available = supported && signedIn && serverKey !== null;
   const enabled = available && subscribed && permission === 'granted';
+  const sharing = enabled || (signedIn && alexaLinked);
 
   useEffect(() => {
     if (!supported) return;
@@ -102,7 +105,7 @@ export function usePushNudges({ auth, calendar, onOpen }: Options) {
 
   // Busy times for today and tomorrow: start and end only.
   useEffect(() => {
-    if (!enabled) return;
+    if (!sharing) return;
     const from = new Date(calendar.now);
     from.setHours(0, 0, 0, 0);
     const upload = calendar.connected
@@ -120,12 +123,12 @@ export function usePushNudges({ auth, calendar, onOpen }: Options) {
     sendPushState({ calendar: upload }).catch(() => {
       lastUpload.current = null;
     });
-  }, [enabled, calendar.connected, calendar.googleConnected, calendar.busy, calendar.now]);
+  }, [sharing, calendar.connected, calendar.googleConnected, calendar.busy, calendar.now]);
 
   // While PranaVeda is on screen the in-app bar is enough; the server holds
   // push nudges until it has been away for a while.
   useEffect(() => {
-    if (!enabled) return;
+    if (!sharing) return;
     const seen = () => document.visibilityState === 'visible' && sendPushState({ seen: true }).catch(() => {});
     seen();
     const timer = window.setInterval(seen, SEEN_EVERY_MS);
@@ -134,7 +137,7 @@ export function usePushNudges({ auth, calendar, onOpen }: Options) {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', seen);
     };
-  }, [enabled]);
+  }, [sharing]);
 
   const enable = useCallback(async () => {
     if (!serverKey) return;

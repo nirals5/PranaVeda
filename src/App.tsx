@@ -17,6 +17,7 @@ import { timeOfDay } from './lib/greeting';
 import RecoveryTrends from './components/RecoveryTrends';
 import ProfileView from './components/ProfileView';
 import { useAuth } from './hooks/useAuth';
+import { useAlexaLink } from './hooks/useAlexaLink';
 import { useProfileSync } from './hooks/useProfileSync';
 import { usePracticeSync } from './hooks/usePracticeSync';
 import { useSavedRituals } from './hooks/useSavedRituals';
@@ -104,7 +105,8 @@ export default function App() {
     setCurrentView('coach');
     setShowHome(true);
   };
-  const push = usePushNudges({ auth, calendar, onOpen: openFromNudge });
+  const alexaLink = useAlexaLink(auth);
+  const push = usePushNudges({ auth, calendar, onOpen: openFromNudge, alexaLinked: alexaLink.linked });
   const notifications = useNudgeNotifications({
     connected: calendar.connected,
     busy: calendar.busy,
@@ -400,6 +402,7 @@ export default function App() {
                 calendar={calendar}
                 notifications={notifications}
                 push={push}
+                alexaLink={alexaLink}
                 heart={heart}
                 health={health}
                 place={place}

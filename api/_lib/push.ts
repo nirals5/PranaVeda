@@ -4,11 +4,12 @@ import { getDb, schema } from './db.js';
 import { ConnectionsUnavailable, loadConnections } from './connections.js';
 import { CalendarLinkError, fetchCalendarText, icsBusyIntervals } from './calendar.js';
 import { type Busy, type NudgeState, mayNudge, planNudge } from './pushRules.js';
+import { sendAlexaNudge } from './alexaEvents.js';
 
 // Push nudges: storing who turned them on, what the check needs between
 // visits, and the check itself (run every 15 minutes, see api/push.ts).
 
-const { pushSubscriptions, pushNudgeState, users, practiceLogEntries } = schema;
+const { pushSubscriptions, pushNudgeState, users, practiceLogEntries, alexaLinks } = schema;
 
 const MAX_ENDPOINT = 1024;
 const MAX_KEY = 256;
@@ -109,6 +110,7 @@ export async function recordState(userId: string, update: { seen?: boolean; cale
 export type SendResult = 'ok' | 'gone' | 'failed';
 export type Sender = (sub: PushSub, payload: string) => Promise<SendResult>;
 export type LinkReader = (link: string, from: number, to: number) => Promise<Busy>;
+export type AlexaSender = (alexaUserId: string, slotKey: string, now: number) => Promise<SendResult>;
 
 export const webPushSender: Sender = async (sub, payload) => {
   const keys = vapid();
@@ -135,9 +137,27 @@ export const readCalendarLink: LinkReader = async (link, from, to) => {
 
 const ms = (d: Date | null) => (d ? d.getTime() : null);
 
+export function nudgeStateOf(row: typeof pushNudgeState.$inferSelect): NudgeState {
+  return {
+    busy: row.busy ?? null,
+    trusted: row.trusted,
+    google: row.google,
+    uploadedAt: ms(row.uploadedAt),
+    coveredUntil: ms(row.coveredUntil),
+    seenAt: ms(row.seenAt),
+    lastSlotKey: row.lastSlotKey,
+    lastNotifiedAt: ms(row.lastNotifiedAt),
+  };
+}
+
+export async function nudgeStateFor(userId: string): Promise<NudgeState | null> {
+  const [row] = await getDb().select().from(pushNudgeState).where(eq(pushNudgeState.userId, userId)).limit(1);
+  return row ? nudgeStateOf(row) : null;
+}
+
 // The account's calendar link read now: undefined when none is kept there,
 // null when it could not be read.
-async function linkBusyFor(userId: string, now: number, readLink: LinkReader): Promise<Busy | null | undefined> {
+export async function linkBusyFor(userId: string, now: number, readLink: LinkReader): Promise<Busy | null | undefined> {
   let link: string | undefined;
   try {
     link = (await loadConnections(userId))?.connections.calendarLink;
@@ -159,15 +179,26 @@ export interface TickResult {
   removed: number;
 }
 
-// One pass over everyone with push turned on.
-export async function runTick({ now = Date.now(), send = webPushSender, readLink = readCalendarLink }: { now?: number; send?: Sender; readLink?: LinkReader } = {}): Promise<TickResult> {
+// One pass over everyone with push or Alexa notifications turned on. One
+// opening is one nudge, whichever way it reaches the person.
+export async function runTick({
+  now = Date.now(),
+  send = webPushSender,
+  readLink = readCalendarLink,
+  sendAlexa = sendAlexaNudge,
+}: { now?: number; send?: Sender; readLink?: LinkReader; sendAlexa?: AlexaSender } = {}): Promise<TickResult> {
   const db = getDb();
   const result: TickResult = { users: 0, sent: 0, removed: 0 };
-  const subs = await db.select().from(pushSubscriptions);
-  if (!subs.length) return result;
+  const [subs, speakers] = await Promise.all([
+    db.select().from(pushSubscriptions),
+    db.select({ userId: alexaLinks.userId, alexaUserId: alexaLinks.alexaUserId }).from(alexaLinks).where(eq(alexaLinks.notifications, true)),
+  ]);
+  if (!subs.length && !speakers.length) return result;
 
   const byUser = new Map<string, PushSub[]>();
   for (const s of subs) byUser.set(s.userId, [...(byUser.get(s.userId) ?? []), { endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth }]);
+  const alexaOf = new Map(speakers.map((s) => [s.userId, s.alexaUserId]));
+  for (const id of alexaOf.keys()) if (!byUser.has(id)) byUser.set(id, []);
   const ids = [...byUser.keys()];
 
   const [states, people, practices] = await Promise.all([
@@ -188,16 +219,7 @@ export async function runTick({ now = Date.now(), send = webPushSender, readLink
     const row = stateOf.get(userId);
     const person = personOf.get(userId);
     if (!row || !person || person.deletedAt) continue;
-    const state: NudgeState = {
-      busy: row.busy ?? null,
-      trusted: row.trusted,
-      google: row.google,
-      uploadedAt: ms(row.uploadedAt),
-      coveredUntil: ms(row.coveredUntil),
-      seenAt: ms(row.seenAt),
-      lastSlotKey: row.lastSlotKey,
-      lastNotifiedAt: ms(row.lastNotifiedAt),
-    };
+    const state = nudgeStateOf(row);
     if (!mayNudge(state, now)) continue;
 
     const plan = planNudge({
@@ -218,6 +240,13 @@ export async function runTick({ now = Date.now(), send = webPushSender, readLink
         await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
         result.removed++;
       }
+    }
+    const alexaUserId = alexaOf.get(userId);
+    if (alexaUserId) {
+      const outcome = await sendAlexa(alexaUserId, plan.key, now);
+      if (outcome === 'ok') delivered = true;
+      // Turned off in the Alexa app.
+      if (outcome === 'gone') await db.update(alexaLinks).set({ notifications: false }).where(eq(alexaLinks.userId, userId));
     }
     if (delivered) {
       result.sent++;
