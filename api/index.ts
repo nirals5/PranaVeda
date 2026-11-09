@@ -2537,10 +2537,10 @@ const alexaDeps: AlexaDeps = {
     return personalFor(userId, body?.context?.System?.user?.userId, zone);
   },
   skillEvent: async (body) => {
-    const token = body?.context?.System?.user?.accessToken;
+    const token = body?.context?.System?.user?.accessToken ?? body?.request?.body?.accessToken;
     const userId = typeof token === 'string' && token ? await alexaUserFrom(token) : undefined;
     const { recordSkillEvent } = await import('./_lib/alexaPersonal.js');
-    await recordSkillEvent(body, userId ?? undefined);
+    console.info(`[alexa] ${body?.request?.type}: ${await recordSkillEvent(body, userId ?? undefined)}`);
   },
 };
 

@@ -4,7 +4,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import authApp from '../api/auth.js';
 import { getDb, schema } from '../api/_lib/db.js';
-import { alexaLinkFor, rememberAlexaUser, setAlexaNotifications } from '../api/_lib/alexaLinks.js';
+import { alexaLinkFor, forgetAlexaUser, rememberAlexaUser, setAlexaNotifications } from '../api/_lib/alexaLinks.js';
 import { issueSession } from '../api/_lib/refresh.js';
 import { dbRefreshStore } from '../api/_lib/refreshStore.js';
 import { runTick, type PushSub, type SendResult } from '../api/_lib/push.js';
@@ -139,6 +139,18 @@ describe.skipIf(!hasDb)('Alexa account linking', () => {
     expect((await request(authApp).delete('/api/me/alexa').set('Authorization', user.auth)).status).toBe(204);
     expect((await request(authApp).get('/api/me/alexa').set('Authorization', user.auth)).body).toEqual({ linked: false, notifications: false });
     expect((await token({ grant_type: 'refresh_token', refresh_token: linked.refresh_token })).body).toEqual({ error: 'invalid_grant' });
+  });
+
+  it('keeps "notifications on" that arrives before Alexa is known, and applies it on linking', async () => {
+    const person = await newUser();
+    const alexaUserId = `amzn1.ask.account.vitest-early-${person.id}`;
+    await setAlexaNotifications(alexaUserId, true);
+    await rememberAlexaUser(person.id, alexaUserId);
+    expect(await alexaLinkFor(person.id)).toEqual({ alexaUserId, notifications: true });
+    // …and a later "off" still wins.
+    await setAlexaNotifications(alexaUserId, false);
+    expect(await alexaLinkFor(person.id)).toEqual({ alexaUserId, notifications: false });
+    await forgetAlexaUser(alexaUserId);
   });
 
   it('nudges through Alexa from the 15-minute check, once per opening across web and Alexa', async () => {

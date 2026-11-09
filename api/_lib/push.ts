@@ -233,8 +233,10 @@ export async function runTick({
 
     const payload = JSON.stringify({ title: 'Amrita', body: plan.body, url: '/?nudge=1', tag: 'pranaveda-nudge' });
     let delivered = false;
+    const web: SendResult[] = [];
     for (const sub of userSubs) {
       const outcome = await send(sub, payload);
+      web.push(outcome);
       if (outcome === 'ok') delivered = true;
       if (outcome === 'gone') {
         await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
@@ -242,12 +244,15 @@ export async function runTick({
       }
     }
     const alexaUserId = alexaOf.get(userId);
+    let alexa: SendResult | 'off' = 'off';
     if (alexaUserId) {
-      const outcome = await sendAlexa(alexaUserId, plan.key, now);
+      const outcome = (alexa = await sendAlexa(alexaUserId, plan.key, now));
       if (outcome === 'ok') delivered = true;
       // Turned off in the Alexa app.
       if (outcome === 'gone') await db.update(alexaLinks).set({ notifications: false }).where(eq(alexaLinks.userId, userId));
     }
+    // Per channel, so a nudge that reached no one is visible (no ids).
+    console.info(`[push] nudge: web ${web.join(',') || 'none'}; alexa ${alexa}`);
     if (delivered) {
       result.sent++;
       await db.update(pushNudgeState).set({ lastSlotKey: plan.key, lastNotifiedAt: new Date(now) }).where(eq(pushNudgeState.userId, userId));

@@ -45,17 +45,27 @@ export async function personalFor(userId: string, alexaUserId: string | undefine
 const MESSAGE_ALERT = 'AMAZON.MessageAlert.Activated';
 
 // Amazon's skill events. Notifications follow what the person allowed in the
-// Alexa app; disabling the skill forgets the Alexa account.
-export async function recordSkillEvent(body: any, userIdFromToken: string | undefined): Promise<void> {
+// Alexa app; disabling the skill forgets the Alexa account. Returns what was
+// done, for the log (no ids).
+export async function recordSkillEvent(body: any, userIdFromToken: string | undefined): Promise<string> {
   const type = body?.request?.type;
   const alexaUserId = body?.context?.System?.user?.userId;
-  if (typeof alexaUserId !== 'string' || !alexaUserId) return;
-  if (type === 'AlexaSkillEvent.SkillDisabled') return forgetAlexaUser(alexaUserId);
+  if (typeof alexaUserId !== 'string' || !alexaUserId) return 'no Alexa user';
+  if (type === 'AlexaSkillEvent.SkillDisabled') {
+    await forgetAlexaUser(alexaUserId);
+    return 'forgotten';
+  }
   if (type === 'AlexaSkillEvent.ProactiveSubscriptionChanged') {
     const subs = body?.request?.body?.subscriptions;
     const on = Array.isArray(subs) && subs.some((s: any) => s?.eventName === MESSAGE_ALERT);
-    if (userIdFromToken) return rememberAlexaUser(userIdFromToken, alexaUserId, on);
-    return setAlexaNotifications(alexaUserId, on);
+    const linked = await setAlexaNotifications(alexaUserId, on);
+    if (userIdFromToken) await rememberAlexaUser(userIdFromToken, alexaUserId, on);
+    return `notifications ${on ? 'on' : 'off'}${linked || userIdFromToken ? '' : ' (kept until Alexa is linked)'}`;
   }
-  if (type === 'AlexaSkillEvent.SkillAccountLinked' && userIdFromToken) return rememberAlexaUser(userIdFromToken, alexaUserId);
+  if (type === 'AlexaSkillEvent.SkillAccountLinked') {
+    if (!userIdFromToken) return 'linked, token not accepted';
+    await rememberAlexaUser(userIdFromToken, alexaUserId);
+    return 'linked';
+  }
+  return 'ignored';
 }

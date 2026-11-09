@@ -8,3 +8,10 @@ crons = ["*/15 * * * *"]
 
 [vars]
 SITE = "https://pranaveda.app"
+
+# Each check's result in the Worker's logs (free). Kept here so a deploy
+# does not switch it off.
+[observability.logs]
+enabled = true
+invocation_logs = true
+persist = true
