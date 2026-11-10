@@ -124,6 +124,21 @@ describe('Alexa notifications', () => {
     expect(await sendAlexaNudge('amzn1.ask.account.A', 'k1', NOW, fetcher)).toBe('failed');
   });
 
+  it('ignore spaces and line breaks pasted around the credentials', async () => {
+    process.env.ALEXA_EVENTS_CLIENT_ID = '  amzn1.application-oa2-client.trim\n';
+    process.env.ALEXA_EVENTS_CLIENT_SECRET = ' secret \n';
+    const bodies: string[] = [];
+    const fetcher = async (url: string, init: any) => {
+      if (url.includes('/auth/o2/token')) {
+        bodies.push(String(init.body));
+        return new Response(JSON.stringify({ access_token: 'lwa3', expires_in: 3600 }));
+      }
+      return new Response(null, { status: 202 });
+    };
+    expect(await sendAlexaNudge('amzn1.ask.account.A', 'k1', NOW, fetcher)).toBe('ok');
+    expect(bodies[0]).toContain('client_id=amzn1.application-oa2-client.trim&client_secret=secret&');
+  });
+
   it('say in the log why nothing could be sent, never silently', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     delete process.env.ALEXA_EVENTS_CLIENT_ID;
@@ -135,6 +150,8 @@ describe('Alexa notifications', () => {
     const refused = async () => new Response(JSON.stringify({ error: 'invalid_client', error_description: 'Client authentication failed' }), { status: 401 });
     expect(await sendAlexaNudge('amzn1.ask.account.A', 'k1', NOW, refused)).toBe('failed');
     expect(String(errors.mock.calls.at(-1))).toContain('401 invalid_client');
+    expect(String(errors.mock.calls.at(-1))).toContain('client id amzn1.application-oa2-client.z…ient.z (30 chars), secret 5 chars');
+    expect(String(errors.mock.calls.at(-1))).not.toContain('wrong');
     errors.mockRestore();
   });
 });
