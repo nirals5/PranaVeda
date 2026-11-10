@@ -42,7 +42,9 @@ async function skillToken(clientId: string, secret: string, now: number, fetcher
   });
   const body: any = await res.json().catch(() => null);
   if (!res.ok || typeof body?.access_token !== 'string') {
-    console.error(`[alexa] skill sign-in for notifications refused: ${res.status} ${body?.error ?? ''}`.trim());
+    // What was used, to compare with the skill's Permissions page (never the secret).
+    const used = `client id ${clientId.slice(0, 32)}…${clientId.slice(-6)} (${clientId.length} chars), secret ${secret.length} chars`;
+    console.error(`[alexa] skill sign-in for notifications refused: ${res.status} ${body?.error ?? ''}; ${used}`);
     return null;
   }
   // A minute early, so a token never runs out mid-check.
@@ -54,8 +56,9 @@ export const alexaEventsConfigured = () => !!(process.env.ALEXA_EVENTS_CLIENT_ID
 
 // 'gone': Amazon refused this person (notifications turned off in the Alexa app).
 export async function sendAlexaNudge(alexaUserId: string, slotKey: string, now: number = Date.now(), fetcher: Fetcher = fetch): Promise<SendResult> {
-  const clientId = process.env.ALEXA_EVENTS_CLIENT_ID;
-  const secret = process.env.ALEXA_EVENTS_CLIENT_SECRET;
+  // Trimmed: a pasted value easily carries a space or a line break.
+  const clientId = process.env.ALEXA_EVENTS_CLIENT_ID?.trim();
+  const secret = process.env.ALEXA_EVENTS_CLIENT_SECRET?.trim();
   if (!clientId || !secret) {
     console.error('[alexa] notifications not configured (ALEXA_EVENTS_CLIENT_ID / _SECRET)');
     return 'failed';
