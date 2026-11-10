@@ -25,6 +25,8 @@ Checks: `npm run lint` (type check) and `npm test` (Vitest). The tests that need
 
 GitHub Actions runs these checks on every pull request (`.github/workflows/`): the website's type check and tests, and, when a pull request touches `ios/` or `android/`, the iOS tests on a simulator and the Android unit tests. The database tests are skipped there, since CI has no database. `tests/apiImports.test.ts` also fails if a file the Vercel functions load has a relative import without a `.js` extension: it would pass every other check and only crash on Vercel.
 
+The site lives at `https://pranaveda.app`. The old Vercel addresses, `pranaveda-five.vercel.app` and `v0-pranaveda.vercel.app`, send every path to the same path there with a permanent (308) redirect, set in `vercel.json` by host so preview links are untouched (KAN-30). Anything saved in a browser on an old address (a guest's profile, practice log, saved rituals) stays with that address and doesn't move across.
+
 ## Features: practice calendar, connectors, wearables, and location
 
 Everything below lives under the profile button at the right end of the top navigation: **Profile → Connectors**. The Profile header shows the name and constitution Amrita has learned, or "Guest". Where accounts are switched on it also holds sign-in (see [Accounts and sync](#accounts-and-sync-optional-off-by-default)); the connectors below work the same signed in or out.

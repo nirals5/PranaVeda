@@ -8,6 +8,20 @@
     "api/sync.ts": { "maxDuration": 15 },
     "api/push.ts": { "maxDuration": 60 }
   },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "pranaveda-five.vercel.app" }],
+      "destination": "https://pranaveda.app/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "v0-pranaveda.vercel.app" }],
+      "destination": "https://pranaveda.app/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/api/auth/:path*", "destination": "/api/auth" },
     { "source": "/api/me", "destination": "/api/auth" },
