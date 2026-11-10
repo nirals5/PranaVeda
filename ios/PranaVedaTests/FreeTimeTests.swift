@@ -95,6 +95,19 @@ struct FreeTimeTests {
         #expect(store.openSlot(now: at(12)) == nil)
     }
 
+    // KAN-23: a tap can arrive before the app's screens are up; it is kept
+    // until they look, and only PranaVeda's reminders open Amrita.
+    @MainActor @Test func aTappedReminderIsKeptUntilTheAppLooks() {
+        let store = CalendarStore(defaults: UserDefaults(suiteName: "CalendarTests-\(UUID().uuidString)")!)
+        #expect(store.reminderOpened == 0)
+        store.reminderTapped(id: "free-time-2026-11-10T07:00")
+        #expect(store.reminderOpened == 1)
+        store.reminderTapped(id: "arrival-home")
+        #expect(store.reminderOpened == 2)
+        store.reminderTapped(id: "something-else")
+        #expect(store.reminderOpened == 2)
+    }
+
     @Test func busyTimesGoWithAMessage() throws {
         var request = APIClient.ChatRequest(
             messages: [.init(role: "user", content: "Hello")], profile: .object([:]),

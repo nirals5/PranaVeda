@@ -29,8 +29,10 @@ final class CalendarStore: NSObject {
 
     /// When they last finished a practice (no nudge for two hours after).
     @ObservationIgnored var lastPracticeAt: (() -> Date?)?
-    /// A reminder was tapped: show the Amrita tab.
-    @ObservationIgnored var onOpenReminder: (() -> Void)?
+    /// Counts reminders tapped. Kept here, not passed straight on, because a
+    /// tap can arrive before the app's screens are up; they show the Amrita
+    /// tab when it changes (KAN-23).
+    private(set) var reminderOpened = 0
 
     private let defaults: UserDefaults
     @ObservationIgnored private lazy var store = EKEventStore()
@@ -137,7 +139,6 @@ final class CalendarStore: NSObject {
             watching = NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.refresh() }
             }
-            UNUserNotificationCenter.current().delegate = self
         }
         refresh()
         if active { cancelReminders() } else { planReminders() }
@@ -232,12 +233,65 @@ extension CalendarStore: UNUserNotificationCenterDelegate {
         id.hasPrefix("free-time-") || id.hasPrefix(ArrivalStore.idPrefix)
     }
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        Self.isReminder(notification.request.identifier) ? [] : [.banner, .sound]
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        let options: UNNotificationPresentationOptions = Self.isReminder(notification.request.identifier) ? [] : [.banner, .sound]
+        nonisolated(unsafe) let done = completionHandler
+        DispatchQueue.main.async { done(options) }
     }
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        guard Self.isReminder(response.notification.request.identifier) else { return }
-        await MainActor.run { onOpenReminder?() }
+    /// Completion handlers, called on the main queue: the async forms ended
+    /// off the main thread, and UIKit stopped the app at the tap (KAN-23).
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        let id = response.notification.request.identifier
+        nonisolated(unsafe) let done = completionHandler
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                ReminderTrace.note("tapped \(id)")
+                self.reminderTapped(id: id)
+            }
+            done()
+        }
+    }
+
+    func reminderTapped(id: String) {
+        guard Self.isReminder(id) else { return }
+        reminderOpened += 1
+    }
+}
+
+#if DEBUG || REMINDER_TEST
+extension CalendarStore {
+    /// Test builds only: a reminder in 30 seconds, to tap straight away
+    /// rather than waiting for free time. Leave the app first; reminders are
+    /// never shown while it is on screen.
+    func sendTestReminder() {
+        let content = UNMutableNotificationContent()
+        content.title = "A moment for yourself"
+        content.body = "A test reminder. Amrita has a practice that fits."
+        content.sound = .default
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 30, repeats: false)
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: Self.idPrefix + "test", content: content, trigger: trigger))
+        ReminderTrace.note("test reminder planned")
+    }
+}
+#endif
+
+/// Test builds only: what happened around a reminder, one line each, in
+/// Documents/reminder-trace.txt (copied off with devicectl). Does nothing
+/// in store builds.
+enum ReminderTrace {
+    static func note(_ event: String) {
+        #if DEBUG || REMINDER_TEST
+        guard let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let file = dir.appendingPathComponent("reminder-trace.txt")
+        let line = Data("\(Date().ISO8601Format()) \(event)\n".utf8)
+        if let handle = try? FileHandle(forWritingTo: file) {
+            handle.seekToEndOfFile()
+            handle.write(line)
+            try? handle.close()
+        } else {
+            try? line.write(to: file)
+        }
+        #endif
     }
 }

@@ -1,6 +1,7 @@
 import GoogleSignIn
 import SwiftUI
 import UIKit
+import UserNotifications
 
 @main
 struct PranaVedaApp: App {
@@ -43,6 +44,10 @@ struct PranaVedaApp: App {
         if let inline = playfair(19, .headline) { bar.titleTextAttributes = [.font: inline] }
         // Must be registered before launch finishes.
         CalendarStore.registerBackgroundRefresh()
+        // Also before launch finishes, or iOS can drop the tap that opened
+        // the app from a reminder (KAN-23).
+        UNUserNotificationCenter.current().delegate = CalendarStore.shared
+        ReminderTrace.note("launched")
         // iOS relaunches the app in the background for an arrival; it must
         // be listening again straight away.
         ArrivalStore.shared.resume()
@@ -82,6 +87,7 @@ struct PranaVedaApp: App {
             // commands), never in the background or over Amrita's own voice.
             .onChange(of: tab == .amrita && openedRitual == nil, initial: true) { _, showing in heyAmrita.chatShowing = showing }
             .onChange(of: scenePhase, initial: true) { _, phase in
+                ReminderTrace.note("scene \(phase)")
                 heyAmrita.hold(.background, phase != .active)
                 // This morning's readings, ready for the next message to Amrita.
                 if phase == .active { Task { await health.load() } }
@@ -109,6 +115,14 @@ struct PranaVedaApp: App {
                 tab = .amrita
                 chat.send(question)
             }
+            // A tapped reminder: Amrita, in front of anything left open.
+            .onChange(of: calendar.reminderOpened, initial: true) { _, opened in
+                guard opened > 0 else { return }
+                ReminderTrace.note("opening Amrita")
+                openedRitual = nil
+                practicingRitual = nil
+                tab = .amrita
+            }
             .sheet(item: $openedRitual) { RitualDetailView(result: $0.result) }
             .fullScreenCover(item: $practicingRitual) {
                 GuidedPracticeView(result: $0.result).environment(practice).environment(saved)
@@ -133,7 +147,6 @@ struct PranaVedaApp: App {
                 }
                 chat.calendarForAmrita = { [calendar] in calendar.contextForAmrita }
                 calendar.lastPracticeAt = { [practice] in practice.entries.last?.completedDate }
-                calendar.onOpenReminder = { tab = .amrita }
                 heyAmrita.onWake = { open(WidgetLink.talk) }
                 practice.auth = auth
                 saved.auth = auth
