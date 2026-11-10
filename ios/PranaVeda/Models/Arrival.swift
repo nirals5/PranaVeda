@@ -196,6 +196,9 @@ final class ArrivalStore: NSObject {
         let before = states[id]
         states[id] = inside ? "inside" : "outside"
         defaults.set(states, forKey: Self.stateKey)
+        // A wake-up from iOS: catch calendar changes first, then plan this
+        // place's reminder, which holds the free-time ones back (KAN-29).
+        CalendarStore.shared.replanInBackground()
         if outside { leave(kind) } else if before == "outside" { arrive(kind) }
     }
 
@@ -243,6 +246,11 @@ final class ArrivalStore: NSObject {
 
     private nonisolated static func scheduled(_ defaults: UserDefaults) -> [String: Date] {
         (defaults.dictionary(forKey: scheduledKey) as? [String: Double] ?? [:]).mapValues { Date(timeIntervalSince1970: $0) }
+    }
+
+    /// Arrival reminders planned but not yet shown.
+    nonisolated static func pending(defaults: UserDefaults = .standard, now: Date = Date()) -> [Date] {
+        scheduled(defaults).values.filter { $0 > now }
     }
 
     /// The latest arrival reminder already shown, for the free-time reminders' distance.

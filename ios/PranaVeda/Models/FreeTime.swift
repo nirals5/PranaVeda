@@ -166,4 +166,12 @@ enum FreeTime {
         }
         return planned
     }
+
+    /// Drops planned reminders before the end of the gap after any pending
+    /// arrival reminder, as `holdBackReminders` did when it was planned, so a
+    /// re-plan in the background doesn't bring them back (KAN-29).
+    static func clearOf(_ planned: [PlannedReminder], arrivals: [Date]) -> [PlannedReminder] {
+        guard let until = arrivals.map({ $0.addingTimeInterval(minGapBetweenReminders) }).max() else { return planned }
+        return planned.filter { $0.at >= until }
+    }
 }
