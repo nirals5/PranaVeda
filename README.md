@@ -505,12 +505,12 @@ Tested against the real thing:
 - Amrita with the live model, signed in and signed out: profile updates saved to the account, and returned to the device for a guest.
 - Push nudges in production (9 November 2026): the Cloudflare cron's check sent a real nudge through Google's push service to Chrome on a Mac, and it appeared on screen. It only appeared once Chrome was allowed to notify in macOS System Settings → Notifications.
 - Alexa account linking in production (9 November 2026): linked from the Alexa app with Google sign-in. Opening the skill then said "Good afternoon, Hetan.", the reflection, "Your calendar is open for the rest of today." and "You last practised on Friday."
+- An Alexa notification in production (9 November 2026): the 15-minute check sent the message alert, the log read `[push] nudge: web ok; alexa ok`, and the Echo Dot lit up with one new message from Amrita. Amazon had refused earlier checks (`401 invalid_client`) until the skill's messaging credentials in Vercel were used exactly as Amazon lists them (they are now trimmed).
 
 Not yet tested against the real thing:
 
 - Google Calendar and Google Health connectors with a real client ID. The Google Health field names and filters come from Google's documentation, not a live call.
 - Sign in with Apple (needs an Apple Developer account).
 - A real Bluetooth heart-rate device.
-- An Alexa notification reaching a real Echo. The 9 November check sent one, but nothing showed on the Echo or in the Alexa app, and Amazon's answer was not logged then. The per-channel log line (Free-time nudges → Logs) now records it.
 - Location with a real device position and the browser's real permission prompt.
 - Amrita's replies using calendar, wearable and location context with the live model.
