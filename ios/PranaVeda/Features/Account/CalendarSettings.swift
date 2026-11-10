@@ -42,6 +42,17 @@ struct CalendarSettings: View {
                         .accessibilityLabel(calendar.remindersOn ? "Turn off free-time reminders" : "Turn on free-time reminders")
                     }
                 }
+                #if DEBUG || REMINDER_TEST
+                if calendar.remindersOn {
+                    HStack(alignment: .center, spacing: 12) {
+                        Text("Test build: a reminder in 30 seconds. Leave the app, then tap it.")
+                            .font(Theme.caption).foregroundStyle(Theme.stone500)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button("Test") { calendar.sendTestReminder() }
+                            .buttonStyle(PillButton(primary: false))
+                    }
+                }
+                #endif
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
