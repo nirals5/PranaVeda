@@ -131,6 +131,24 @@ function toIntervals(list: unknown): BusyInterval[] {
 
 class GoogleAuthExpired extends Error {}
 
+// Why Google refused the busy-times request: 'lapsed' (offer Reconnect), or
+// a sentence naming the real cause, from Google's own error reasons.
+export function googleRefusal(status: number, body: any): 'lapsed' | string {
+  const reasons = [
+    ...(body?.error?.errors ?? []).map((e: any) => e?.reason),
+    ...(body?.error?.details ?? []).map((d: any) => d?.reason),
+  ].filter(Boolean);
+  const has = (...r: string[]) => reasons.some((x: string) => r.includes(x));
+  if (status === 401) return 'lapsed';
+  if (has('accessNotConfigured', 'SERVICE_DISABLED'))
+    return 'The Google Calendar API is not enabled for this site yet, so busy times cannot be read.';
+  if (has('insufficientPermissions', 'ACCESS_TOKEN_SCOPE_INSUFFICIENT'))
+    return 'Calendar access was not allowed. Connect again and tick “See your free/busy information”.';
+  if (status === 429 || has('rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded', 'RATE_LIMIT_EXCEEDED'))
+    return 'Google Calendar is busy just now. Please try again in a minute.';
+  return 'lapsed';
+}
+
 async function fetchGoogleBusy(token: string, timeMin: number, timeMax: number): Promise<BusyInterval[]> {
   const response = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
     method: 'POST',
@@ -141,7 +159,10 @@ async function fetchGoogleBusy(token: string, timeMin: number, timeMax: number):
       items: [{ id: 'primary' }],
     }),
   });
-  if (response.status === 401 || response.status === 403) throw new GoogleAuthExpired();
+  if (response.status === 401 || response.status === 403 || response.status === 429) {
+    const refusal = googleRefusal(response.status, await response.json().catch(() => null));
+    throw refusal === 'lapsed' ? new GoogleAuthExpired() : new Error(refusal);
+  }
   if (!response.ok) throw new Error('Google Calendar could not be read just now.');
   const data = await response.json();
   return toIntervals(data?.calendars?.primary?.busy);
@@ -252,7 +273,7 @@ export function useExternalCalendar() {
     } catch (err: any) {
       setErrors((e) => ({
         ...e,
-        google: err instanceof GoogleAuthExpired ? 'Google did not grant calendar access.' : err?.message,
+        google: err instanceof GoogleAuthExpired ? 'Google did not accept the sign-in. Please connect again.' : err?.message,
       }));
     } finally {
       setPending(null);

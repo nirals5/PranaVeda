@@ -480,8 +480,11 @@ Everything is removed when the account is deleted.
 
 1. In Google Cloud Console, create an OAuth client of type "Web application".
 2. Add your site origins under "Authorized JavaScript origins", including `http://localhost:3000` for local work.
-3. For Google Health, enable the Google Health API on the same project.
-4. Set `VITE_GOOGLE_CLIENT_ID` to the client ID (see `.env.example`).
+3. Enable the **Google Calendar API** on the same project (APIs & Services → Library). Without it, sign-in succeeds but Google refuses the busy-times request, and the page says the API is not enabled.
+4. For Google Health, enable the Google Health API on the same project.
+5. Set `VITE_GOOGLE_CLIENT_ID` to the client ID (see `.env.example`).
+
+When Google refuses the busy-times request, the calendar row says why: lapsed access offers **Reconnect**; the Calendar API not enabled, the free/busy permission left unticked, or Google limiting requests each get their own message (`googleRefusal` in `src/hooks/useExternalCalendar.ts`). Reconnect shows Google's account chooser each time, because the busy-times permission does not tell the page which account was used.
 
 Without the client ID, both Google options show "Not set up yet for this site". The private calendar link and the Bluetooth device work without it.
 
@@ -505,12 +508,14 @@ Tested against the real thing:
 - Amrita with the live model, signed in and signed out: profile updates saved to the account, and returned to the device for a guest.
 - Push nudges in production (9 November 2026): the Cloudflare cron's check sent a real nudge through Google's push service to Chrome on a Mac, and it appeared on screen. It only appeared once Chrome was allowed to notify in macOS System Settings → Notifications.
 - Alexa account linking in production (9 November 2026): linked from the Alexa app with Google sign-in. Opening the skill then said "Good afternoon, Hetan.", the reflection, "Your calendar is open for the rest of today." and "You last practised on Friday."
+- Google Calendar in production (9 November 2026), with the real client ID: connected and read busy times once the Google Calendar API was enabled; after about an hour the row said access had lapsed and the free-time line was hidden; **Reconnect** (after Google's account chooser) restored both.
+- Amrita with the live model and a real calendar (9 November 2026): asked "I have a little time, what should I practise?" with about 30 minutes before an event, she gave a 22-minute wind-down, said it ends "well before your 9:15 commitment", and did not guess what the event was.
 - An Alexa notification in production (9 November 2026): the 15-minute check sent the message alert, the log read `[push] nudge: web ok; alexa ok`, and the Echo Dot lit up with one new message from Amrita. Amazon had refused earlier checks (`401 invalid_client`) until the skill's messaging credentials in Vercel were used exactly as Amazon lists them (they are now trimmed).
 
 Not yet tested against the real thing:
 
-- Google Calendar and Google Health connectors with a real client ID. The Google Health field names and filters come from Google's documentation, not a live call.
+- The Google Health connector with a real client ID. Its field names and filters come from Google's documentation, not a live call.
 - Sign in with Apple (needs an Apple Developer account).
 - A real Bluetooth heart-rate device.
 - Location with a real device position and the browser's real permission prompt.
-- Amrita's replies using calendar, wearable and location context with the live model.
+- Amrita's replies using wearable and location context with the live model (calendar context is confirmed above).
