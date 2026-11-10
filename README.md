@@ -65,7 +65,10 @@ Things to know:
 
 - **All-day events do not count as busy.** Holidays and birthdays would otherwise silence Amrita all day; the catch is that an all-day "out of office" will not block nudges either.
 - Cancelled events and events marked "free" do not count as busy. Recurring events, deleted occurrences, and moved occurrences are handled.
-- **Google access lapses about every hour.** Browser-only sign-in cannot renew silently, so the user must click "Reconnect". The private link has no such limit.
+- **Google access lapses about every hour.** Browser-only sign-in cannot renew silently, so the user must click "Reconnect". The private link has no such limit, and the server can re-read it at every nudge check, so the card steers people to it (KAN-27):
+  - with Google connected and no private link, the Google row adds "Google asks you to confirm about once an hour; for no interruptions, use your calendar's private link below", and a lapsed row says the link does not lapse;
+  - **How to find your private link** under the link field opens steps for Google Calendar (Settings → your calendar → Integrate calendar → *Secret address in iCal format*), Apple iCloud (Public Calendar) and Outlook (Publish a calendar, "Can view when I'm busy"), and warns that anyone with the link can see the calendar.
+  - A server-kept Google refresh token was weighed and not built: until Google verifies the app it expires weekly, and verification of the calendar permission takes days to weeks.
 - **Fail closed:** if any connected calendar has lapsed or errored, free time is not trusted and Amrita does not nudge at all.
 - The link reader only accepts public `https://` or `webcal://` addresses and refuses private, loopback, and cloud-metadata addresses.
 

@@ -9,6 +9,50 @@ const actionButton =
 const primaryAction = `${actionButton} bg-[#8A79A5] hover:bg-[#72618F] text-white`;
 const quietAction = `${actionButton} text-stone-600 hover:text-stone-900 bg-white/50 hover:bg-white/80 border border-white/70`;
 
+// Where each calendar keeps its private iCal address. Inline, closed by default.
+function PrivateLinkHelp() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="private-link-help"
+        onClick={() => setOpen((o) => !o)}
+        className="text-[12.5px] font-sans text-[#72618F] hover:text-[#5a4c73] underline underline-offset-2 cursor-pointer"
+      >
+        How to find your private link
+      </button>
+      {open && (
+        <div
+          id="private-link-help"
+          role="region"
+          aria-label="How to find your private link"
+          className="mt-2 space-y-2 text-[13px] text-stone-600 font-sans leading-relaxed"
+        >
+          <p>
+            <span className="font-semibold text-[#2D3436]">Google Calendar</span> (on a computer): Settings → under
+            “Settings for my calendars”, choose your calendar → Integrate calendar → copy the{' '}
+            <span className="italic">Secret address in iCal format</span>. Unlike signing in with Google, this link does
+            not lapse every hour.
+          </p>
+          <p>
+            <span className="font-semibold text-[#2D3436]">Apple iCloud</span>: on iCloud.com, open Calendar, click the
+            share icon next to your calendar, turn on Public Calendar and copy the link.
+          </p>
+          <p>
+            <span className="font-semibold text-[#2D3436]">Outlook</span>: Settings → Calendar → Shared calendars →
+            Publish a calendar, choose “Can view when I’m busy”, then copy the ICS link.
+          </p>
+          <p>
+            Keep it private: anyone with the link can see your calendar. PranaVeda reads only when you are busy.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Connect an outside calendar so Amrita knows when the user is free. Only
 // busy times are ever read — the copy says so, because it is the whole promise.
 export default function CalendarConnections({
@@ -66,9 +110,9 @@ export default function CalendarConnections({
               {!calendar.googleConfigured
                 ? 'Not set up yet for this site.'
                 : calendar.googleNeedsReconnect
-                  ? 'Access has lapsed — Google asks you to confirm about once an hour. Amrita is paused until you reconnect.'
+                  ? `Access has lapsed — Google asks you to confirm about once an hour. Amrita is paused until you reconnect${calendar.icsConnected ? '.' : ', or use your calendar’s private link below, which does not lapse.'}`
                   : calendar.googleConnected
-                    ? 'Connected. Reading busy times only.'
+                    ? `Connected. Reading busy times only.${calendar.icsConnected ? '' : ' Google asks you to confirm about once an hour; for no interruptions, use your calendar’s private link below.'}`
                     : 'Sign in with Google and allow read-only access to your busy times.'}
             </p>
             {calendar.errors.google && <p role="alert" className="text-[13px] text-[#B4443A] font-sans">{calendar.errors.google}</p>}
@@ -106,6 +150,7 @@ export default function CalendarConnections({
               </button>
             )}
           </div>
+          {!calendar.icsConnected && <PrivateLinkHelp />}
           {!calendar.icsConnected && (
             <form onSubmit={submitLink} className="flex flex-col sm:flex-row gap-2">
               <label className="flex-1 flex items-center gap-2 bg-white/60 border border-white/80 rounded-full px-4 py-2 focus-within:border-[#8A79A5]/40">
