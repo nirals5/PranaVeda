@@ -95,6 +95,18 @@ struct FreeTimeTests {
         #expect(store.openSlot(now: at(12)) == nil)
     }
 
+    // KAN-29: re-planning in the background keeps the three hours an arrival
+    // reminder already holds; with none pending, nothing is dropped.
+    @Test func replanningKeepsClearOfAPendingArrivalReminder() {
+        let plan = [
+            PlannedReminder(at: at(10), key: "a", text: ""),
+            PlannedReminder(at: at(13), key: "b", text: ""),
+            PlannedReminder(at: at(16), key: "c", text: ""),
+        ]
+        #expect(FreeTime.clearOf(plan, arrivals: [at(11)]).map(\.key) == ["c"])
+        #expect(FreeTime.clearOf(plan, arrivals: []) == plan)
+    }
+
     // KAN-23: a tap can arrive before the app's screens are up; it is kept
     // until they look, and only PranaVeda's reminders open Amrita.
     @MainActor @Test func aTappedReminderIsKeptUntilTheAppLooks() {

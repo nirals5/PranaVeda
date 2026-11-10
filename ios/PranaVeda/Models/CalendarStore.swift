@@ -2,6 +2,7 @@ import BackgroundTasks
 import EventKit
 import Foundation
 import Observation
+import UIKit
 import UserNotifications
 
 /// The phone's calendar, read for busy and free time only, as the website
@@ -158,8 +159,11 @@ final class CalendarStore: NSObject {
         if let arrival = ArrivalStore.lastShown(defaults: defaults, now: now), arrival > (last?.at ?? .distantPast) {
             last = PlannedReminder(at: arrival, key: "arrival", text: "")
         }
-        let planned = FreeTime.planReminders(busy, from: now.addingTimeInterval(FreeTime.awayBeforeReminder), until: end,
-                                             lastPracticeAt: lastPracticeAt?(), last: last)
+        let planned = FreeTime.clearOf(
+            FreeTime.planReminders(busy, from: now.addingTimeInterval(FreeTime.awayBeforeReminder), until: end,
+                                   lastPracticeAt: lastPracticeAt?(), last: last),
+            arrivals: ArrivalStore.pending(defaults: defaults, now: now)
+        )
         defaults.set(try? JSONEncoder().encode(planned), forKey: Self.plannedKey)
         for reminder in planned {
             let content = UNMutableNotificationContent()
@@ -209,6 +213,15 @@ final class CalendarStore: NSObject {
 
     /// Registered at launch: when iOS lends the app a moment, the calendar is
     /// read again and the reminders re-planned.
+    /// iOS woke the app for something else (an arrival): read the calendar
+    /// again and re-plan, catching meetings added since (KAN-29). Never while
+    /// on screen, where reminders are held back.
+    func replanInBackground() {
+        guard UIApplication.shared.applicationState != .active else { return }
+        refresh()
+        planReminders()
+    }
+
     nonisolated static func registerBackgroundRefresh() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: refreshTaskId, using: .main) { task in
             MainActor.assumeIsolated {
@@ -221,7 +234,8 @@ final class CalendarStore: NSObject {
 
     private func scheduleBackgroundRefresh() {
         let request = BGAppRefreshTaskRequest(identifier: Self.refreshTaskId)
-        request.earliestBeginDate = Date().addingTimeInterval(60 * 60)
+        // The soonest iOS allows; it still decides when (KAN-29).
+        request.earliestBeginDate = Date().addingTimeInterval(15 * 60)
         try? BGTaskScheduler.shared.submit(request)
     }
 }
