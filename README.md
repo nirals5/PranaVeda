@@ -63,7 +63,9 @@ Busy times cover today and tomorrow and refresh every 10 minutes and whenever th
 
 Things to know:
 
-- **All-day events do not count as busy.** Holidays and birthdays would otherwise silence Amrita all day; the catch is that an all-day "out of office" will not block nudges either.
+- **All-day events never count as busy, on every path (KAN-28).** A holiday, a vacation or an out-of-office day is a good day for a practice, so it never silences Amrita. Timed events on those days still count.
+  - Private link, iPhone and Android: all-day entries are skipped.
+  - Google sign-in: Google's free/busy answer counts an all-day "Busy" or "Out of office" event as busy from midnight to midnight and gives no event types, so `withoutWholeDays` removes every whole local day from its busy blocks and keeps the timed parts either side. The cost: on a day Google marks busy all day, a timed meeting is merged into that block and is lost too.
 - Cancelled events and events marked "free" do not count as busy. Recurring events, deleted occurrences, and moved occurrences are handled.
 - **Google access lapses about every hour.** Browser-only sign-in cannot renew silently, so the user must click "Reconnect". The private link has no such limit, and the server can re-read it at every nudge check, so the card steers people to it (KAN-27):
   - with Google connected and no private link, the Google row adds "Google asks you to confirm about once an hour; for no interruptions, use your calendar's private link below", and a lapsed row says the link does not lapse;

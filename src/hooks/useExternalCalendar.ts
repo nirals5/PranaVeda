@@ -35,6 +35,30 @@ function startOfDay(ms: number): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
+function nextMidnight(ms: number): number {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+}
+
+// KAN-28: all-day events never block a nudge. Google's free/busy answer has
+// no event types, so every whole local day (midnight to midnight) inside a
+// busy block is taken out and the timed parts either side are kept.
+export function withoutWholeDays(intervals: BusyInterval[]): BusyInterval[] {
+  const kept: BusyInterval[] = [];
+  for (const { start, end } of intervals) {
+    const first = startOfDay(start) === start ? start : nextMidnight(start);
+    let last = first;
+    while (nextMidnight(last) <= end) last = nextMidnight(last);
+    if (last === first) {
+      kept.push({ start, end });
+      continue;
+    }
+    if (start < first) kept.push({ start, end: first });
+    if (last < end) kept.push({ start: last, end });
+  }
+  return kept;
+}
+
 export function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
@@ -165,7 +189,7 @@ async function fetchGoogleBusy(token: string, timeMin: number, timeMax: number):
   }
   if (!response.ok) throw new Error('Google Calendar could not be read just now.');
   const data = await response.json();
-  return toIntervals(data?.calendars?.primary?.busy);
+  return withoutWholeDays(toIntervals(data?.calendars?.primary?.busy));
 }
 
 async function fetchIcsBusy(url: string, timeMin: number, timeMax: number): Promise<BusyInterval[]> {
