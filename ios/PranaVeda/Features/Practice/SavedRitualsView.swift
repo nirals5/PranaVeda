@@ -22,7 +22,7 @@ struct SavedRitualsView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(shown) { ritual in
-                        row(ritual)
+                        row(ritual).siriShows(SavedRitualEntity.self, id: ritual.id)
                         if ritual.id != shown.last?.id { Divider() }
                     }
                 }

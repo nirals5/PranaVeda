@@ -163,6 +163,7 @@ struct PoseImage: View {
 struct RitualDetailView: View {
     let result: RecommendationResult
     @Environment(\.dismiss) private var dismiss
+    @Environment(SavedRitualStore.self) private var saved: SavedRitualStore?
     @State private var guiding = false
 
     var body: some View {
@@ -216,6 +217,7 @@ struct RitualDetailView: View {
             }
             .fullScreenCover(isPresented: $guiding) { GuidedPracticeView(result: result) }
         }
+        .siriShows(SavedRitualEntity.self, id: saved?.rituals.first { $0.result == result }?.id)
     }
 }
 
