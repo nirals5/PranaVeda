@@ -80,7 +80,14 @@ for distribution when it is uploaded. The app record in App Store Connect
 
 Each upload needs a higher build number (`CURRENT_PROJECT_VERSION` in
 `project.yml`). A new version for the store also raises `MARKETING_VERSION`.
-Pass them for one build instead of editing the file:
+Pass them for one build instead of editing the file, then raise the number in
+`project.yml` to match once the build is uploaded.
+
+Store builds use the released Xcode, not a beta: App Store Connect rejects beta
+SDKs, and only a 27.3 SDK compiles the Siri developer-preview code (`SIRI_AI`).
+If `xcode-select` points at a beta, prefix both commands with
+`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`. Build 4 of 1.0 was
+archived this way with Xcode 27.2.
 
 ```bash
 xcodebuild -project PranaVeda.xcodeproj -scheme PranaVeda -configuration Release -destination 'generic/platform=iOS' -archivePath build/PranaVeda.xcarchive -allowProvisioningUpdates CURRENT_PROJECT_VERSION=2 archive
