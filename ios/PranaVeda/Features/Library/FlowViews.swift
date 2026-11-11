@@ -113,6 +113,22 @@ struct FlowPlayerView: View {
             let player = AVPlayer(url: url)
             self.player = player
             player.play()
+            SiriBridge.flowPlayed(flow)
+        }
+        // Opened by Siri, the first play() can be dropped: Siri still holds
+        // the audio, or the app isn't in front yet. Ask again for the first
+        // few seconds, until it has started once; a later pause is theirs.
+        .task(id: player == nil) {
+            guard let player else { return }
+            for _ in 0..<20 {
+                if player.timeControlStatus == .playing { return }
+                if UIApplication.shared.applicationState == .active {
+                    try? AVAudioSession.sharedInstance().setActive(true)
+                    player.play()
+                }
+                try? await Task.sleep(for: .milliseconds(400))
+                if Task.isCancelled { return }
+            }
         }
         .onDisappear { player?.pause() }
     }

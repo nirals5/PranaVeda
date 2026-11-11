@@ -25,6 +25,9 @@ struct PranaVedaApp: App {
     @State private var openedRitual: SavedRitual?
     /// A saved ritual begun straight away ("Start my practice").
     @State private var practicingRitual: SavedRitual?
+    /// A Library pose opened, or a flow played, from Siri or Shortcuts.
+    @State private var libraryPath = NavigationPath()
+    @State private var playingFlow: Flow?
     /// Links from intents (the Talk to Amrita control).
     @State private var router = AppLinkRouter.shared
     /// "Hey Amrita" while the app is open (opt-in).
@@ -68,7 +71,7 @@ struct PranaVedaApp: App {
                 }
                     .tabItem { Label("Dosha", systemImage: "wind") }
                     .tag(AppTab.dosha)
-                LibraryView(catalog: catalog, conditions: chat.profileConditions)
+                LibraryView(catalog: catalog, conditions: chat.profileConditions, path: $libraryPath)
                     .tabItem { Label("Library", systemImage: "figure.mind.and.body") }
                     .tag(AppTab.library)
                 AccountView(auth: auth, practice: practice, saved: saved, health: health, place: place, calendar: calendar, chat: chat, connections: connections) { tab = .amrita }
@@ -121,12 +124,14 @@ struct PranaVedaApp: App {
                 ReminderTrace.note("opening Amrita")
                 openedRitual = nil
                 practicingRitual = nil
+                playingFlow = nil
                 tab = .amrita
             }
             .sheet(item: $openedRitual) { RitualDetailView(result: $0.result) }
             .fullScreenCover(item: $practicingRitual) {
                 GuidedPracticeView(result: $0.result).environment(practice).environment(saved)
             }
+            .fullScreenCover(item: $playingFlow) { FlowPlayerView(flow: $0) }
             // The widgets show what the app knows; keep them in step.
             .onChange(of: practice.entries, initial: true) { publishToWidgets() }
             .onChange(of: saved.rituals) { publishToWidgets() }
@@ -173,7 +178,8 @@ struct PranaVedaApp: App {
     }
 
     /// pranaveda://talk, pranaveda://you, pranaveda://ritual/<id>,
-    /// pranaveda://practice, pranaveda://practice/<id>
+    /// pranaveda://practice, pranaveda://practice/<id>,
+    /// pranaveda://pose/<id>, pranaveda://flow/<id>
     private func open(_ url: URL) {
         switch url.host() {
         case "talk":
@@ -191,8 +197,26 @@ struct PranaVedaApp: App {
         case "ritual":
             let id = url.lastPathComponent
             if let ritual = saved.rituals.first(where: { $0.id == id }) { openedRitual = ritual } else { tab = .you }
+        case "pose":
+            // On a cold start the catalog may still be loading: the copy kept
+            // on the phone knows the pose. Unknown, it's the Library itself.
+            let library = catalog.catalog ?? Catalog.saved()
+            closeCovers()
+            tab = .library
+            libraryPath = NavigationPath()
+            if let pose = library?.poses.first(where: { $0.id == url.lastPathComponent }) { libraryPath.append(pose) }
+        case "flow":
+            let library = catalog.catalog ?? Catalog.saved()
+            closeCovers()
+            if let flow = library?.flows?.first(where: { $0.id == url.lastPathComponent }) { playingFlow = flow } else { tab = .library }
         default:
             break
         }
+    }
+
+    private func closeCovers() {
+        openedRitual = nil
+        practicingRitual = nil
+        playingFlow = nil
     }
 }
