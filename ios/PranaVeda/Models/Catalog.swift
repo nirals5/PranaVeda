@@ -1,7 +1,7 @@
 import Foundation
 
 /// The practice catalog from GET /api/catalog.
-struct Catalog: Decodable, Sendable {
+struct Catalog: Codable, Sendable {
     let poses: [CatalogPose]
     let breathwork: [CatalogBreathwork]
     /// Advanced poses Amrita never offers (G3), for Library → Explore. Absent
@@ -12,8 +12,26 @@ struct Catalog: Decodable, Sendable {
     let flows: [Flow]?
 }
 
+extension Catalog {
+    /// The last catalog loaded, kept on the phone so Siri and Shortcuts can
+    /// find poses and flows when the app's screens aren't open (KAN-21).
+    static var defaultFileURL: URL {
+        let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return folder.appending(path: "catalog.json")
+    }
+
+    static func saved(fileURL: URL = Catalog.defaultFileURL) -> Catalog? {
+        (try? Data(contentsOf: fileURL)).flatMap { try? JSONDecoder().decode(Catalog.self, from: $0) }
+    }
+
+    func save(to fileURL: URL = Catalog.defaultFileURL) {
+        try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? JSONEncoder().encode(self).write(to: fileURL, options: .atomic)
+    }
+}
+
 /// One follow-along video (api/_lib/flows.ts), served from media.pranaveda.app.
-struct Flow: Decodable, Hashable, Sendable, Identifiable {
+struct Flow: Codable, Hashable, Sendable, Identifiable {
     let id: String
     let title: String
     let group: String
@@ -44,8 +62,8 @@ extension Array where Element == Flow {
 
 /// An explore-only pose: shown with an at-your-own-risk note, never guided,
 /// never logged.
-struct ExplorePose: Decodable, Hashable, Sendable, Identifiable {
-    struct Condition: Decodable, Hashable, Sendable {
+struct ExplorePose: Codable, Hashable, Sendable, Identifiable {
+    struct Condition: Codable, Hashable, Sendable {
         let code: String
         let label: String
         let words: [String]
@@ -86,7 +104,7 @@ struct ExplorePose: Decodable, Hashable, Sendable, Identifiable {
     }
 }
 
-struct CatalogPose: Decodable, Hashable, Sendable, Identifiable {
+struct CatalogPose: Codable, Hashable, Sendable, Identifiable {
     let id: String
     let nameSanskrit: String
     let nameEnglish: String
@@ -107,7 +125,7 @@ struct CatalogPose: Decodable, Hashable, Sendable, Identifiable {
     var experiencedOnly: Bool { minExperience == "experienced" }
 }
 
-struct CatalogBreathwork: Decodable, Hashable, Sendable, Identifiable {
+struct CatalogBreathwork: Codable, Hashable, Sendable, Identifiable {
     let id: String
     let name: String
     let sanskritName: String
@@ -139,7 +157,10 @@ final class CatalogStore {
     func load() async {
         loadError = nil
         do {
-            catalog = try await api.catalog()
+            let loaded = try await api.catalog()
+            catalog = loaded
+            loaded.save()
+            SiriBridge.catalogChanged(loaded)
         } catch {
             loadError = "The library could not be loaded. Is the PranaVeda server running?"
         }

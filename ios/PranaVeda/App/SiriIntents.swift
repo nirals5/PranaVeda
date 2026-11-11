@@ -223,4 +223,8 @@ extension StartPracticeIntent: ToolIntent {}
 extension AskAmritaIntent: ToolIntent {}
 @available(iOS 27.3, *)
 extension PracticeSummaryIntent: ToolIntent {}
+@available(iOS 27.3, *)
+extension ShowPoseIntent: ToolIntent {}
+@available(iOS 27.3, *)
+extension PlayFlowIntent: ToolIntent {}
 #endif

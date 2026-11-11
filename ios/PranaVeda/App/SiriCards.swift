@@ -39,6 +39,34 @@ extension PracticeSummaryEntity: SnippetRepresentableEntity {
 }
 
 @available(iOS 27.3, *)
+extension LibraryPoseEntity: SnippetRepresentableEntity {
+    static var snippet: some EntitySnippetContent<Self> {
+        CardSnippet(supportedFamilies: [.standard]) { pose, _ in
+            SiriCard(label: pose.level, title: pose.name, symbol: "figure.yoga") {
+                Text(pose.sanskritName).font(Theme.bodySmall).italic().foregroundStyle(Theme.lavenderDeep)
+            } detail: {
+                Text(pose.bodyFocus)
+            }
+        }
+    }
+}
+
+@available(iOS 27.3, *)
+extension FlowEntity: SnippetRepresentableEntity {
+    static var snippet: some EntitySnippetContent<Self> {
+        CardSnippet(supportedFamilies: [.standard]) { flow, _ in
+            SiriCard(label: flow.group, title: flow.title, symbol: "play.rectangle") {
+                SiriCardFact(value: "\(flow.minutes)", unit: "min")
+            } detail: {
+                if !flow.poses.isEmpty {
+                    Text(flow.poses.prefix(4).joined(separator: " · "))
+                }
+            }
+        }
+    }
+}
+
+@available(iOS 27.3, *)
 private struct SiriCard<Facts: View, Detail: View>: View {
     let label: String
     let title: String

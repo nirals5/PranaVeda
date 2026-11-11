@@ -107,4 +107,7 @@ enum WidgetLink {
     /// A particular saved ritual's guided practice (Siri).
     static func practice(_ id: String) -> URL { practice.appending(path: id) }
     static func savedRitual(_ id: String) -> URL { URL(string: "pranaveda://ritual/\(id)")! }
+    /// A Library pose's page, and a Library flow's video (Siri).
+    static func pose(_ id: String) -> URL { URL(string: "pranaveda://pose/\(id)")! }
+    static func flow(_ id: String) -> URL { URL(string: "pranaveda://flow/\(id)")! }
 }

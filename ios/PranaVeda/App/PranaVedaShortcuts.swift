@@ -27,6 +27,16 @@ struct PranaVedaShortcuts: AppShortcutsProvider {
             systemImageName: "figure.yoga"
         )
         AppShortcut(
+            intent: PlayFlowIntent(),
+            phrases: [
+                "Play a flow in \(.applicationName)",
+                "Play \(\.$flow) in \(.applicationName)",
+                "Play the \(\.$flow) flow in \(.applicationName)",
+            ],
+            shortTitle: "Play a Yoga Flow",
+            systemImageName: "play.rectangle"
+        )
+        AppShortcut(
             intent: PracticeSummaryIntent(),
             phrases: [
                 "How's my \(.applicationName) streak",

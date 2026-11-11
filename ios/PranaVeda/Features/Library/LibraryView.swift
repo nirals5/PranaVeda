@@ -5,9 +5,11 @@ struct LibraryView: View {
     let catalog: CatalogStore
     /// From their profile, so an Explore pose can say it is not for them.
     var conditions: [String] = []
+    /// The pages open over the Library; Siri can open a pose's (KAN-21).
+    @Binding var path: NavigationPath
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ZStack {
                 Theme.background.ignoresSafeArea()
                 if let poses = catalog.catalog?.poses {
@@ -25,10 +27,6 @@ struct LibraryView: View {
                             exploreSection(explore)
                         }
                     }
-                    .navigationDestination(for: CatalogPose.self) { pose in
-                        PoseDetailView(pose: pose, flows: catalog.catalog?.flows?.featuring(pose.id) ?? [])
-                    }
-                    .navigationDestination(for: ExplorePose.self) { ExploreDetailView(pose: $0, notFor: $0.notFor(conditions)) }
                 } else if let error = catalog.loadError {
                     VStack(spacing: 12) {
                         Text(error).font(Theme.body).multilineTextAlignment(.center).foregroundStyle(Theme.stone700)
@@ -39,6 +37,12 @@ struct LibraryView: View {
                     ProgressView().tint(Theme.lavender)
                 }
             }
+            // Outside the loaded state: a pose opened by Siri on a cold start
+            // arrives before the catalog has loaded.
+            .navigationDestination(for: CatalogPose.self) { pose in
+                PoseDetailView(pose: pose, flows: catalog.catalog?.flows?.featuring(pose.id) ?? [])
+            }
+            .navigationDestination(for: ExplorePose.self) { ExploreDetailView(pose: $0, notFor: $0.notFor(conditions)) }
             .navigationTitle("Library")
         }
     }
@@ -118,6 +122,7 @@ struct PoseDetailView: View {
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle(pose.nameEnglish)
         .navigationBarTitleDisplayMode(.inline)
+        .task { SiriBridge.poseShown(pose) }
     }
 }
 
