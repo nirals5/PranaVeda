@@ -87,6 +87,18 @@ struct SiriIntentsTests {
         #expect(PracticeSummaryIntent.summary(one) == "You're on a 1-day streak. This week: 1 practice, 10 minutes.")
     }
 
+    // KAN-21, Siri AI: the summary also goes back as values Siri can read
+    // and show on a card, not only as a sentence.
+    @Test func theSummaryCarriesItsNumbers() {
+        let trends = PracticeTrends(entries: [entry("a", "2026-11-02", minutes: 15), entry("b", "2026-11-03"), entry("c", "2026-11-04")],
+                                    today: wednesday, calendar: calendar)
+        let summary = PracticeSummaryEntity(trends)
+        #expect(summary.streakDays == 3)
+        #expect(summary.practicesThisWeek == 3)
+        #expect(summary.minutesThisWeek == 35)
+        #expect(summary.summary == PracticeSummaryIntent.summary(trends))
+    }
+
     @Test func summarisesAnEmptyLog() {
         let trends = PracticeTrends(entries: [], today: wednesday, calendar: calendar)
         #expect(PracticeSummaryIntent.summary(trends).hasPrefix("You haven't logged a practice yet."))

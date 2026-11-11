@@ -6,6 +6,9 @@ import Foundation
 // Entities and intents read the saved rituals and the practice log straight
 // from their files, so they work whether or not the app's screens are open.
 // Nothing from Health goes into them.
+//
+// Property titles say what the value is and its format: the descriptions the
+// new Siri reads need iOS 27.3 as the app's minimum, and titles work from 17.
 
 /// A saved ritual: "Hey Siri, start my evening flow in PranaVeda".
 struct SavedRitualEntity: AppEntity {
@@ -13,15 +16,15 @@ struct SavedRitualEntity: AppEntity {
     static var defaultQuery: SavedRitualQuery { SavedRitualQuery() }
 
     let id: String
-    @Property(title: "Title")
+    @Property(title: "Ritual Name")
     var title: String
-    @Property(title: "Saved On")
+    @Property(title: "Date Saved (YYYY-MM-DD)")
     var savedOn: String
-    @Property(title: "Minutes")
+    @Property(title: "Length in Minutes")
     var minutes: Int?
-    @Property(title: "Poses")
+    @Property(title: "Yoga Poses in Order")
     var poses: [String]
-    @Property(title: "About")
+    @Property(title: "What the Practice Is For")
     var about: String?
 
     init(_ ritual: SavedRitual) {
@@ -134,9 +137,9 @@ struct PracticeSummaryIntent: AppIntent {
     static let title: LocalizedStringResource = "Practice Summary"
     static let description = IntentDescription("Tells you your current practice streak and how much you've practised this week.")
 
-    func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
-        let text = Self.summary(PracticeTrends(entries: PracticeStore.savedEntries()))
-        return .result(value: text, dialog: "\(text)")
+    func perform() async throws -> some IntentResult & ReturnsValue<PracticeSummaryEntity> & ProvidesDialog {
+        let summary = PracticeSummaryEntity(PracticeTrends(entries: PracticeStore.savedEntries()))
+        return .result(value: summary, dialog: "\(summary.summary)")
     }
 
     static func summary(_ trends: PracticeTrends) -> String {
@@ -151,6 +154,39 @@ struct PracticeSummaryIntent: AppIntent {
             ? "Nothing logged this week yet."
             : "This week: \(week.practices) \(week.practices == 1 ? "practice" : "practices"), \(week.minutes) minutes."
         return "\(streak) \(thisWeek)"
+    }
+}
+
+/// What Practice Summary answers with: the sentence, and its numbers for
+/// Siri to read or show. Made fresh for each answer, never stored.
+struct PracticeSummaryEntity: TransientAppEntity {
+    static var typeDisplayRepresentation: TypeDisplayRepresentation { "Practice Summary" }
+
+    @Property(title: "Current Streak in Days")
+    var streakDays: Int
+    @Property(title: "Practices Logged This Week")
+    var practicesThisWeek: Int
+    @Property(title: "Minutes Practised This Week")
+    var minutesThisWeek: Int
+    @Property(title: "Summary to Read Out")
+    var summary: String
+
+    init() {
+        streakDays = 0
+        practicesThisWeek = 0
+        minutesThisWeek = 0
+        summary = ""
+    }
+
+    init(_ trends: PracticeTrends) {
+        streakDays = trends.currentStreak
+        practicesThisWeek = trends.thisWeek.practices
+        minutesThisWeek = trends.thisWeek.minutes
+        summary = PracticeSummaryIntent.summary(trends)
+    }
+
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(streakDays)-day streak", subtitle: "\(practicesThisWeek) this week · \(minutesThisWeek) min", image: .init(systemName: "flame"))
     }
 }
 
@@ -176,3 +212,15 @@ enum SiriBridge {
         Task { _ = try? await IntentDonationManager.shared.donate(intent: StartPracticeIntent(ritual: SavedRitualEntity(ritual))) }
     }
 }
+
+#if SIRI_AI
+// Siri AI (KAN-21): these are the tools the new Siri may call. Written as
+// conformances, not @AppIntent(.tool): the macro needs iOS 27.3 as the app's
+// minimum, and this keeps it at 17.
+@available(iOS 27.3, *)
+extension StartPracticeIntent: ToolIntent {}
+@available(iOS 27.3, *)
+extension AskAmritaIntent: ToolIntent {}
+@available(iOS 27.3, *)
+extension PracticeSummaryIntent: ToolIntent {}
+#endif
