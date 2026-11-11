@@ -70,7 +70,9 @@ struct LibraryPoseEntity: AppEntity {
     }
 }
 
-struct LibraryPoseQuery: EntityStringQuery, EnumerableEntityQuery {
+// Not EnumerableEntityQuery, like SavedRitualQuery: Siri would see only the
+// first 20 poses. It finds them through Spotlight (IndexedEntity).
+struct LibraryPoseQuery: EntityStringQuery {
     func entities(for identifiers: [String]) async throws -> [LibraryPoseEntity] {
         let poses = LibraryPoseEntity.poses()
         return identifiers.compactMap { id in poses.first { $0.id == id }.map(LibraryPoseEntity.init) }
@@ -80,17 +82,25 @@ struct LibraryPoseQuery: EntityStringQuery, EnumerableEntityQuery {
         LibraryPoseEntity.matching(string, in: LibraryPoseEntity.poses()).map(LibraryPoseEntity.init)
     }
 
-    func allEntities() async throws -> [LibraryPoseEntity] {
-        LibraryPoseEntity.poses().map(LibraryPoseEntity.init)
-    }
-
-    func suggestedEntities() async throws -> [LibraryPoseEntity] {
-        LibraryPoseEntity.poses().prefix(10).map(LibraryPoseEntity.init)
-    }
+    // No suggestions: asked "which one?", Siri matched the answer against
+    // the suggested list only (KAN-21). Shortcuts searches by name instead.
+    func suggestedEntities() async throws -> [LibraryPoseEntity] { [] }
 }
 
+// What Spotlight, and with it Siri, knows each one by: the name, what it is
+// and words people might use. With only the display name, Siri couldn't find
+// "a yin video" (KAN-21).
 @available(iOS 18.0, *)
-extension LibraryPoseEntity: IndexedEntity {}
+extension LibraryPoseEntity: IndexedEntity {
+    var attributeSet: CSSearchableItemAttributeSet {
+        let set = defaultAttributeSet
+        set.displayName = name
+        set.contentDescription = benefits
+        set.keywords = [name, sanskritName, level, "yoga pose", "asana"]
+            + bodyFocus.split(separator: "/").map { $0.trimmingCharacters(in: .whitespaces) }
+        return set
+    }
+}
 
 /// Opens a pose's page in the Library. Runs in the app.
 struct ShowPoseIntent: AppIntent {
@@ -163,7 +173,9 @@ struct FlowEntity: AppEntity {
     }
 }
 
-struct FlowQuery: EntityStringQuery, EnumerableEntityQuery {
+// Not EnumerableEntityQuery: Siri saw only the first 20 flows, so never the
+// yin ones. It finds them through Spotlight (IndexedEntity).
+struct FlowQuery: EntityStringQuery {
     func entities(for identifiers: [String]) async throws -> [FlowEntity] {
         let flows = FlowEntity.all()
         return identifiers.compactMap { id in flows.first { $0.id == id } }
@@ -174,17 +186,21 @@ struct FlowQuery: EntityStringQuery, EnumerableEntityQuery {
         return FlowEntity.matching(string, in: catalog.flows ?? []).map { FlowEntity($0, poses: catalog.poses) }
     }
 
-    func allEntities() async throws -> [FlowEntity] {
-        FlowEntity.all()
-    }
-
-    func suggestedEntities() async throws -> [FlowEntity] {
-        FlowEntity.all()
-    }
+    // No suggestions: asked "which one?", Siri matched the answer against the
+    // first 20 suggested flows only, never the yin ones (KAN-21).
+    func suggestedEntities() async throws -> [FlowEntity] { [] }
 }
 
 @available(iOS 18.0, *)
-extension FlowEntity: IndexedEntity {}
+extension FlowEntity: IndexedEntity {
+    var attributeSet: CSSearchableItemAttributeSet {
+        let set = defaultAttributeSet
+        set.displayName = title
+        set.contentDescription = "A \(group) yoga flow to follow along with, \(minutes) minutes."
+        set.keywords = [group, "yoga flow", "flow", "yoga video", "video"] + poses
+        return set
+    }
+}
 
 /// Plays a flow's video full screen. Runs in the app.
 struct PlayFlowIntent: AppIntent {

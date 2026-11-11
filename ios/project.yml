@@ -196,6 +196,26 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+  # Scripted requests to the new Siri (KAN-21). iOS 27.3 and a real iPhone
+  # only, so it has its own scheme and stays out of CI's PranaVeda scheme.
+  PranaVedaSiriEvaluations:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "27.3"
+    sources: [PranaVedaSiriEvaluations]
+    # A UI test target, as SiriEvaluations requires, aimed at the app. Run it
+    # with -configuration Release, so the app talks to production.
+    dependencies:
+      - target: PranaVeda
+    # For the signing team; the app's own settings are put back below.
+    configFiles:
+      Debug: Configuration/App.xcconfig
+      Release: Configuration/App.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(PV_BUNDLE_ID).SiriEvaluations
+        CODE_SIGN_ENTITLEMENTS: ""
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   PranaVeda:
     build:
@@ -209,3 +229,9 @@ schemes:
     build:
       targets:
         PranaVedaWatch: all
+  PranaVedaSiriEvaluations:
+    build:
+      targets:
+        PranaVedaSiriEvaluations: [test]
+    test:
+      targets: [PranaVedaSiriEvaluations]
