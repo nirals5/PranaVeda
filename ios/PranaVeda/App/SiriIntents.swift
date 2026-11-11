@@ -67,7 +67,9 @@ struct SavedRitualEntity: AppEntity {
     }
 }
 
-struct SavedRitualQuery: EntityStringQuery, EnumerableEntityQuery {
+// Not EnumerableEntityQuery: Siri takes only the first 20 of a list-all query,
+// so it would miss the rest. It finds them through Spotlight (IndexedEntity).
+struct SavedRitualQuery: EntityStringQuery {
     func entities(for identifiers: [String]) async throws -> [SavedRitualEntity] {
         let rituals = SavedRitualEntity.saved()
         return identifiers.compactMap { id in rituals.first { $0.id == id }.map(SavedRitualEntity.init) }
@@ -77,17 +79,21 @@ struct SavedRitualQuery: EntityStringQuery, EnumerableEntityQuery {
         SavedRitualEntity.matching(string, in: SavedRitualEntity.saved()).map(SavedRitualEntity.init)
     }
 
-    func allEntities() async throws -> [SavedRitualEntity] {
-        SavedRitualEntity.saved().map(SavedRitualEntity.init)
-    }
-
     func suggestedEntities() async throws -> [SavedRitualEntity] {
         SavedRitualEntity.saved().prefix(10).map(SavedRitualEntity.init)
     }
 }
 
 @available(iOS 18.0, *)
-extension SavedRitualEntity: IndexedEntity {}
+extension SavedRitualEntity: IndexedEntity {
+    var attributeSet: CSSearchableItemAttributeSet {
+        let set = defaultAttributeSet
+        set.displayName = title
+        set.contentDescription = about
+        set.keywords = [title, "saved ritual", "my practice"] + poses
+        return set
+    }
+}
 
 /// Begins a saved ritual's guided practice: the one named, or the newest.
 /// Opens the Library when nothing is saved yet. Runs in the app.

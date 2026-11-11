@@ -1,3 +1,4 @@
+import AppIntents
 import Foundation
 import Testing
 @testable import PranaVeda
@@ -63,6 +64,36 @@ struct SiriLibraryTests {
         let kept = try #require(Catalog.saved(fileURL: file))
         #expect(kept.poses.map(\.id) == ["balasana", "virabhadrasana_2"])
         #expect(kept.flows?.map(\.id) == ["warrior_flow", "yin_dragon"])
+    }
+
+    // "Play a yin video" found no flow: the index needs the kind of flow and
+    // what it is, not only its title.
+    @Test func theIndexKnowsWhatAFlowAndAPoseAre() throws {
+        guard #available(iOS 18.0, *) else { return }
+        let flow = FlowEntity(catalog.flows![1], poses: catalog.poses).attributeSet
+        #expect(flow.displayName == "Yin Dragon with Puppy")
+        #expect(try #require(flow.keywords).contains("Yin"))
+        #expect(try #require(flow.keywords).contains("yoga flow"))
+        #expect(try #require(flow.contentDescription).contains("6 minutes"))
+        let pose = LibraryPoseEntity(catalog.poses[0]).attributeSet
+        #expect(pose.displayName == "Child's Pose")
+        #expect(try #require(pose.keywords).contains("Balasana"))
+        #expect(pose.contentDescription == "Calms the mind.")
+    }
+
+    // Siri took only the first 20 of a list-all query, so the yin flows (21st
+    // on) were out of its reach. Indexed entities are looked up in Spotlight.
+    @Test func siriLooksThemUpInsteadOfListingThem() {
+        #expect(!(FlowQuery() is any EnumerableEntityQuery))
+        #expect(!(LibraryPoseQuery() is any EnumerableEntityQuery))
+        #expect(!(SavedRitualQuery() is any EnumerableEntityQuery))
+    }
+
+    // Asked "which one?", Siri matched the answer against the suggested list
+    // only, and took its first 20.
+    @Test func posesAndFlowsSuggestNothing() async throws {
+        #expect(try await FlowQuery().suggestedEntities().isEmpty)
+        #expect(try await LibraryPoseQuery().suggestedEntities().isEmpty)
     }
 
     @Test func linksOpenAPoseOrAFlow() {
