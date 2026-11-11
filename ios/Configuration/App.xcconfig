@@ -31,4 +31,11 @@ PV_ENTITLEMENTS_YES = PranaVeda/PranaVeda.entitlements
 PV_ENTITLEMENTS_NO = PranaVeda/PranaVedaBase.entitlements
 CODE_SIGN_ENTITLEMENTS = $(PV_ENTITLEMENTS_$(PV_APPLE_SIGN_IN))
 
+// Siri AI (KAN-21): its API is only in the iOS 27.3 SDK and later, so the
+// code that uses it is compiled in only when building with one.
+PV_SIRI_AI =
+PV_SIRI_AI[sdk=iphoneos27.3*] = SIRI_AI
+PV_SIRI_AI[sdk=iphonesimulator27.3*] = SIRI_AI
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) $(PV_SIRI_AI)
+
 #include? "Local.xcconfig"

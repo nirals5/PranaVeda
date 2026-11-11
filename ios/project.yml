@@ -23,7 +23,16 @@ targets:
   PranaVeda:
     type: application
     platform: iOS
-    sources: [PranaVeda, Shared]
+    sources:
+      - path: PranaVeda
+        excludes: ["Skills.skillsbundle"]
+      # Siri AI app skills (KAN-21): added as one item, the way Xcode's Skills
+      # Bundle template does, so Xcode 27.3 compiles it. As a plain folder its
+      # SKILL.md files would be copied loose and Siri would get no skills.
+      - path: PranaVeda/Skills.skillsbundle
+        type: file
+        buildPhase: resources
+      - Shared
     dependencies:
       - target: PranaVedaWidgets
       - target: PranaVedaWatch
