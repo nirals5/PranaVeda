@@ -1,6 +1,7 @@
 import AppIntents
 import CoreSpotlight
 import Foundation
+import SwiftUI
 
 // The Library for Siri, Shortcuts and Spotlight (KAN-21): its poses and its
 // follow-along flows. They read the catalog kept on the phone (Catalog.saved),
@@ -241,5 +242,25 @@ extension SiriBridge {
     static func flowPlayed(_ flow: Flow) {
         let entity = FlowEntity(flow, poses: Catalog.saved()?.poses ?? [])
         Task { _ = try? await IntentDonationManager.shared.donate(intent: PlayFlowIntent(flow: entity)) }
+    }
+}
+
+// MARK: On screen
+
+extension View {
+    /// Tells Siri which saved ritual, pose or flow this view shows, so "this
+    /// one" or "the second one" means it (KAN-21). Nothing before iOS 18.4,
+    /// and nothing for a nil id (a ritual that isn't saved has no entity).
+    @ViewBuilder
+    func siriShows<Entity: AppEntity>(_ type: Entity.Type, id: String?) -> some View where Entity.ID == String {
+        #if SIRI_ONSCREEN
+        if #available(iOS 18.4, *) {
+            appEntityIdentifier(id.map { EntityIdentifier(for: type, identifier: $0) })
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
     }
 }

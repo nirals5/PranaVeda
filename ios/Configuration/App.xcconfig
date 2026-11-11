@@ -36,6 +36,11 @@ CODE_SIGN_ENTITLEMENTS = $(PV_ENTITLEMENTS_$(PV_APPLE_SIGN_IN))
 PV_SIRI_AI =
 PV_SIRI_AI[sdk=iphoneos27.3*] = SIRI_AI
 PV_SIRI_AI[sdk=iphonesimulator27.3*] = SIRI_AI
-SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) $(PV_SIRI_AI)
+// The SwiftUI modifier that tells Siri what's on screen is in the iOS 27 SDK,
+// not in the Xcode 26 that CI's runner has (KAN-21).
+PV_ONSCREEN =
+PV_ONSCREEN[sdk=iphoneos27*] = SIRI_ONSCREEN
+PV_ONSCREEN[sdk=iphonesimulator27*] = SIRI_ONSCREEN
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) $(PV_SIRI_AI) $(PV_ONSCREEN)
 
 #include? "Local.xcconfig"

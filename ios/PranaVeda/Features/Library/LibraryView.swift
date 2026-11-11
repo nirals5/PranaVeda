@@ -17,6 +17,7 @@ struct LibraryView: View {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 14, alignment: .top)], spacing: 18) {
                             ForEach(poses) { pose in
                                 NavigationLink(value: pose) { tile(pose) }.buttonStyle(.plain)
+                                    .siriShows(LibraryPoseEntity.self, id: pose.id)
                             }
                         }
                         .padding(16)
@@ -123,6 +124,7 @@ struct PoseDetailView: View {
         .navigationTitle(pose.nameEnglish)
         .navigationBarTitleDisplayMode(.inline)
         .task { SiriBridge.poseShown(pose) }
+        .siriShows(LibraryPoseEntity.self, id: pose.id)
     }
 }
 

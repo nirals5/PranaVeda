@@ -21,6 +21,7 @@ struct FlowsSection: View {
                         Button { playing = flow } label: { FlowTile(flow: flow) }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Play \(flow.title), \(flow.minutes) minutes")
+                            .siriShows(FlowEntity.self, id: flow.id)
                     }
                 }
             }
@@ -77,6 +78,7 @@ struct PoseFlowLinks: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Play \(flow.title), \(flow.minutes) minutes")
+                .siriShows(FlowEntity.self, id: flow.id)
             }
         }
         .cardSurface()
@@ -131,5 +133,6 @@ struct FlowPlayerView: View {
             }
         }
         .onDisappear { player?.pause() }
+        .siriShows(FlowEntity.self, id: flow.id)
     }
 }
