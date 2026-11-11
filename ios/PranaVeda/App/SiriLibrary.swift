@@ -253,10 +253,14 @@ extension View {
     /// and nothing for a nil id (a ritual that isn't saved has no entity).
     @ViewBuilder
     func siriShows<Entity: AppEntity>(_ type: Entity.Type, id: String?) -> some View where Entity.ID == String {
+        #if SIRI_ONSCREEN
         if #available(iOS 18.4, *) {
             appEntityIdentifier(id.map { EntityIdentifier(for: type, identifier: $0) })
         } else {
             self
         }
+        #else
+        self
+        #endif
     }
 }
