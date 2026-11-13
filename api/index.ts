@@ -848,6 +848,11 @@ const SCENE_POSE_IDS = new Set([
   'downward_dog', 'forearm_plank', 'half_moon', 'legs_up_the_wall', 'lizard', 'pigeon', 'seated_twist',
   'side_plank', 'sphinx', 'standing_forward_fold', 'thread_the_needle', 'triangle', 'warrior_1', 'warrior_3',
   'wide_legged_forward_fold', 'wind_relieving',
+  // Added Nov 2026; all 16:9, so none needs a "_wide" version.
+  'accomplished_pose', 'boat_pose', 'butterfly', 'eagle_pose', 'garland_pose', 'handstand_wall_supported',
+  'headstand', 'locust_pose', 'low_lunge', 'marichis_pose_seated_twist', 'monkey_split_pose',
+  'one_legged_king_pigeon_pose', 'prayer_pose', 'seated_forward_bend', 'shoulder_stand', 'staff_pose',
+  'standing_backbend', 'tadasana',
 ]);
 const WIDE_SCENE_POSE_IDS = new Set(['triangle', 'dancer', 'seated_twist']);
 

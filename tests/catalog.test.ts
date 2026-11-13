@@ -21,20 +21,31 @@ describe('catalog artwork', () => {
     expect(missing).toEqual([]);
   });
 
-  it('uses every room scene Niral made, and only those', () => {
-    const scenesOnDisk = new Set(
-      readdirSync(path.join(PUBLIC_DIR, 'poses_with_background/web'))
-        .filter((f) => f.endsWith('.webp'))
-        .map((f) => f.replace(/(_wide)?\.webp$/, ''))
-    );
-    const scenesInCatalog = new Set(POSES.map((p) => p.id).filter((id) => sceneImagePath(id)));
-    expect([...scenesInCatalog].sort()).toEqual([...scenesOnDisk].sort());
+  // Scenes also exist for poses that only the Practice Library sheet lists
+  // (boat_pose, headstand…), so this checks the files, not the built-in poses.
+  it('serves every room scene Niral made', () => {
+    const unused = readdirSync(path.join(PUBLIC_DIR, 'poses_with_background/web'))
+      .filter((f) => f.endsWith('.webp'))
+      .map((f) => f.replace(/(_wide)?\.webp$/, ''))
+      .filter((id) => !sceneImagePath(id));
+    expect(unused).toEqual([]);
+  });
+
+  it('has a file for every pose it says has a scene', () => {
+    const ids = [
+      ...POSES.map((p) => p.id),
+      'accomplished_pose', 'boat_pose', 'eagle_pose', 'garland_pose', 'handstand_wall_supported', 'headstand',
+      'locust_pose', 'low_lunge', 'marichis_pose_seated_twist', 'monkey_split_pose', 'one_legged_king_pigeon_pose',
+      'prayer_pose', 'shoulder_stand', 'staff_pose', 'standing_backbend',
+    ];
+    const missing = ids.map(sceneImagePath).filter((url) => url && !existsSync(path.join(PUBLIC_DIR, url)));
+    expect(missing).toEqual([]);
   });
 
   it('chooses the landscape version where a pose has one', () => {
     expect(sceneImagePath('triangle')).toBe('/poses_with_background/web/triangle_wide.webp');
     expect(sceneImagePath('cobra')).toBe('/poses_with_background/web/cobra.webp');
-    expect(sceneImagePath('tadasana')).toBeUndefined();
+    expect(sceneImagePath('tree_pose')).toBeUndefined();
   });
 });
 
@@ -50,7 +61,7 @@ describe('publicCatalog', () => {
       poseImageUrl: 'https://pranaveda.example/poses/cobra.jpg',
       sceneImageUrl: 'https://pranaveda.example/poses_with_background/web/cobra.webp',
     });
-    const unsplash = catalog.poses.find((p) => p.id === 'tadasana')!;
+    const unsplash = catalog.poses.find((p) => p.id === 'tree_pose')!;
     expect(unsplash.poseImageUrl).toMatch(/^https:\/\/images\.unsplash\.com\//);
     expect(unsplash.sceneImageUrl).toBeUndefined();
   });
@@ -106,7 +117,7 @@ describe('ritual cards', () => {
           primaryEnergy: 'Scattered Wind',
           poses: [
             { poseId: 'triangle', durationMinutes: 2 },
-            { poseId: 'tadasana', durationMinutes: 1 },
+            { poseId: 'tree_pose', durationMinutes: 1 },
           ],
           breathworkId: 'sama_vritti',
           ayurvedic: { assessment: 'x', doshaPrimary: 'Vata', dietaryTips: [], lifestyleTips: [], recommendedHerbs: [] },
@@ -133,15 +144,15 @@ describe('ritual cards', () => {
   };
 
   it('carry the room scene for poses that have one, as paths that work on any copy of the site', async () => {
-    const [triangle, tadasana] = await ritualPoses();
+    const [triangle, tree_pose] = await ritualPoses();
     expect(triangle).toMatchObject({
       poseId: 'triangle',
       poseImageUrl: '/poses/triangle.jpg',
       sceneImageUrl: '/poses_with_background/web/triangle_wide.webp',
     });
-    expect(tadasana.sceneImageUrl).toBeUndefined();
+    expect(tree_pose.sceneImageUrl).toBeUndefined();
     // Never the address of the request: cards are saved and synced.
-    expect(JSON.stringify([triangle, tadasana])).not.toContain('some-preview');
+    expect(JSON.stringify([triangle, tree_pose])).not.toContain('some-preview');
   });
 
   it('use PUBLIC_ASSET_BASE_URL when it is set', async () => {
