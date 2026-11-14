@@ -77,6 +77,45 @@ struct AuthTests {
         #expect(StubURLProtocol.requests(to: "/api/auth/refresh").count == 2)
     }
 
+    // KAN-36: a background wake has seconds to live. A refresh started then
+    // can be cut off after the server rotated, leaving the phone with the old
+    // token, so the session is only confirmed once the app is on screen.
+    @Test func aStoredSessionIsConfirmedOnlyOnceTheAppIsOnScreen() async {
+        StubURLProtocol.reset { _ in (200, session("access-2", "refresh-2")) }
+        let storage = InMemorySessionStorage(refreshToken: "refresh-1", user: user)
+        var inBackground = true
+        let auth = AuthStore(api: stubAPI(), storage: storage, google: FakeGoogle(), isInBackground: { inBackground })
+        var signIns = 0
+        auth.onSignedIn = { _ in signIns += 1 }
+
+        await auth.restore()
+        #expect(StubURLProtocol.requests(to: "/api/auth/refresh").isEmpty)
+        #expect(signIns == 0)
+        #expect(auth.isSignedIn)
+
+        inBackground = false
+        async let first: Void = auth.restore()
+        async let second: Void = auth.restore()
+        _ = await (first, second)
+        #expect(StubURLProtocol.requests(to: "/api/auth/refresh").count == 1)
+        #expect(signIns == 1)
+    }
+
+    @Test func aRefreshAsksForTimeToFinishAndSavesTheNewTokenBeforeLettingGo() async {
+        StubURLProtocol.reset { _ in (200, session("access-2", "refresh-2")) }
+        let storage = InMemorySessionStorage(refreshToken: "refresh-1", user: user)
+        var begun: [String] = []
+        var savedWhenEnded: String?
+        let auth = AuthStore(api: stubAPI(), storage: storage, google: FakeGoogle(), backgroundWork: { name in
+            begun.append(name)
+            return { savedWhenEnded = storage.refreshToken }
+        })
+
+        #expect(await auth.validAccessToken() == "access-2")
+        #expect(begun.count == 1)
+        #expect(savedWhenEnded == "refresh-2")
+    }
+
     @Test func anEndedSessionSignsOutAndClearsTheStoredSession() async {
         StubURLProtocol.reset { _ in (401, #"{"error":"session_expired"}"#) }
         let storage = InMemorySessionStorage(refreshToken: "revoked", user: user)

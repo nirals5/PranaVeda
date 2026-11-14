@@ -8,6 +8,8 @@ struct PranaVedaApp: App {
     @State private var chat = ChatViewModel()
     @State private var catalog = CatalogStore()
     @State private var auth = AuthStore()
+    /// The sign-in callbacks are set, so the session may be confirmed.
+    @State private var authReady = false
     @State private var doshaGuide = DoshaGuideStore()
     @State private var practice = PracticeStore()
     @State private var insight = DailyInsightStore()
@@ -98,6 +100,9 @@ struct PranaVedaApp: App {
                 place.setActive(phase == .active)
                 // "Always" may have been changed in Settings.
                 if phase == .active { ArrivalStore.shared.refreshPermission() }
+                // A session isn't confirmed during a background wake (KAN-36):
+                // here, the first time the app is on screen.
+                if phase == .active, authReady { Task { await auth.restore() } }
                 // Places changed on another device.
                 if phase == .active { Task { await connections.sync() } }
                 // Free time is read on screen; reminders are planned on leaving.
@@ -167,6 +172,7 @@ struct PranaVedaApp: App {
                     saved.handBackDevice()
                     connections.handBackDevice()
                 }
+                authReady = true
                 await auth.restore()
             }
             .task { await catalog.loadIfNeeded() }
