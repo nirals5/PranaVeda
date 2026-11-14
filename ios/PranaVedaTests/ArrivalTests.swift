@@ -18,6 +18,20 @@ struct ArrivalTests {
         Arrival.shouldRemind(kind, at: time, lastPracticeAt: practice, lastReminderAt: last, remindedAt: reminded, busyNow: busy, calendar: calendar)
     }
 
+    /// Said in the reminder trace, so a missing reminder can be explained (KAN-36).
+    @Test func saysWhyAReminderIsHeldBack() {
+        func why(_ kind: PlaceKind = .home, at time: Date, practice: Date? = nil, last: Date? = nil, reminded: Date? = nil, busy: Bool = false) -> String? {
+            Arrival.heldBack(kind, at: time, lastPracticeAt: practice, lastReminderAt: last, remindedAt: reminded, busyNow: busy, calendar: calendar)
+        }
+        #expect(why(at: at(18)) == nil)
+        #expect(why(.work, at: at(9)) == "not a place for reminders")
+        #expect(why(at: at(18), busy: true) == "busy on the calendar")
+        #expect(why(at: at(22, 30)) == "outside waking hours")
+        #expect(why(at: at(18), practice: at(17)) == "practised recently")
+        #expect(why(at: at(18), last: at(16, 29)) == "another reminder within 3 hours")
+        #expect(why(at: at(20), reminded: at(9)) == "already reminded today")
+    }
+
     @Test func remindsOnArrivingHomeInWakingHours() {
         #expect(remind(at: at(18, 5)))
         #expect(remind(.studio, at: at(7)))

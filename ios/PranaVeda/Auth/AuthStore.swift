@@ -29,12 +29,19 @@ final class AuthStore {
     private var accessToken: String?
     private var accessTokenExpiry = Date.distantPast
     private var refreshing: Task<String?, Never>?
+    private var restoring: Task<Void, Never>?
     private var restoredThisLaunch = false
+    private let isInBackground: @MainActor () -> Bool
+    private let backgroundWork: @MainActor (String) -> @MainActor () -> Void
 
     init(api: APIClient = APIClient(), storage: SessionStorage = KeychainSessionStorage(),
          google: GoogleIdentityProvider = GoogleSignInFlow(), apple: AppleIdentityProvider = AppleSignInFlow(),
-         now: @escaping () -> Date = Date.init) {
+         now: @escaping () -> Date = Date.init,
+         isInBackground: @escaping @MainActor () -> Bool = { UIApplication.shared.applicationState == .background },
+         backgroundWork: @escaping @MainActor (String) -> @MainActor () -> Void = AuthStore.beginBackgroundWork) {
         self.api = api
+        self.isInBackground = isInBackground
+        self.backgroundWork = backgroundWork
         self.storage = storage
         self.google = google
         self.apple = apple
@@ -44,8 +51,21 @@ final class AuthStore {
         if storage.refreshToken != nil { user = storage.user }
     }
 
-    /// At launch: confirms a stored session with the server.
+    /// At launch and whenever the app comes on screen: confirms a stored
+    /// session with the server, once per launch. Not during a background wake
+    /// (an arrival, a background refresh): those have seconds to live, and a
+    /// refresh cut off there leaves the phone with a token the server has
+    /// already replaced (KAN-36).
     func restore() async {
+        guard isSignedIn, !restoredThisLaunch, !isInBackground() else { return }
+        if let restoring { return await restoring.value }
+        let task = Task { await restoreNow() }
+        restoring = task
+        await task.value
+        restoring = nil
+    }
+
+    private func restoreNow() async {
         guard isSignedIn, !restoredThisLaunch else { return }
         // Signed in with Apple, then stopped using the Apple ID with
         // PranaVeda (in Settings): Apple asks apps to sign the person out.
@@ -129,6 +149,10 @@ final class AuthStore {
         if let refreshing { return await refreshing.value }
         let task = Task<String?, Never> { [weak self] in
             guard let self, let refreshToken = storage.refreshToken else { return nil }
+            // Time from iOS to hear the reply and save the new token, even if
+            // the app is leaving the screen (KAN-36).
+            let finished = backgroundWork("Refresh sign-in")
+            defer { finished() }
             do {
                 adopt(try await api.refreshSession(refreshToken: refreshToken))
                 return accessToken
@@ -170,6 +194,13 @@ final class AuthStore {
         if wasSignedIn { onSignedOut?() }
     }
 
+    /// Asks iOS for time to finish; the returned closure says it's done.
+    static func beginBackgroundWork(_ name: String) -> @MainActor () -> Void {
+        let work = BackgroundWork()
+        work.id = UIApplication.shared.beginBackgroundTask(withName: name) { work.end() }
+        return { work.end() }
+    }
+
     static func deviceDescription() -> DeviceDescription {
         var system = utsname()
         uname(&system)
@@ -181,5 +212,16 @@ final class AuthStore {
             deviceModel: model,
             appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         )
+    }
+}
+
+/// One stretch of time asked of iOS, ended once: when done, or when iOS says time is up.
+@MainActor
+private final class BackgroundWork {
+    var id = UIBackgroundTaskIdentifier.invalid
+    func end() {
+        guard id != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(id)
+        id = .invalid
     }
 }

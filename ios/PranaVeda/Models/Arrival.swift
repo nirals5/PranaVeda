@@ -31,11 +31,22 @@ enum Arrival {
         _ kind: PlaceKind, at: Date, lastPracticeAt: Date?, lastReminderAt: Date?,
         remindedAt: Date?, busyNow: Bool, calendar: Calendar = .current
     ) -> Bool {
-        guard kinds.contains(kind), !busyNow, FreeTime.wakingHours.contains(calendar.component(.hour, from: at)) else { return false }
-        if let lastPracticeAt, at.timeIntervalSince(lastPracticeAt) < FreeTime.restAfterPractice { return false }
-        if let lastReminderAt, at.timeIntervalSince(lastReminderAt) < FreeTime.minGapBetweenReminders { return false }
-        if let remindedAt, calendar.isDate(remindedAt, inSameDayAs: at) { return false }
-        return true
+        heldBack(kind, at: at, lastPracticeAt: lastPracticeAt, lastReminderAt: lastReminderAt,
+                 remindedAt: remindedAt, busyNow: busyNow, calendar: calendar) == nil
+    }
+
+    /// Why a reminder may not show `at`, or nil when it may.
+    static func heldBack(
+        _ kind: PlaceKind, at: Date, lastPracticeAt: Date?, lastReminderAt: Date?,
+        remindedAt: Date?, busyNow: Bool, calendar: Calendar = .current
+    ) -> String? {
+        guard kinds.contains(kind) else { return "not a place for reminders" }
+        if busyNow { return "busy on the calendar" }
+        guard FreeTime.wakingHours.contains(calendar.component(.hour, from: at)) else { return "outside waking hours" }
+        if let lastPracticeAt, at.timeIntervalSince(lastPracticeAt) < FreeTime.restAfterPractice { return "practised recently" }
+        if let lastReminderAt, at.timeIntervalSince(lastReminderAt) < FreeTime.minGapBetweenReminders { return "another reminder within 3 hours" }
+        if let remindedAt, calendar.isDate(remindedAt, inSameDayAs: at) { return "already reminded today" }
+        return nil
     }
 }
 
@@ -164,10 +175,19 @@ final class ArrivalStore: NSObject {
             }
             // New or moved: its first report says where they are, not an arrival.
             await monitor.add(CLMonitor.CircularGeographicCondition(center: center, radius: Arrival.radiusMetres), identifier: id)
+            ReminderTrace.note("arrival \(id): watching")
             states[id] = nil
         }
         defaults.set(states, forKey: Self.stateKey)
         if !on { cancelPending() }
+    }
+
+    private static var appState: String {
+        switch UIApplication.shared.applicationState {
+        case .active: "on screen"
+        case .inactive: "inactive"
+        default: "background"
+        }
     }
 
     private static func unwatched(_ state: CLMonitor.Event.State) -> Bool {
@@ -196,6 +216,7 @@ final class ArrivalStore: NSObject {
         let before = states[id]
         states[id] = inside ? "inside" : "outside"
         defaults.set(states, forKey: Self.stateKey)
+        ReminderTrace.note("arrival \(id): \(before ?? "unknown") -> \(states[id]!), app \(Self.appState)")
         // A wake-up from iOS: catch calendar changes first, then plan this
         // place's reminder, which holds the free-time ones back (KAN-29).
         CalendarStore.shared.replanInBackground()
@@ -204,14 +225,20 @@ final class ArrivalStore: NSObject {
 
     /// Plans the reminder for the end of the stay; leaving first cancels it.
     private func arrive(_ kind: PlaceKind, now: Date = Date()) {
-        guard on, UIApplication.shared.applicationState != .active else { return }
+        guard on else { return ReminderTrace.note("arrival \(kind.rawValue): held back, reminders off") }
+        guard UIApplication.shared.applicationState != .active else {
+            return ReminderTrace.note("arrival \(kind.rawValue): held back, app on screen")
+        }
         let at = now.addingTimeInterval(Arrival.stay)
         let calendar = CalendarStore.shared
         calendar.refresh(now: now)
         let busyNow = calendar.enabled && !calendar.blocked && FreeTime.window(calendar.busy, now: at).busyNow
         let lastReminder = [calendar.lastReminderShown(now: now), Self.lastShown(defaults: defaults, now: now)].compactMap { $0 }.max()
-        guard Arrival.shouldRemind(kind, at: at, lastPracticeAt: PracticeStore.lastCompletedAt(), lastReminderAt: lastReminder,
-                                   remindedAt: scheduled[kind.rawValue], busyNow: busyNow) else { return }
+        if let reason = Arrival.heldBack(kind, at: at, lastPracticeAt: PracticeStore.lastCompletedAt(), lastReminderAt: lastReminder,
+                                         remindedAt: scheduled[kind.rawValue], busyNow: busyNow) {
+            return ReminderTrace.note("arrival \(kind.rawValue): held back, \(reason)")
+        }
+        ReminderTrace.note("arrival \(kind.rawValue): reminder planned for \(at.ISO8601Format())")
         var all = scheduled
         all[kind.rawValue] = at
         scheduled = all
@@ -227,6 +254,7 @@ final class ArrivalStore: NSObject {
 
     private func leave(_ kind: PlaceKind, now: Date = Date()) {
         guard let at = scheduled[kind.rawValue], at > now else { return }
+        ReminderTrace.note("arrival \(kind.rawValue): left before the reminder, cancelled")
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.idPrefix + kind.rawValue])
         var all = scheduled
         all[kind.rawValue] = nil

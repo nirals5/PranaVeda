@@ -5,14 +5,17 @@ import type { Audience } from './tokens.js';
 // Sessions: issuing and rotating refresh tokens.
 //
 // Every refresh token is single-use and belongs to a family (one sign-in on
-// one device). Using it returns a successor in the same family. Two cases need
+// one device). Using it returns a successor in the same family. Three cases need
 // care:
 //
 //   Retry  — a flaky network makes a client send the same token twice within
 //            moments. Both requests get the SAME successor, so the client is
 //            never logged out by its own retry and the family never forks.
-//   Reuse  — the same token shows up after that short window. It has leaked or
-//            been replayed, so the whole family is revoked.
+//   Lost   — the client never got the reply (a phone suspended mid-refresh)
+//            and sends the token again later. While the successor is still
+//            unused, it gets that successor again.
+//   Reuse  — the same token shows up once its successor has been used. It
+//            has leaked or been replayed, so the whole family is revoked.
 
 export const REFRESH_TTL_MS = 60 * 24 * 60 * 60 * 1000; // sliding: renewed on every rotation
 export const REFRESH_GRACE_MS = 30 * 1000;
@@ -138,6 +141,16 @@ export async function rotateSession(
     const successor = unseal(row.successorEnc);
     if (!successor) throw new RefreshError('invalid');
     return tokensFor(row, successor, now);
+  }
+
+  // Lost reply: the successor was never used, so nobody else holds a live
+  // token from this family. A phone suspended mid-refresh (a background wake)
+  // sends the old token again, sometimes hours later; it gets the same
+  // successor rather than being signed out (KAN-36).
+  const successor = row.successorEnc ? unseal(row.successorEnc) : null;
+  const next = successor ? await store.findByHash(hashToken(successor)) : null;
+  if (successor && next && !next.rotatedAt && !next.revokedAt && next.expiresAt.getTime() > now.getTime()) {
+    return tokensFor(next, successor, now);
   }
 
   await store.revokeFamily(row.familyId, now);

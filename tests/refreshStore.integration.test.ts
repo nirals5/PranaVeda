@@ -50,16 +50,29 @@ describe.skipIf(!hasDb)('refresh tokens in Postgres', () => {
     expect(await familyRows(first.sessionId)).toHaveLength(2);
   });
 
-  it('revokes the family on reuse after the grace window', async () => {
+  it('hands a lost reply its successor again after the grace window', async () => {
+    const now = new Date();
+    const first = await issueSession(dbRefreshStore, session(), now);
+    const lost = await rotateSession(dbRefreshStore, first.refreshToken, now);
+    const again = await rotateSession(dbRefreshStore, first.refreshToken, later(now, REFRESH_GRACE_MS + 1));
+
+    expect(again.refreshToken).toBe(lost.refreshToken);
+    const rows = await familyRows(first.sessionId);
+    expect(rows).toHaveLength(2);
+    expect(rows.some((r) => r.revokedAt)).toBe(false);
+  });
+
+  it('revokes the family on reuse once the successor has been used', async () => {
     const now = new Date();
     const first = await issueSession(dbRefreshStore, session(), now);
     const second = await rotateSession(dbRefreshStore, first.refreshToken, now);
+    const third = await rotateSession(dbRefreshStore, second.refreshToken, now);
     const afterGrace = later(now, REFRESH_GRACE_MS + 1);
 
     await expect(rotateSession(dbRefreshStore, first.refreshToken, afterGrace)).rejects.toMatchObject({ reason: 'reused' });
-    await expect(rotateSession(dbRefreshStore, second.refreshToken, afterGrace)).rejects.toBeInstanceOf(RefreshError);
+    await expect(rotateSession(dbRefreshStore, third.refreshToken, afterGrace)).rejects.toBeInstanceOf(RefreshError);
     const rows = await familyRows(first.sessionId);
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
     expect(rows.every((r) => r.revokedAt && !r.successorEnc)).toBe(true);
   });
 });
