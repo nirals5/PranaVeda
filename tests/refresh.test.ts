@@ -99,22 +99,41 @@ describe('rotateSession', () => {
     expect(await reasonOf(rotateSession(store, a.refreshToken, later(now, 3_600_000)))).toBe('accepted');
   });
 
-  it('treats reuse after the grace window as theft and revokes the whole family', async () => {
+  // The phone was suspended (a background wake) after the server rotated but
+  // before it saved the reply: it still holds the old token (KAN-36).
+  it('gives a token whose successor was never used that same successor, even after the grace window', async () => {
+    const first = await issueSession(store, session, now);
+    const lost = await rotateSession(store, first.refreshToken, now);
+    const hoursLater = later(now, 6 * 3_600_000);
+
+    const again = await rotateSession(store, first.refreshToken, hoursLater);
+    expect(again.refreshToken).toBe(lost.refreshToken);
+    expect(again.sessionId).toBe(first.sessionId);
+    expect(await verifyAccessToken(again.accessToken, 'app', hoursLater)).toMatchObject({ userId: 'user-1' });
+    expect(store.rows.some((r) => r.revokedAt)).toBe(false);
+    expect(store.rows).toHaveLength(2);
+    // And the session carries on from there.
+    expect(await reasonOf(rotateSession(store, again.refreshToken, hoursLater))).toBe('accepted');
+  });
+
+  it('treats reuse after the successor was used as theft and revokes the whole family', async () => {
     const first = await issueSession(store, session, now);
     const second = await rotateSession(store, first.refreshToken, now);
-    const afterGrace = later(now, REFRESH_GRACE_MS + 1);
+    const third = await rotateSession(store, second.refreshToken, later(now, 60_000));
+    const afterGrace = later(now, REFRESH_GRACE_MS + 120_000);
 
     expect(await reasonOf(rotateSession(store, first.refreshToken, afterGrace))).toBe('reused');
     expect(store.rows.every((r) => r.revokedAt)).toBe(true);
-    // The legitimate holder of the successor is signed out too.
-    expect(await reasonOf(rotateSession(store, second.refreshToken, afterGrace))).toBe('invalid');
+    // The legitimate holder of the newest token is signed out too.
+    expect(await reasonOf(rotateSession(store, third.refreshToken, afterGrace))).toBe('invalid');
   });
 
   it('does not touch other sessions of the same user when one is revoked', async () => {
     const phone = await issueSession(store, session, now);
     const laptop = await issueSession(store, { ...session, client: 'web' }, now);
-    await rotateSession(store, phone.refreshToken, now);
-    await reasonOf(rotateSession(store, phone.refreshToken, later(now, REFRESH_GRACE_MS + 1)));
+    const next = await rotateSession(store, phone.refreshToken, now);
+    await rotateSession(store, next.refreshToken, now);
+    expect(await reasonOf(rotateSession(store, phone.refreshToken, later(now, REFRESH_GRACE_MS + 1)))).toBe('reused');
 
     expect(await reasonOf(rotateSession(store, laptop.refreshToken, later(now, 3_600_000)))).toBe('accepted');
   });
