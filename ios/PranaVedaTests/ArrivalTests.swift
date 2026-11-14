@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import Testing
 @testable import PranaVeda
@@ -16,6 +17,18 @@ struct ArrivalTests {
     }
     func remind(_ kind: PlaceKind = .home, at time: Date, practice: Date? = nil, last: Date? = nil, reminded: Date? = nil, busy: Bool = false) -> Bool {
         Arrival.shouldRemind(kind, at: time, lastPracticeAt: practice, lastReminderAt: last, remindedAt: reminded, busyNow: busy, calendar: calendar)
+    }
+
+    // KAN-36: iOS keeps a watched place's centre about 23 m from the one the
+    // app gave it. Compared exactly, Home looked moved on every launch and
+    // was added again, which threw away the arrival iOS had woken the app for.
+    @Test func aPlaceIOSStoredSlightlyOffIsStillTheSamePlace() {
+        let saved = CLLocationCoordinate2D(latitude: 37.6512, longitude: -121.8987)
+        let stored = CLLocationCoordinate2D(latitude: saved.latitude - 0.0001725537806578359, longitude: saved.longitude + 0.00014224818905006487)
+        #expect(Arrival.sameCentre(saved, stored))
+        #expect(Arrival.sameCentre(saved, saved))
+        let moved = CLLocationCoordinate2D(latitude: saved.latitude + 0.003, longitude: saved.longitude) // about 330 m
+        #expect(!Arrival.sameCentre(saved, moved))
     }
 
     /// Said in the reminder trace, so a missing reminder can be explained (KAN-36).
