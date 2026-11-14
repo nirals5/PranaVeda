@@ -17,6 +17,15 @@ enum Arrival {
     /// They must stay this long, so passing by or a quick stop doesn't count.
     static let stay: TimeInterval = 5 * 60
 
+    /// iOS keeps a watched place's centre a little off the one it was given
+    /// (about 23 m on an iPhone), so a place counts as moved only beyond this.
+    static let sameCentreMetres: CLLocationDistance = 100
+
+    static func sameCentre(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Bool {
+        CLLocation(latitude: a.latitude, longitude: a.longitude)
+            .distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude)) <= sameCentreMetres
+    }
+
     static func text(_ kind: PlaceKind) -> String {
         switch kind {
         case .home: "You're home. A few minutes of slow breathing to settle in?"
@@ -161,18 +170,22 @@ final class ArrivalStore: NSObject {
         let wanted = Dictionary(uniqueKeysWithValues: places.map { ($0.kind.rawValue, $0) })
         var states = defaults.dictionary(forKey: Self.stateKey) as? [String: String] ?? [:]
         for id in await monitor.identifiers where wanted[id] == nil {
+            ReminderTrace.note("arrival \(id): no longer wanted, removed (on \(on), places \(places.count))")
             await monitor.remove(id)
             states[id] = nil
         }
         for (id, place) in wanted {
             let center = CLLocationCoordinate2D(latitude: place.lat, longitude: place.lon)
             // Kept unless moved, or iOS stopped watching it (added before "Always", say).
-            if let record = await monitor.record(for: id),
+            // Re-adding throws away any arrival iOS woke the app to report.
+            let record = await monitor.record(for: id)
+            if let record,
                !Self.unwatched(record.lastEvent.state),
                let current = record.condition as? CLMonitor.CircularGeographicCondition,
-               current.center.latitude == center.latitude, current.center.longitude == center.longitude {
+               Arrival.sameCentre(current.center, center) {
                 continue
             }
+            ReminderTrace.note("arrival \(id): re-adding, " + Self.whyReadded(record, center: center))
             // New or moved: its first report says where they are, not an arrival.
             await monitor.add(CLMonitor.CircularGeographicCondition(center: center, radius: Arrival.radiusMetres), identifier: id)
             ReminderTrace.note("arrival \(id): watching")
@@ -188,6 +201,16 @@ final class ArrivalStore: NSObject {
         case .inactive: "inactive"
         default: "background"
         }
+    }
+
+    /// Trace only (KAN-36): why a watched place is being added again.
+    private static func whyReadded(_ record: CLMonitor.Record?, center: CLLocationCoordinate2D) -> String {
+        guard let record else { return "no record" }
+        let state = "last state \(record.lastEvent.state.rawValue)"
+        guard let current = record.condition as? CLMonitor.CircularGeographicCondition else { return "not a circle, \(state)" }
+        return Arrival.sameCentre(current.center, center)
+            ? "unwatched, \(state)"
+            : "moved, \(state)"
     }
 
     private static func unwatched(_ state: CLMonitor.Event.State) -> Bool {
