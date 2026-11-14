@@ -89,8 +89,18 @@ struct PoseFlowLinks: View {
 /// One flow, full screen with the system player controls.
 struct FlowPlayerView: View {
     let flow: Flow
+    /// Seconds in to start at (Siri's "Start at"); 0 from the beginning.
+    var startAt = 0
     @Environment(\.dismiss) private var dismiss
     @State private var player: AVPlayer?
+
+    /// Where to start: the time asked for, or the beginning when none is asked
+    /// for or it falls in the last 5 seconds. An unknown length doesn't stop it.
+    static func startSeconds(asked: Int, length: Double?) -> Double {
+        guard asked > 0 else { return 0 }
+        if let length, length.isFinite, Double(asked) > length - 5 { return 0 }
+        return Double(asked)
+    }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -112,16 +122,22 @@ struct FlowPlayerView: View {
             guard player == nil, let url = flow.videoURL else { return }
             // Sound even with the ring switch on silent, like other video apps.
             try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
-            let player = AVPlayer(url: url)
-            self.player = player
-            player.play()
+            self.player = AVPlayer(url: url)
             SiriBridge.flowPlayed(flow)
         }
         // Opened by Siri, the first play() can be dropped: Siri still holds
         // the audio, or the app isn't in front yet. Ask again for the first
         // few seconds, until it has started once; a later pause is theirs.
+        // A start time is reached first, so it never plays from 0:00.
         .task(id: player == nil) {
             guard let player else { return }
+            if startAt > 0 {
+                let length = try? await player.currentItem?.asset.load(.duration).seconds
+                let start = Self.startSeconds(asked: startAt, length: length)
+                if start > 0 {
+                    await player.seek(to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+                }
+            }
             for _ in 0..<20 {
                 if player.timeControlStatus == .playing { return }
                 if UIApplication.shared.applicationState == .active {

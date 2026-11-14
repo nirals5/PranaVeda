@@ -100,4 +100,35 @@ struct SiriLibraryTests {
         #expect(WidgetLink.pose("balasana").absoluteString == "pranaveda://pose/balasana")
         #expect(WidgetLink.flow("warrior_flow").absoluteString == "pranaveda://flow/warrior_flow")
     }
+
+    // "Play Warrior Flow from 2 minutes": the start time rides in the link.
+    @Test func aFlowLinkCarriesItsStartTime() {
+        let link = WidgetLink.flow("warrior_flow", start: 120)
+        #expect(link.absoluteString == "pranaveda://flow/warrior_flow?t=120")
+        #expect(link.lastPathComponent == "warrior_flow")
+        #expect(WidgetLink.flowStart(link) == 120)
+        #expect(WidgetLink.flow("warrior_flow", start: 0).absoluteString == "pranaveda://flow/warrior_flow")
+        #expect(WidgetLink.flowStart(WidgetLink.flow("warrior_flow")) == 0)
+        #expect(WidgetLink.flowStart(URL(string: "pranaveda://flow/warrior_flow?t=-5")!) == 0)
+        #expect(WidgetLink.flowStart(URL(string: "pranaveda://flow/warrior_flow?t=soon")!) == 0)
+    }
+
+    @Test func startAtBecomesWholeSeconds() {
+        #expect(PlayFlowIntent.startSeconds(Measurement(value: 2, unit: .minutes)) == 120)
+        #expect(PlayFlowIntent.startSeconds(Measurement(value: 1.5, unit: .minutes)) == 90)
+        #expect(PlayFlowIntent.startSeconds(Measurement(value: 45, unit: .seconds)) == 45)
+        #expect(PlayFlowIntent.startSeconds(Measurement(value: 0, unit: .minutes)) == nil)
+        #expect(PlayFlowIntent.startSeconds(nil) == nil)
+    }
+
+    @Test func thePlayerStartsWhereAskedUnlessItIsTheEnd() {
+        #expect(FlowPlayerView.startSeconds(asked: 120, length: 254) == 120)
+        #expect(FlowPlayerView.startSeconds(asked: 0, length: 254) == 0)
+        // Past the end, or in the last 5 seconds: from the beginning.
+        #expect(FlowPlayerView.startSeconds(asked: 300, length: 254) == 0)
+        #expect(FlowPlayerView.startSeconds(asked: 250, length: 254) == 0)
+        // Length not known yet: trust the time asked for.
+        #expect(FlowPlayerView.startSeconds(asked: 90, length: nil) == 90)
+        #expect(FlowPlayerView.startSeconds(asked: 90, length: .nan) == 90)
+    }
 }

@@ -109,5 +109,15 @@ enum WidgetLink {
     static func savedRitual(_ id: String) -> URL { URL(string: "pranaveda://ritual/\(id)")! }
     /// A Library pose's page, and a Library flow's video (Siri).
     static func pose(_ id: String) -> URL { URL(string: "pranaveda://pose/\(id)")! }
-    static func flow(_ id: String) -> URL { URL(string: "pranaveda://flow/\(id)")! }
+    /// A flow can start part way in: `?t=` seconds (Siri's "Start at").
+    static func flow(_ id: String, start: Int? = nil) -> URL {
+        let url = URL(string: "pranaveda://flow/\(id)")!
+        guard let start, start > 0 else { return url }
+        return url.appending(queryItems: [URLQueryItem(name: "t", value: String(start))])
+    }
+    /// The seconds a flow link asks to start at; 0 without one.
+    static func flowStart(_ url: URL) -> Int {
+        let t = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "t" }?.value
+        return max(0, Int(t ?? "") ?? 0)
+    }
 }
