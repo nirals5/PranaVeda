@@ -30,6 +30,8 @@ struct PranaVedaApp: App {
     /// A Library pose opened, or a flow played, from Siri or Shortcuts.
     @State private var libraryPath = NavigationPath()
     @State private var playingFlow: Flow?
+    /// Seconds into `playingFlow` to start at (Siri's "Start at"); 0 from the start.
+    @State private var flowStart = 0
     /// Links from intents (the Talk to Amrita control).
     @State private var router = AppLinkRouter.shared
     /// "Hey Amrita" while the app is open (opt-in).
@@ -136,7 +138,7 @@ struct PranaVedaApp: App {
             .fullScreenCover(item: $practicingRitual) {
                 GuidedPracticeView(result: $0.result).environment(practice).environment(saved)
             }
-            .fullScreenCover(item: $playingFlow) { FlowPlayerView(flow: $0) }
+            .fullScreenCover(item: $playingFlow) { FlowPlayerView(flow: $0, startAt: flowStart) }
             // The widgets show what the app knows; keep them in step.
             .onChange(of: practice.entries, initial: true) { publishToWidgets() }
             .onChange(of: saved.rituals) { publishToWidgets() }
@@ -214,7 +216,12 @@ struct PranaVedaApp: App {
         case "flow":
             let library = catalog.catalog ?? Catalog.saved()
             closeCovers()
-            if let flow = library?.flows?.first(where: { $0.id == url.lastPathComponent }) { playingFlow = flow } else { tab = .library }
+            if let flow = library?.flows?.first(where: { $0.id == url.lastPathComponent }) {
+                flowStart = WidgetLink.flowStart(url)
+                playingFlow = flow
+            } else {
+                tab = .library
+            }
         default:
             break
         }

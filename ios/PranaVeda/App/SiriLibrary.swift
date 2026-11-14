@@ -214,19 +214,40 @@ struct PlayFlowIntent: AppIntent {
     @Parameter(title: "Flow", description: "The Library flow to play.", requestValueDialog: "Which flow?")
     var flow: FlowEntity
 
+    /// Optional, never asked for: "play Warrior Flow from 2 minutes".
+    @Parameter(
+        title: "Start at",
+        description: "How far into the flow to start, such as 2 minutes. Leave empty to play from the beginning.",
+        defaultUnit: .minutes,
+        supportsNegativeNumbers: false
+    )
+    var startAt: Measurement<UnitDuration>?
+
     init() {}
 
-    init(flow: FlowEntity) {
+    init(flow: FlowEntity, startAt: Measurement<UnitDuration>? = nil) {
         self.flow = flow
+        self.startAt = startAt
     }
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Play \(\.$flow)")
+        When(\.$startAt, .hasAnyValue) {
+            Summary("Play \(\.$flow) from \(\.$startAt)")
+        } otherwise: {
+            Summary("Play \(\.$flow)")
+        }
+    }
+
+    /// The start time in whole seconds, nil when there isn't one.
+    static func startSeconds(_ startAt: Measurement<UnitDuration>?) -> Int? {
+        guard let startAt else { return nil }
+        let seconds = Int(startAt.converted(to: .seconds).value.rounded())
+        return seconds > 0 ? seconds : nil
     }
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<FlowEntity> {
-        AppLinkRouter.shared.pending = WidgetLink.flow(flow.id)
+        AppLinkRouter.shared.pending = WidgetLink.flow(flow.id, start: Self.startSeconds(startAt))
         return .result(value: flow)
     }
 }
