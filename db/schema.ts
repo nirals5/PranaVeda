@@ -171,6 +171,23 @@ export const pushSubscriptions = pgTable(
   (t) => [index('push_subscriptions_user_id_idx').on(t.userId)]
 );
 
+// Push nudges for the apps (KAN-31): one row per phone that registered. The
+// token is the phone's address at APNs (iOS) or FCM (Android); `environment`
+// is APNs's sandbox or live service, by how the app was signed.
+export const appPushTokens = pgTable(
+  'app_push_tokens',
+  {
+    token: text('token').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    platform: text('platform').notNull(),
+    environment: text('environment').notNull(),
+    createdAt: timestamptz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('app_push_tokens_user_id_idx').on(t.userId)]
+);
+
 // What the push check needs to know about a user between visits: busy times
 // only (start and end, never what an event is), whether those were complete,
 // when PranaVeda was last on screen, and the last nudge sent.

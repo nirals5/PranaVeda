@@ -143,6 +143,8 @@ final class CalendarStore: NSObject {
         }
         refresh()
         if active { cancelReminders() } else { planReminders() }
+        // With server nudges on (KAN-31), the server needs the busy times instead.
+        Task { await PushStore.shared.report(seen: active) }
     }
 
     /// The reminders for the rest of today and tomorrow, replacing any
@@ -151,6 +153,8 @@ final class CalendarStore: NSObject {
     func planReminders(now: Date = Date()) {
         cancelReminders()
         noteShown(now: now)
+        // The server sends them (KAN-31); a background moment still uploads busy times.
+        if PushStore.serverNudges(defaults: defaults) { return scheduleBackgroundRefresh() }
         guard remindersOn, enabled, !blocked, readAt != nil else { return }
         let calendar = Calendar.current
         let end = calendar.date(byAdding: .day, value: 2, to: calendar.startOfDay(for: now))!
@@ -202,6 +206,12 @@ final class CalendarStore: NSObject {
         defaults.set(try? JSONEncoder().encode(planned.filter { !dropped.contains($0) }), forKey: Self.plannedKey)
     }
 
+    /// The server has started sending free-time nudges: drop the planned ones.
+    func standDown(now: Date = Date()) {
+        cancelReminders()
+        noteShown(now: now)
+    }
+
     /// By the planned keys, at once: a re-plan reuses them, so a removal
     /// that waited for the pending list would land after the new reminders.
     private func cancelReminders() {
@@ -220,15 +230,20 @@ final class CalendarStore: NSObject {
         guard UIApplication.shared.applicationState != .active else { return }
         refresh()
         planReminders()
+        Task { await PushStore.shared.report(seen: false) }
     }
 
     nonisolated static func registerBackgroundRefresh() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: refreshTaskId, using: .main) { task in
+            nonisolated(unsafe) let task = task
             MainActor.assumeIsolated {
                 shared.refresh()
                 shared.planReminders()
+                Task {
+                    await PushStore.shared.report(seen: false)
+                    task.setTaskCompleted(success: true)
+                }
             }
-            task.setTaskCompleted(success: true)
         }
     }
 
@@ -247,8 +262,13 @@ extension CalendarStore: UNUserNotificationCenterDelegate {
         id.hasPrefix("free-time-") || id.hasPrefix(ArrivalStore.idPrefix)
     }
 
+    /// The server's free-time nudges (KAN-31) count as reminders too.
+    nonisolated private static func isReminder(_ request: UNNotificationRequest) -> Bool {
+        isReminder(request.identifier) || PushNudges.isServerNudge(request.content.userInfo)
+    }
+
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        let options: UNNotificationPresentationOptions = Self.isReminder(notification.request.identifier) ? [] : [.banner, .sound]
+        let options: UNNotificationPresentationOptions = Self.isReminder(notification.request) ? [] : [.banner, .sound]
         nonisolated(unsafe) let done = completionHandler
         DispatchQueue.main.async { done(options) }
     }
@@ -257,18 +277,19 @@ extension CalendarStore: UNUserNotificationCenterDelegate {
     /// off the main thread, and UIKit stopped the app at the tap (KAN-23).
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let id = response.notification.request.identifier
+        let fromServer = PushNudges.isServerNudge(response.notification.request.content.userInfo)
         nonisolated(unsafe) let done = completionHandler
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 ReminderTrace.note("tapped \(id)")
-                self.reminderTapped(id: id)
+                self.reminderTapped(id: id, serverNudge: fromServer)
             }
             done()
         }
     }
 
-    func reminderTapped(id: String) {
-        guard Self.isReminder(id) else { return }
+    func reminderTapped(id: String, serverNudge: Bool = false) {
+        guard serverNudge || Self.isReminder(id) else { return }
         reminderOpened += 1
     }
 }
