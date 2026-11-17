@@ -76,9 +76,6 @@ final class ArrivalStore: NSObject {
         manager.delegate = self
         return manager
     }()
-    /// Opened once: a second monitor with the same name ends the app.
-    @ObservationIgnored private var monitor: Task<CLMonitor, Never>?
-    @ObservationIgnored private var listening: Task<Void, Never>?
     @ObservationIgnored private var syncing: Task<Void, Never>?
     /// Waiting for the answer to "Always".
     @ObservationIgnored private var askingForAlways: CheckedContinuation<Void, Never>?
@@ -89,8 +86,11 @@ final class ArrivalStore: NSObject {
     /// Place → when its latest reminder shows (seconds since 1970).
     private nonisolated static let scheduledKey = "pranaveda_arrival_scheduled"
     nonisolated static let idPrefix = "arrival-"
-    /// Letters only: CoreLocation refuses a name with a hyphen.
+    /// The CLMonitor that watched the places before (KAN-36). Letters only:
+    /// CoreLocation refuses a name with a hyphen.
     private static let monitorName = "PranaVedaArrivals"
+    /// Set once that monitor's watches are removed.
+    private static let monitorRetiredKey = "pranaveda_arrival_monitor_retired"
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -163,74 +163,48 @@ final class ArrivalStore: NSObject {
         await next.value
     }
 
+    // Watched with region monitoring, not CLMonitor: on an iPhone, CLMonitor
+    // reported arrivals but never once reported leaving, even 30 miles away
+    // for most of a day, so no arrival could count (KAN-36).
     private func syncNow() async {
+        await retireMonitor()
         let places = on && defaults.bool(forKey: PlaceStore.enabledKey) ? PlaceStore.savedPlaces(defaults: defaults).filter { Arrival.kinds.contains($0.kind) } : []
-        if places.isEmpty, monitor == nil, !on { return }
-        let monitor = await openMonitor()
         let wanted = Dictionary(uniqueKeysWithValues: places.map { ($0.kind.rawValue, $0) })
+        let watched = manager.monitoredRegions.compactMap { $0 as? CLCircularRegion }.filter { PlaceKind(rawValue: $0.identifier) != nil }
         var states = defaults.dictionary(forKey: Self.stateKey) as? [String: String] ?? [:]
-        for id in await monitor.identifiers where wanted[id] == nil {
-            ReminderTrace.note("arrival \(id): no longer wanted, removed (on \(on), places \(places.count))")
-            await monitor.remove(id)
-            states[id] = nil
+        for region in watched where wanted[region.identifier] == nil {
+            manager.stopMonitoring(for: region)
+            states[region.identifier] = nil
         }
         for (id, place) in wanted {
             let center = CLLocationCoordinate2D(latitude: place.lat, longitude: place.lon)
-            // Kept unless moved, or iOS stopped watching it (added before "Always", say).
-            // Re-adding throws away any arrival iOS woke the app to report.
-            let record = await monitor.record(for: id)
-            if let record,
-               !Self.unwatched(record.lastEvent.state),
-               let current = record.condition as? CLMonitor.CircularGeographicCondition,
-               Arrival.sameCentre(current.center, center) {
+            if let current = watched.first(where: { $0.identifier == id }), Arrival.sameCentre(current.center, center) {
+                // Asks where they are now, in case a move was missed while closed.
+                manager.requestState(for: current)
                 continue
             }
-            ReminderTrace.note("arrival \(id): re-adding, " + Self.whyReadded(record, center: center))
             // New or moved: its first report says where they are, not an arrival.
-            await monitor.add(CLMonitor.CircularGeographicCondition(center: center, radius: Arrival.radiusMetres), identifier: id)
-            ReminderTrace.note("arrival \(id): watching")
+            let region = CLCircularRegion(center: center, radius: Arrival.radiusMetres, identifier: id)
+            region.notifyOnEntry = true
+            region.notifyOnExit = true
+            manager.startMonitoring(for: region)
             states[id] = nil
         }
         defaults.set(states, forKey: Self.stateKey)
         if !on { cancelPending() }
     }
 
-    private static var appState: String {
-        switch UIApplication.shared.applicationState {
-        case .active: "on screen"
-        case .inactive: "inactive"
-        default: "background"
-        }
+    /// Removes the old CLMonitor watches once, so iOS stops waking the app for them.
+    private func retireMonitor() async {
+        guard !defaults.bool(forKey: Self.monitorRetiredKey) else { return }
+        let monitor = await CLMonitor(Self.monitorName)
+        for id in await monitor.identifiers { await monitor.remove(id) }
+        defaults.set(true, forKey: Self.monitorRetiredKey)
     }
 
-    /// Trace only (KAN-36): why a watched place is being added again.
-    private static func whyReadded(_ record: CLMonitor.Record?, center: CLLocationCoordinate2D) -> String {
-        guard let record else { return "no record" }
-        let state = "last state \(record.lastEvent.state.rawValue)"
-        guard let current = record.condition as? CLMonitor.CircularGeographicCondition else { return "not a circle, \(state)" }
-        return Arrival.sameCentre(current.center, center)
-            ? "unwatched, \(state)"
-            : "moved, \(state)"
-    }
-
-    private static func unwatched(_ state: CLMonitor.Event.State) -> Bool {
-        if #available(iOS 17.2, *) { return state == .unmonitored }
-        return false
-    }
-
-    private func openMonitor() async -> CLMonitor {
-        if let monitor { return await monitor.value }
-        let opening = Task { await CLMonitor(Self.monitorName) }
-        monitor = opening
-        let monitor = await opening.value
-        listening = Task { [weak self] in
-            do {
-                for try await event in await monitor.events {
-                    await self?.handle(event.identifier, inside: event.state == .satisfied, outside: event.state == .unsatisfied)
-                }
-            } catch {}
-        }
-        return monitor
+    /// From the location manager: where they are against a watched place.
+    fileprivate func regionState(_ id: String, _ state: CLRegionState) {
+        handle(id, inside: state == .inside, outside: state == .outside)
     }
 
     private func handle(_ id: String, inside: Bool, outside: Bool) {
@@ -239,7 +213,6 @@ final class ArrivalStore: NSObject {
         let before = states[id]
         states[id] = inside ? "inside" : "outside"
         defaults.set(states, forKey: Self.stateKey)
-        ReminderTrace.note("arrival \(id): \(before ?? "unknown") -> \(states[id]!), app \(Self.appState)")
         // A wake-up from iOS: catch calendar changes first, then plan this
         // place's reminder, which holds the free-time ones back (KAN-29).
         CalendarStore.shared.replanInBackground()
@@ -248,20 +221,14 @@ final class ArrivalStore: NSObject {
 
     /// Plans the reminder for the end of the stay; leaving first cancels it.
     private func arrive(_ kind: PlaceKind, now: Date = Date()) {
-        guard on else { return ReminderTrace.note("arrival \(kind.rawValue): held back, reminders off") }
-        guard UIApplication.shared.applicationState != .active else {
-            return ReminderTrace.note("arrival \(kind.rawValue): held back, app on screen")
-        }
+        guard on, UIApplication.shared.applicationState != .active else { return }
         let at = now.addingTimeInterval(Arrival.stay)
         let calendar = CalendarStore.shared
         calendar.refresh(now: now)
         let busyNow = calendar.enabled && !calendar.blocked && FreeTime.window(calendar.busy, now: at).busyNow
         let lastReminder = [calendar.lastReminderShown(now: now), Self.lastShown(defaults: defaults, now: now)].compactMap { $0 }.max()
-        if let reason = Arrival.heldBack(kind, at: at, lastPracticeAt: PracticeStore.lastCompletedAt(), lastReminderAt: lastReminder,
-                                         remindedAt: scheduled[kind.rawValue], busyNow: busyNow) {
-            return ReminderTrace.note("arrival \(kind.rawValue): held back, \(reason)")
-        }
-        ReminderTrace.note("arrival \(kind.rawValue): reminder planned for \(at.ISO8601Format())")
+        guard Arrival.shouldRemind(kind, at: at, lastPracticeAt: PracticeStore.lastCompletedAt(), lastReminderAt: lastReminder,
+                                   remindedAt: scheduled[kind.rawValue], busyNow: busyNow) else { return }
         var all = scheduled
         all[kind.rawValue] = at
         scheduled = all
@@ -277,7 +244,6 @@ final class ArrivalStore: NSObject {
 
     private func leave(_ kind: PlaceKind, now: Date = Date()) {
         guard let at = scheduled[kind.rawValue], at > now else { return }
-        ReminderTrace.note("arrival \(kind.rawValue): left before the reminder, cancelled")
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.idPrefix + kind.rawValue])
         var all = scheduled
         all[kind.rawValue] = nil
@@ -318,5 +284,17 @@ extension ArrivalStore: CLLocationManagerDelegate {
             if status == .authorizedAlways { finishAsking() }
             if on { needsAlways = status != .authorizedAlways }
         }
+    }
+
+    /// Called on every crossing, and for each requestState; iOS relaunches the
+    /// app for a crossing while it's closed.
+    nonisolated func locationManager(_ manager: CLLocationManager, didDetermineState state: CLRegionState, for region: CLRegion) {
+        let id = region.identifier
+        MainActor.assumeIsolated { regionState(id, state) }
+    }
+
+    /// The first report, right after a place is added.
+    nonisolated func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion) {
+        manager.requestState(for: region)
     }
 }
