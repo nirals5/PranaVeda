@@ -5,11 +5,12 @@ import { ConnectionsUnavailable, loadConnections } from './connections.js';
 import { CalendarLinkError, fetchCalendarText, icsBusyIntervals } from './calendar.js';
 import { type Busy, type NudgeState, mayNudge, planNudge } from './pushRules.js';
 import { sendAlexaNudge } from './alexaEvents.js';
+import { apnsSender, type AppSender, type AppToken } from './apns.js';
 
 // Push nudges: storing who turned them on, what the check needs between
 // visits, and the check itself (run every 15 minutes, see api/push.ts).
 
-const { pushSubscriptions, pushNudgeState, users, practiceLogEntries, alexaLinks } = schema;
+const { pushSubscriptions, pushNudgeState, users, practiceLogEntries, alexaLinks, appPushTokens } = schema;
 
 const MAX_ENDPOINT = 1024;
 const MAX_KEY = 256;
@@ -85,6 +86,19 @@ export async function saveSubscription(userId: string, sub: PushSub): Promise<vo
 
 export async function removeSubscription(userId: string, endpoint: string): Promise<void> {
   await getDb().delete(pushSubscriptions).where(and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint)));
+}
+
+// A phone that registered for push (KAN-31). A token belongs to one account:
+// whoever signs in on that phone last takes it over.
+export async function saveDeviceToken(userId: string, to: AppToken, platform: 'ios' = 'ios'): Promise<void> {
+  await getDb()
+    .insert(appPushTokens)
+    .values({ userId, platform, ...to })
+    .onConflictDoUpdate({ target: appPushTokens.token, set: { userId, platform, environment: to.environment } });
+}
+
+export async function removeDeviceToken(userId: string, token: string): Promise<void> {
+  await getDb().delete(appPushTokens).where(and(eq(appPushTokens.userId, userId), eq(appPushTokens.token, token)));
 }
 
 export async function recordState(userId: string, update: { seen?: boolean; calendar?: CalendarUpload }, now = new Date()): Promise<void> {
@@ -179,26 +193,30 @@ export interface TickResult {
   removed: number;
 }
 
-// One pass over everyone with push or Alexa notifications turned on. One
-// opening is one nudge, whichever way it reaches the person.
+// One pass over everyone with push (browser or app) or Alexa notifications
+// turned on. One opening is one nudge, whichever way it reaches the person.
 export async function runTick({
   now = Date.now(),
   send = webPushSender,
   readLink = readCalendarLink,
   sendAlexa = sendAlexaNudge,
-}: { now?: number; send?: Sender; readLink?: LinkReader; sendAlexa?: AlexaSender } = {}): Promise<TickResult> {
+  sendApp = apnsSender(),
+}: { now?: number; send?: Sender; readLink?: LinkReader; sendAlexa?: AlexaSender; sendApp?: AppSender } = {}): Promise<TickResult> {
   const db = getDb();
   const result: TickResult = { users: 0, sent: 0, removed: 0 };
-  const [subs, speakers] = await Promise.all([
+  const [subs, speakers, phones] = await Promise.all([
     db.select().from(pushSubscriptions),
     db.select({ userId: alexaLinks.userId, alexaUserId: alexaLinks.alexaUserId }).from(alexaLinks).where(eq(alexaLinks.notifications, true)),
+    db.select().from(appPushTokens),
   ]);
-  if (!subs.length && !speakers.length) return result;
+  if (!subs.length && !speakers.length && !phones.length) return result;
 
   const byUser = new Map<string, PushSub[]>();
   for (const s of subs) byUser.set(s.userId, [...(byUser.get(s.userId) ?? []), { endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth }]);
   const alexaOf = new Map(speakers.map((s) => [s.userId, s.alexaUserId]));
-  for (const id of alexaOf.keys()) if (!byUser.has(id)) byUser.set(id, []);
+  const phonesOf = new Map<string, AppToken[]>();
+  for (const p of phones) phonesOf.set(p.userId, [...(phonesOf.get(p.userId) ?? []), { token: p.token, environment: p.environment as AppToken['environment'] }]);
+  for (const id of [...alexaOf.keys(), ...phonesOf.keys()]) if (!byUser.has(id)) byUser.set(id, []);
   const ids = [...byUser.keys()];
 
   const [states, people, practices] = await Promise.all([
@@ -243,6 +261,17 @@ export async function runTick({
         result.removed++;
       }
     }
+    const ios: SendResult[] = [];
+    for (const phone of phonesOf.get(userId) ?? []) {
+      const outcome = await sendApp(phone, { title: 'Amrita', body: plan.body, url: '/?nudge=1' }, now);
+      ios.push(outcome);
+      if (outcome === 'ok') delivered = true;
+      // The app was deleted, or push was turned off for it.
+      if (outcome === 'gone') {
+        await db.delete(appPushTokens).where(eq(appPushTokens.token, phone.token));
+        result.removed++;
+      }
+    }
     const alexaUserId = alexaOf.get(userId);
     let alexa: SendResult | 'off' = 'off';
     if (alexaUserId) {
@@ -252,7 +281,7 @@ export async function runTick({
       if (outcome === 'gone') await db.update(alexaLinks).set({ notifications: false }).where(eq(alexaLinks.userId, userId));
     }
     // Per channel, so a nudge that reached no one is visible (no ids).
-    console.info(`[push] nudge: web ${web.join(',') || 'none'}; alexa ${alexa}`);
+    console.info(`[push] nudge: web ${web.join(',') || 'none'}; ios ${ios.join(',') || 'none'}; alexa ${alexa}`);
     if (delivered) {
       result.sent++;
       await db.update(pushNudgeState).set({ lastSlotKey: plan.key, lastNotifiedAt: new Date(now) }).where(eq(pushNudgeState.userId, userId));

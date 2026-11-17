@@ -2,10 +2,12 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { isSameOrigin, requireUser } from './_lib/http.js';
-import { parseCalendarUpload, parseSubscription, recordState, removeSubscription, runTick, saveSubscription, vapid } from './_lib/push.js';
+import { parseCalendarUpload, parseSubscription, recordState, removeDeviceToken, removeSubscription, runTick, saveDeviceToken, saveSubscription, vapid } from './_lib/push.js';
+import { apnsConfig, parseDeviceToken } from './_lib/apns.js';
 
-// Push nudges for the website: /api/push/*. Signed-in only. The browser
-// subscribes and keeps the server told of its busy times; a scheduled call to
+// Push nudges for the website and the apps: /api/push/*. Signed-in only. The
+// browser subscribes (the apps register their push token) and keeps the
+// server told of its busy times; a scheduled call to
 // /api/push/tick (a Cloudflare cron, see cloudflare/push-ticker) sends nudges.
 
 const app = express();
@@ -56,6 +58,34 @@ app.delete(
   })
 );
 
+// The iPhone app's push token, sent after sign-in and on each launch (KAN-31).
+app.put(
+  '/api/push/device',
+  route(async (req, res) => {
+    if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const token = parseDeviceToken(req.body);
+    if (!token) return res.status(400).json({ error: 'invalid_token' });
+    await saveDeviceToken(user.id, token);
+    res.json({ ok: true });
+  })
+);
+
+// Before the app signs out, so the next person on that phone gets no nudges meant for this one.
+app.delete(
+  '/api/push/device',
+  route(async (req, res) => {
+    if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const token = req.body?.token;
+    if (typeof token !== 'string') return res.status(400).json({ error: 'token_required' });
+    await removeDeviceToken(user.id, token.toLowerCase());
+    res.json({ ok: true });
+  })
+);
+
 // `seen`: PranaVeda is on screen now. `calendar`: busy times for today and
 // tomorrow, or untrusted when a calendar is missing or could not be read.
 app.put(
@@ -85,7 +115,7 @@ app.post(
   '/api/push/tick',
   route(async (req, res) => {
     if (!tickAllowed(req)) return res.status(401).json({ error: 'unauthorized' });
-    if (!vapid()) return res.status(503).json({ error: 'push_unavailable' });
+    if (!vapid() && !apnsConfig()) return res.status(503).json({ error: 'push_unavailable' });
     res.json(await runTick());
   })
 );

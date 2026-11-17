@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import pushApp from '../api/push.js';
 import { getDb, schema } from '../api/_lib/db.js';
 import { parseCalendarUpload, parseSubscription, runTick, type PushSub, type SendResult } from '../api/_lib/push.js';
+import type { AppToken, Nudge } from '../api/_lib/apns.js';
 import { signAccessToken } from '../api/_lib/tokens.js';
 import { SECRET_A, useSecrets } from './helpers.js';
 
@@ -13,11 +14,14 @@ import { SECRET_A, useSecrets } from './helpers.js';
 // afterwards.
 
 const hasDb = !!(process.env.DATABASE_URL_POOLED || process.env.DATABASE_URL);
-const { users, pushSubscriptions, pushNudgeState } = schema;
+const { users, pushSubscriptions, pushNudgeState, appPushTokens } = schema;
 const H = 60 * 60 * 1000;
 // Tuesday 10 November 2026, 2:00 PM in Los Angeles.
 const NOW = Date.parse('2026-11-10T22:00:00Z');
 const at = (hhmm: string) => Date.parse(`2026-11-10T${hhmm}:00-08:00`);
+
+// A phone's APNs token: hex, marked so the check's stand-in ignores anyone else's.
+const phone = (n: number) => `feed${n}${Array.from({ length: 59 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('')}`;
 
 const sub = (n: number) => ({ endpoint: `https://push.example.com/send/vitest-${n}-${Math.random().toString(36).slice(2)}`, keys: { p256dh: 'BPk3cUc-key', auth: 'auth_key' } });
 
@@ -76,6 +80,20 @@ describe.skipIf(!hasDb)('push nudges', () => {
     return { sent, send };
   };
   const noLink = async () => [] as [number, number][];
+  const phones = () => {
+    const sent: { token: string; nudge: Nudge }[] = [];
+    const sendApp = async (t: AppToken, nudge: Nudge): Promise<SendResult> => {
+      if (!t.token.startsWith('feed')) return 'failed';
+      sent.push({ token: t.token, nudge });
+      return t.token.startsWith('feed9') ? 'gone' : 'ok';
+    };
+    return { sent, sendApp };
+  };
+  const trustedEmptyDay = async (user: { id: string; auth: string }) => {
+    await put('/api/push/state', user.auth, { calendar: { trusted: true, google: false, busy: [[at('15:00'), at('16:00')]], coveredUntil: NOW + 30 * H } });
+    await getDb().update(pushNudgeState).set({ uploadedAt: new Date(NOW - H) }).where(eq(pushNudgeState.userId, user.id));
+  };
+  const tokensOf = async (id: string) => (await getDb().select().from(appPushTokens).where(eq(appPushTokens.userId, id))).map((r) => r.token);
 
   beforeAll(() => useSecrets(SECRET_A));
   afterAll(async () => {
@@ -142,5 +160,67 @@ describe.skipIf(!hasDb)('push nudges', () => {
     expect((await put('/api/push/state', user.auth, { calendar: { trusted: true } })).status).toBe(400);
     expect((await put('/api/push/subscription', user.auth, { subscription: s }).set('Origin', 'https://evil.example')).status).toBe(403);
     expect((await request(pushApp).put('/api/push/subscription').send({ subscription: s })).status).toBe(401);
+  });
+
+  it('registers a phone, and forgets it on sign-out; bad tokens and guests are refused', async () => {
+    const user = await newUser();
+    const token = phone(1);
+    expect((await put('/api/push/device', user.auth, { token, environment: 'sandbox' })).body).toEqual({ ok: true });
+    // Registering again (every launch) keeps one row.
+    await put('/api/push/device', user.auth, { token, environment: 'production' });
+    const rows = await getDb().select().from(appPushTokens).where(eq(appPushTokens.token, token));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ userId: user.id, platform: 'ios', environment: 'production' });
+
+    // Another account signing in on the same phone takes the token over.
+    const other = await newUser();
+    await put('/api/push/device', other.auth, { token, environment: 'production' });
+    expect(await tokensOf(user.id)).toEqual([]);
+    expect(await tokensOf(other.id)).toEqual([token]);
+
+    // Only the owner can remove it.
+    await request(pushApp).delete('/api/push/device').set('Authorization', user.auth).send({ token });
+    expect(await tokensOf(other.id)).toEqual([token]);
+    await request(pushApp).delete('/api/push/device').set('Authorization', other.auth).send({ token });
+    expect(await tokensOf(other.id)).toEqual([]);
+
+    expect((await put('/api/push/device', user.auth, { token: 'nope', environment: 'sandbox' })).status).toBe(400);
+    expect((await request(pushApp).put('/api/push/device').send({ token, environment: 'sandbox' })).status).toBe(401);
+  });
+
+  it('nudges an app-only user on their phone, once per opening', async () => {
+    const user = await newUser();
+    const token = phone(2);
+    await put('/api/push/device', user.auth, { token, environment: 'production' });
+    await trustedEmptyDay(user);
+
+    const first = phones();
+    await runTick({ now: NOW, send: recorder().send, sendApp: first.sendApp, readLink: noLink });
+    const mine = first.sent.filter((x) => x.token === token);
+    expect(mine).toEqual([{ token, nudge: { title: 'Amrita', body: 'You have 60 open minutes, until 3:00 PM. A good moment to practice.', url: '/?nudge=1' } }]);
+    expect((await stateOf(user.id)).lastSlotKey).toBe(String(at('15:00')));
+
+    const again = phones();
+    await runTick({ now: NOW + 15 * 60 * 1000, send: recorder().send, sendApp: again.sendApp, readLink: noLink });
+    expect(again.sent.filter((x) => x.token === token)).toHaveLength(0);
+  });
+
+  it('sends one opening to the browser and the phone alike, and forgets a phone Apple says is gone', async () => {
+    const user = await newUser();
+    const s = sub(5);
+    const live = phone(3);
+    const gone = phone(9);
+    await put('/api/push/subscription', user.auth, { subscription: s });
+    await put('/api/push/device', user.auth, { token: live, environment: 'production' });
+    await put('/api/push/device', user.auth, { token: gone, environment: 'production' });
+    await trustedEmptyDay(user);
+
+    const web = recorder();
+    const app = phones();
+    const result = await runTick({ now: NOW, send: web.send, sendApp: app.sendApp, readLink: noLink });
+    expect(web.sent.filter((x) => x.endpoint === s.endpoint)).toHaveLength(1);
+    expect(app.sent.filter((x) => [live, gone].includes(x.token))).toHaveLength(2);
+    expect(result.sent).toBeGreaterThanOrEqual(1);
+    expect(await tokensOf(user.id)).toEqual([live]);
   });
 });
