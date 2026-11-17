@@ -20,6 +20,8 @@ final class AuthStore {
     var onSignedIn: (@MainActor (_ user: AccountUser) async -> Void)?
     /// Called whenever the session ends, by any route.
     var onSignedOut: (@MainActor () -> Void)?
+    /// While the session still works: tell the server what this phone no longer wants (push nudges).
+    var beforeSignOut: (@MainActor () async -> Void)?
 
     private let api: APIClient
     private let storage: SessionStorage
@@ -117,6 +119,7 @@ final class AuthStore {
     }
 
     func signOut() async {
+        await beforeSignOut?()
         let token = storage.refreshToken
         endSession()
         if let token { try? await api.signOut(refreshToken: token) }

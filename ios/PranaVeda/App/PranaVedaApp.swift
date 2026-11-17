@@ -37,6 +37,8 @@ struct PranaVedaApp: App {
     /// "Hey Amrita" while the app is open (opt-in).
     @State private var heyAmrita = HeyAmrita.shared
     @Environment(\.scenePhase) private var scenePhase
+    /// iOS hands the push address to an app delegate only (KAN-31).
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate
 
     enum AppTab: Hashable { case amrita, dosha, library, you }
 
@@ -168,7 +170,10 @@ struct PranaVedaApp: App {
                     await saved.adoptAccount(user)
                     await connections.adoptAccount(user)
                 }
+                PushStore.shared.auth = auth
+                auth.beforeSignOut = { await PushStore.shared.stop() }
                 auth.onSignedOut = { [chat, practice, saved, connections] in
+                    PushStore.shared.forget()
                     chat.handBackDevice()
                     practice.handBackDevice()
                     saved.handBackDevice()
@@ -178,6 +183,19 @@ struct PranaVedaApp: App {
                 await auth.restore()
             }
             .task { await catalog.loadIfNeeded() }
+            // Free-time nudges from the server while signed in (KAN-31).
+            .onChange(of: auth.isSignedIn && calendar.remindersOn, initial: true) { _, wanted in
+                Task { await PushStore.shared.update(wanted: wanted) }
+            }
+            // On screen: the server holds nudges back, as the website keeps it told.
+            .task(id: scenePhase == .active) {
+                guard scenePhase == .active else { return }
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(5 * 60))
+                    guard !Task.isCancelled else { return }
+                    await PushStore.shared.report(seen: true)
+                }
+            }
         }
     }
 
