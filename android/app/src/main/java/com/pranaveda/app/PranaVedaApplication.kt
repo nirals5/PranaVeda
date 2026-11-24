@@ -14,6 +14,8 @@ import com.pranaveda.app.auth.KeystoreSessionStorage
 import com.pranaveda.app.model.DailyInsightStore
 import com.pranaveda.app.model.PracticeStore
 import com.pranaveda.app.model.SavedRitualStore
+import com.pranaveda.app.push.PushSetup
+import com.pranaveda.app.push.PushStore
 import com.pranaveda.app.voice.AmritaVoice
 import com.pranaveda.app.voice.HeyAmrita
 import com.pranaveda.app.widget.WidgetBridge
@@ -72,6 +74,14 @@ class PranaVedaApplication : Application() {
     /** The phone's calendar, read for busy and free time, and free-time reminders. */
     val calendar: CalendarStore by lazy { CalendarStore(this) }
 
+    /** Free-time nudges sent by the server (KAN-31), once this phone is registered. */
+    val push: PushStore by lazy {
+        PushStore(this, AccountApi(), getSharedPreferences("pranaveda", MODE_PRIVATE), appScope).also {
+            it.auth = auth
+            it.calendar = calendar
+        }
+    }
+
     /** Amrita's spoken replies, shared so a new message or screen can stop them. */
     val voice: AmritaVoice by lazy { AmritaVoice(this, appScope) }
 
@@ -87,6 +97,9 @@ class PranaVedaApplication : Application() {
         WidgetBridge.start(this)
         // Free-time reminders keep running once turned on.
         calendar.resume()
+        // Before any message can arrive: Firebase from the build's settings, if it has them.
+        PushSetup.start(this)
+        auth.beforeSignOut = { push.stop() }
     }
 
     val auth: AuthStore by lazy {

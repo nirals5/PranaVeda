@@ -23,6 +23,11 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import com.pranaveda.app.push.CalendarUpload
+import com.pranaveda.app.push.PushNudges
+import com.pranaveda.app.push.PushStore
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import com.pranaveda.app.MainActivity
 import com.pranaveda.app.PranaVedaApplication
 import com.pranaveda.app.R
@@ -121,7 +126,8 @@ class CalendarStore(context: Context) {
 
     /** From [FreeTimeWorker]: the reminder text when one is due now, recorded as shown; otherwise null. */
     fun reminderDue(now: Instant, lastPracticeAt: Instant?): String? {
-        if (!enabled || !remindersOn || prefs.getBoolean(ON_SCREEN_KEY, false)) return null
+        if (!phonePlansReminders(enabled, remindersOn, prefs.getBoolean(PushStore.SERVER_KEY, false))) return null
+        if (prefs.getBoolean(ON_SCREEN_KEY, false)) return null
         val leftAt = Instant.ofEpochMilli(prefs.getLong(LEFT_AT_KEY, 0))
         if (Duration.between(leftAt, now) < FreeTime.AWAY_BEFORE_REMINDER) return null
         val busy = readBusy(appContext, now) ?: return null // fail closed
@@ -133,6 +139,12 @@ class CalendarStore(context: Context) {
         return FreeTime.describe(slot)
     }
 
+    /** For the server's nudge check (KAN-31): busy times read now, or untrusted when the calendar can't be read. */
+    fun serverUpload(now: Instant = Instant.now()): CalendarUpload {
+        val busy = if (enabled && hasPermission()) readBusy(appContext, now) else null
+        return PushNudges.calendarUpload(trusted = busy != null, busy = busy.orEmpty(), now = now)
+    }
+
     private fun schedule() {
         WorkManager.getInstance(appContext).enqueueUniquePeriodicWork(
             WORK_NAME,
@@ -142,6 +154,10 @@ class CalendarStore(context: Context) {
     }
 
     companion object {
+        /** The phone shows its own free-time reminders only while the server isn't sending them (KAN-31). */
+        fun phonePlansReminders(enabled: Boolean, remindersOn: Boolean, serverNudges: Boolean): Boolean =
+            enabled && remindersOn && !serverNudges
+
         private const val ENABLED_KEY = "pranaveda_calendar_enabled"
         private const val REMINDERS_KEY = "pranaveda_free_time_reminders"
         const val ON_SCREEN_KEY = "pranaveda_on_screen"
@@ -193,12 +209,22 @@ class FreeTimeWorker(context: Context, params: WorkerParameters) : Worker(contex
     override fun doWork(): Result {
         val app = applicationContext as PranaVedaApplication
         val lastPractice = app.practice.entries.lastOrNull()?.completedInstant
+        // The server sends them (KAN-31): keep its busy times fresh instead.
+        if (app.push.serverNudges) {
+            runBlocking { withTimeoutOrNull(20_000) { app.push.report(seen = false) } }
+            return Result.success()
+        }
         val text = app.calendar.reminderDue(Instant.now(), lastPractice) ?: return Result.success()
-        notify(applicationContext, text)
+        FreeTimeNotice.show(applicationContext, "A moment for yourself", "$text Amrita has a practice that fits.")
         return Result.success()
     }
+}
 
-    private fun notify(context: Context, text: String) {
+/** A free-time reminder, the phone's own or the server's (KAN-31): one at a time, opening on Amrita. */
+object FreeTimeNotice {
+    private const val NOTIFICATION_ID = 4107
+
+    fun show(context: Context, title: String, text: String) {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
         val manager = context.getSystemService(NotificationManager::class.java)
         if (manager.getNotificationChannel(CalendarStore.CHANNEL) == null) {
@@ -212,18 +238,14 @@ class FreeTimeWorker(context: Context, params: WorkerParameters) : Worker(contex
         )
         val notification = NotificationCompat.Builder(context, CalendarStore.CHANNEL)
             .setSmallIcon(R.drawable.ic_lotus)
-            .setContentTitle("A moment for yourself")
-            .setContentText("$text Amrita has a practice that fits.")
-            .setStyle(NotificationCompat.BigTextStyle().bigText("$text Amrita has a practice that fits."))
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()
         if (Build.VERSION.SDK_INT < 33 || context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
             manager.notify(NOTIFICATION_ID, notification)
         }
-    }
-
-    private companion object {
-        const val NOTIFICATION_ID = 4107
     }
 }

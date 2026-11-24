@@ -140,6 +140,11 @@ class MainActivity : ComponentActivity() {
                 LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { app.place.setActive(false) }
                 LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { app.calendar.setActive(true) }
                 LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { app.calendar.setActive(false) }
+                // Free-time nudges from the server while signed in (KAN-31); on screen it holds them back.
+                val wantPush = app.auth.isSignedIn && app.calendar.remindersOn
+                LaunchedEffect(wantPush) { app.push.update(wantPush) }
+                LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { app.push.setOnScreen(true) }
+                LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { app.push.setOnScreen(false) }
                 LifecycleEventEffect(Lifecycle.Event.ON_STOP) { heyAmrita.hold(HeyAmrita.Hold.Background, true) }
 
                 openedRitual?.let { RitualSheet(it) { openedRitual = null } }
