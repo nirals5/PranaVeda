@@ -23,6 +23,9 @@ const at = (hhmm: string) => Date.parse(`2026-11-10T${hhmm}:00-08:00`);
 // A phone's APNs token: hex, marked so the check's stand-in ignores anyone else's.
 const phone = (n: number) => `feed${n}${Array.from({ length: 59 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('')}`;
 
+// An Android phone's FCM token, marked the same way.
+const android = (n: number) => `fcm${n}:APA91b${Array.from({ length: 140 }, () => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'[Math.floor(Math.random() * 64)]).join('')}`;
+
 const sub = (n: number) => ({ endpoint: `https://push.example.com/send/vitest-${n}-${Math.random().toString(36).slice(2)}`, keys: { p256dh: 'BPk3cUc-key', auth: 'auth_key' } });
 
 describe('push input checks', () => {
@@ -88,6 +91,15 @@ describe.skipIf(!hasDb)('push nudges', () => {
       return t.token.startsWith('feed9') ? 'gone' : 'ok';
     };
     return { sent, sendApp };
+  };
+  const androids = () => {
+    const sent: { token: string; nudge: Nudge }[] = [];
+    const sendFcm = async (token: string, nudge: Nudge): Promise<SendResult> => {
+      if (!token.startsWith('fcm')) return 'failed';
+      sent.push({ token, nudge });
+      return token.startsWith('fcm9') ? 'gone' : 'ok';
+    };
+    return { sent, sendFcm };
   };
   const trustedEmptyDay = async (user: { id: string; auth: string }) => {
     await put('/api/push/state', user.auth, { calendar: { trusted: true, google: false, busy: [[at('15:00'), at('16:00')]], coveredUntil: NOW + 30 * H } });
@@ -222,5 +234,46 @@ describe.skipIf(!hasDb)('push nudges', () => {
     expect(app.sent.filter((x) => [live, gone].includes(x.token))).toHaveLength(2);
     expect(result.sent).toBeGreaterThanOrEqual(1);
     expect(await tokensOf(user.id)).toEqual([live]);
+  });
+
+  it('registers an Android phone by its FCM token', async () => {
+    const user = await newUser();
+    const token = android(1);
+    expect((await put('/api/push/device', user.auth, { platform: 'android', token })).body).toEqual({ ok: true });
+    const [row] = await getDb().select().from(appPushTokens).where(eq(appPushTokens.token, token));
+    expect(row).toMatchObject({ userId: user.id, platform: 'android', environment: 'production' });
+
+    // An iPhone without a platform field is still an iPhone.
+    const iphone = phone(4);
+    await put('/api/push/device', user.auth, { token: iphone, environment: 'sandbox' });
+    expect((await getDb().select().from(appPushTokens).where(eq(appPushTokens.token, iphone)))[0]).toMatchObject({ platform: 'ios' });
+
+    expect((await put('/api/push/device', user.auth, { platform: 'android', token: 'short' })).status).toBe(400);
+    expect((await put('/api/push/device', user.auth, { platform: 'windows', token })).status).toBe(400);
+    await request(pushApp).delete('/api/push/device').set('Authorization', user.auth).send({ token });
+    expect(await tokensOf(user.id)).toEqual([iphone]);
+  });
+
+  it('sends each phone through its own service, once per opening, and forgets an Android phone Google says is gone', async () => {
+    const user = await newUser();
+    const iphone = phone(5);
+    const pixel = android(2);
+    const gone = android(9);
+    await put('/api/push/device', user.auth, { token: iphone, environment: 'production' });
+    await put('/api/push/device', user.auth, { platform: 'android', token: pixel });
+    await put('/api/push/device', user.auth, { platform: 'android', token: gone });
+    await trustedEmptyDay(user);
+
+    const apple = phones();
+    const google = androids();
+    await runTick({ now: NOW, send: recorder().send, sendApp: apple.sendApp, sendFcm: google.sendFcm, readLink: noLink });
+    expect(apple.sent.filter((x) => x.token === iphone)).toHaveLength(1);
+    expect(google.sent.filter((x) => [pixel, gone].includes(x.token)).map((x) => x.token).sort()).toEqual([pixel, gone].sort());
+    expect(google.sent.find((x) => x.token === pixel)?.nudge).toEqual({ title: 'Amrita', body: 'You have 60 open minutes, until 3:00 PM. A good moment to practice.', url: '/?nudge=1' });
+    expect((await tokensOf(user.id)).sort()).toEqual([iphone, pixel].sort());
+
+    const again = androids();
+    await runTick({ now: NOW + 15 * 60 * 1000, send: recorder().send, sendApp: phones().sendApp, sendFcm: again.sendFcm, readLink: noLink });
+    expect(again.sent.filter((x) => x.token === pixel)).toHaveLength(0);
   });
 });

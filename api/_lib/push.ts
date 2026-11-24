@@ -5,7 +5,8 @@ import { ConnectionsUnavailable, loadConnections } from './connections.js';
 import { CalendarLinkError, fetchCalendarText, icsBusyIntervals } from './calendar.js';
 import { type Busy, type NudgeState, mayNudge, planNudge } from './pushRules.js';
 import { sendAlexaNudge } from './alexaEvents.js';
-import { apnsSender, type AppSender, type AppToken } from './apns.js';
+import { apnsSender, parseDeviceToken, type AppSender, type AppToken } from './apns.js';
+import { fcmSender, parseFcmToken, type FcmSender } from './fcm.js';
 
 // Push nudges: storing who turned them on, what the check needs between
 // visits, and the check itself (run every 15 minutes, see api/push.ts).
@@ -88,13 +89,30 @@ export async function removeSubscription(userId: string, endpoint: string): Prom
   await getDb().delete(pushSubscriptions).where(and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint)));
 }
 
+export type Device = { platform: 'ios'; token: string; environment: AppToken['environment'] } | { platform: 'android'; token: string; environment: 'production' };
+
+// What an app sends: an iPhone's APNs token with its environment (no
+// platform field, as the first iPhone builds send it), or an Android
+// phone's FCM token.
+export function parseDevice(raw: unknown): Device | null {
+  const platform = (raw as { platform?: unknown } | null)?.platform;
+  if (platform === undefined || platform === 'ios') {
+    const ios = parseDeviceToken(raw);
+    return ios && { platform: 'ios', ...ios };
+  }
+  if (platform !== 'android') return null;
+  const token = parseFcmToken((raw as { token?: unknown }).token);
+  return token && { platform: 'android', token, environment: 'production' };
+}
+
 // A phone that registered for push (KAN-31). A token belongs to one account:
 // whoever signs in on that phone last takes it over.
-export async function saveDeviceToken(userId: string, to: AppToken, platform: 'ios' = 'ios'): Promise<void> {
+export async function saveDeviceToken(userId: string, device: Device): Promise<void> {
+  const { platform, token, environment } = device;
   await getDb()
     .insert(appPushTokens)
-    .values({ userId, platform, ...to })
-    .onConflictDoUpdate({ target: appPushTokens.token, set: { userId, platform, environment: to.environment } });
+    .values({ userId, platform, token, environment })
+    .onConflictDoUpdate({ target: appPushTokens.token, set: { userId, platform, environment } });
 }
 
 export async function removeDeviceToken(userId: string, token: string): Promise<void> {
@@ -201,7 +219,8 @@ export async function runTick({
   readLink = readCalendarLink,
   sendAlexa = sendAlexaNudge,
   sendApp = apnsSender(),
-}: { now?: number; send?: Sender; readLink?: LinkReader; sendAlexa?: AlexaSender; sendApp?: AppSender } = {}): Promise<TickResult> {
+  sendFcm = fcmSender(),
+}: { now?: number; send?: Sender; readLink?: LinkReader; sendAlexa?: AlexaSender; sendApp?: AppSender; sendFcm?: FcmSender } = {}): Promise<TickResult> {
   const db = getDb();
   const result: TickResult = { users: 0, sent: 0, removed: 0 };
   const [subs, speakers, phones] = await Promise.all([
@@ -214,8 +233,8 @@ export async function runTick({
   const byUser = new Map<string, PushSub[]>();
   for (const s of subs) byUser.set(s.userId, [...(byUser.get(s.userId) ?? []), { endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth }]);
   const alexaOf = new Map(speakers.map((s) => [s.userId, s.alexaUserId]));
-  const phonesOf = new Map<string, AppToken[]>();
-  for (const p of phones) phonesOf.set(p.userId, [...(phonesOf.get(p.userId) ?? []), { token: p.token, environment: p.environment as AppToken['environment'] }]);
+  const phonesOf = new Map<string, Device[]>();
+  for (const p of phones) phonesOf.set(p.userId, [...(phonesOf.get(p.userId) ?? []), { platform: p.platform, token: p.token, environment: p.environment } as Device]);
   for (const id of [...alexaOf.keys(), ...phonesOf.keys()]) if (!byUser.has(id)) byUser.set(id, []);
   const ids = [...byUser.keys()];
 
@@ -262,9 +281,12 @@ export async function runTick({
       }
     }
     const ios: SendResult[] = [];
+    const android: SendResult[] = [];
+    const nudge = { title: 'Amrita', body: plan.body, url: '/?nudge=1' };
     for (const phone of phonesOf.get(userId) ?? []) {
-      const outcome = await sendApp(phone, { title: 'Amrita', body: plan.body, url: '/?nudge=1' }, now);
-      ios.push(outcome);
+      const outcome =
+        phone.platform === 'android' ? await sendFcm(phone.token, nudge, now) : await sendApp({ token: phone.token, environment: phone.environment }, nudge, now);
+      (phone.platform === 'android' ? android : ios).push(outcome);
       if (outcome === 'ok') delivered = true;
       // The app was deleted, or push was turned off for it.
       if (outcome === 'gone') {
@@ -281,7 +303,7 @@ export async function runTick({
       if (outcome === 'gone') await db.update(alexaLinks).set({ notifications: false }).where(eq(alexaLinks.userId, userId));
     }
     // Per channel, so a nudge that reached no one is visible (no ids).
-    console.info(`[push] nudge: web ${web.join(',') || 'none'}; ios ${ios.join(',') || 'none'}; alexa ${alexa}`);
+    console.info(`[push] nudge: web ${web.join(',') || 'none'}; ios ${ios.join(',') || 'none'}; android ${android.join(',') || 'none'}; alexa ${alexa}`);
     if (delivered) {
       result.sent++;
       await db.update(pushNudgeState).set({ lastSlotKey: plan.key, lastNotifiedAt: new Date(now) }).where(eq(pushNudgeState.userId, userId));
