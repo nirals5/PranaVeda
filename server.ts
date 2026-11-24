@@ -11,14 +11,16 @@ import app from './api/index';
 import authApp from './api/auth';
 import syncApp from './api/sync';
 import pushApp from './api/push';
+import usageApp from './api/usage';
 
 const PORT = Number(process.env.PORT) || 3000;
 
-// Vercel routes /api/auth/*, /api/me, /api/sync/* and /api/push/* to their own functions
+// Vercel routes /api/auth/*, /api/me, /api/sync/*, /api/push/* and /api/usage to their own functions
 // (see vercel.json); here the same apps are mounted ahead of the page handlers.
 app.use(authApp);
 app.use(syncApp);
 app.use(pushApp);
+app.use(usageApp);
 
 async function startServer() {
   // The privacy policy and support page are plain pages in public/ (as on

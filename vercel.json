@@ -6,7 +6,8 @@
     "api/index.ts": { "maxDuration": 60 },
     "api/auth.ts": { "maxDuration": 15 },
     "api/sync.ts": { "maxDuration": 15 },
-    "api/push.ts": { "maxDuration": 60 }
+    "api/push.ts": { "maxDuration": 60 },
+    "api/usage.ts": { "maxDuration": 15 }
   },
   "redirects": [
     {
@@ -29,6 +30,7 @@
     { "source": "/api/oauth/:path*", "destination": "/api/auth" },
     { "source": "/api/sync/:path*", "destination": "/api/sync" },
     { "source": "/api/push/:path*", "destination": "/api/push" },
+    { "source": "/api/usage", "destination": "/api/usage" },
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/support", "destination": "/support.html" },

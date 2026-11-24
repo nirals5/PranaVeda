@@ -6,6 +6,8 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    // Usage counts (KAN-32) carry the build they came from: the commit on Vercel.
+    define: { __APP_VERSION__: JSON.stringify((process.env.VERCEL_GIT_COMMIT_SHA || 'dev').slice(0, 7)) },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

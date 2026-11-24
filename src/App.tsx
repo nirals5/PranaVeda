@@ -6,6 +6,7 @@ import Logo from './components/Logo';
 import VoiceModal from './components/VoiceModal';
 import WellnessInsight from './components/WellnessInsight';
 import CoachingDashboard from './components/CoachingDashboard';
+import { browserSend, usage } from './lib/usage';
 import AmritaChat from './components/AmritaChat';
 import DoshaProfileView from './components/DoshaProfileView';
 import ExploreView from './components/ExploreView';
@@ -75,6 +76,25 @@ export default function App() {
   // Optional sign-in. Held here so it survives moving between screens; inert
   // (no requests, always "guest") where accounts are switched off.
   const auth = useAuth();
+  // Usage counts (KAN-32): once per visit, after the session check, so a
+  // signed-in visit counts as one; sent as the tab is hidden and every few minutes.
+  useEffect(() => usage.setSignedIn(auth.status === 'user'), [auth.status]);
+  const opened = useRef(false);
+  useEffect(() => {
+    if (auth.status === 'checking' || opened.current) return;
+    opened.current = true;
+    usage.track('app_open');
+    void usage.flush(browserSend);
+  }, [auth.status]);
+  useEffect(() => {
+    const leaving = () => document.visibilityState === 'hidden' && void usage.flush(browserSend, { leaving: true });
+    const timer = window.setInterval(() => void usage.flush(browserSend), 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', leaving);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', leaving);
+    };
+  }, []);
   // Places and the calendar link, on the account once the user turns that on.
   const connectionsSync = useConnectionsSync(auth, place, calendar);
   const { items: chatItems, profile, replaceProfile, isStreaming, sendMessage, resetConversation, voiceMuted, toggleVoiceMuted } = useAmritaChat(
@@ -102,6 +122,7 @@ export default function App() {
   const lastPracticeAt = practiceLog.length ? Date.parse(practiceLog[practiceLog.length - 1].completedAt) : null;
   // Land on the home screen, where the in-app nudge offers the practice.
   const openFromNudge = () => {
+    usage.track('nudge_opened');
     setCurrentView('coach');
     setShowHome(true);
   };

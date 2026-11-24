@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { usage } from '../lib/usage';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowLeft, Bookmark, BookmarkCheck, Heart, Sparkles, Flame, Wind, 
@@ -66,6 +67,7 @@ export default function CoachingDashboard({
   // The practice just finished, asking how it left them (H11).
   const [justDone, setJustDone] = useState<{ id: string; kind: 'ritual' | 'breathwork'; feeling?: Feeling } | null>(null);
   const finished = (entry: NewPracticeLogEntry) => {
+    usage.track('practice_finished');
     const id = onPracticeComplete?.(entry);
     setJustDone(id && onRateFeeling ? { id, kind: entry.kind } : null);
   };
@@ -307,6 +309,7 @@ export default function CoachingDashboard({
         remainingRef.current = result.breathwork.inhale;
         cycleRef.current = 1;
         heart?.startSession();
+        usage.track('practice_started');
       }
       prefetchPhaseCues();
       speakVocalPhase(`Beginning ${result.breathwork.name}${result.breathwork.caution ? `. Take care. ${result.breathwork.caution}` : ''}`);
@@ -351,6 +354,7 @@ export default function CoachingDashboard({
 
   // 2. Yoga Wizard Sequences Logic
   const startYogaWizard = () => {
+    usage.track('practice_started');
     setIsYogaWizardActive(true);
     yogaLoggedRef.current = false;
     heart?.startSession();

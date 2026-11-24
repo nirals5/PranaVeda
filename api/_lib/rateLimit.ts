@@ -11,7 +11,7 @@ import { getDb, schema } from './db.js';
 // UTC day. If the count cannot be read the request is let through — a database
 // problem should not silence Amrita.
 
-export type LimitedRoute = 'chat' | 'coaching' | 'insight' | 'voice' | 'calendar';
+export type LimitedRoute = 'chat' | 'coaching' | 'insight' | 'voice' | 'calendar' | 'usage';
 
 // Requests per caller per window. Generous for a real person (a busy day of
 // conversation is well under the daily figure); a script hits them quickly.
@@ -21,6 +21,7 @@ export const LIMITS: Record<LimitedRoute, { minute: number; day: number }> = {
   insight: { minute: 5, day: 50 },
   voice: { minute: 30, day: 600 }, // a spoken reply, or a breath cue (a few at a practice's start)
   calendar: { minute: 10, day: 300 },
+  usage: { minute: 20, day: 1000 }, // usage counts (KAN-32): batches of up to 50 events
 };
 
 // Each route's limits can be changed without a code change: RATE_LIMIT_CHAT,

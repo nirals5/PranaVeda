@@ -188,6 +188,25 @@ export const appPushTokens = pgTable(
   (t) => [index('app_push_tokens_user_id_idx').on(t.userId)]
 );
 
+// Usage counts (KAN-32, api/usage.ts): counts, never content, and never the
+// account. An install id made on the device (a reinstall makes a new one),
+// the platform and app version, and for each event its name, time and
+// whether someone was signed in. Removed after 13 months.
+export const usageEvents = pgTable(
+  'usage_events',
+  {
+    seq: bigserial('seq', { mode: 'number' }).primaryKey(),
+    installId: uuid('install_id').notNull(),
+    platform: text('platform', { enum: ['web', 'ios', 'android'] }).notNull(),
+    appVersion: text('app_version').notNull(),
+    name: text('name').notNull(),
+    signedIn: boolean('signed_in').notNull(),
+    occurredAt: timestamptz('occurred_at').notNull(),
+    receivedAt: timestamptz('received_at').notNull().defaultNow(),
+  },
+  (t) => [index('usage_events_occurred_at_idx').on(t.occurredAt)]
+);
+
 // What the push check needs to know about a user between visits: busy times
 // only (start and end, never what an event is), whether those were complete,
 // when PranaVeda was last on screen, and the last nudge sent.
