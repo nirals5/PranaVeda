@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { usage } from '../lib/usage';
 import { ChatCard, ChatItem, WellnessProfile } from '../types';
 import { useSpeech } from './useSpeech';
 import { CalendarContext } from './useExternalCalendar';
@@ -125,6 +126,7 @@ export function useAmritaChat(
     async (text: string, opts?: { inputMode?: 'voice' | 'text' }) => {
       const trimmed = text.trim();
       if (!trimmed || isStreaming) return;
+      usage.track('chat_sent');
       const inputMode = opts?.inputMode ?? 'text';
       stopSpeaking();
 

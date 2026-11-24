@@ -6,6 +6,7 @@ import CalendarConnections from './CalendarConnections';
 import WearableConnections from './WearableConnections';
 import LocationSettings from './LocationSettings';
 import AssistantsSettings from './AssistantsSettings';
+import { usage } from '../lib/usage';
 import GoogleSignIn from './GoogleSignIn';
 import AppleSignIn from './AppleSignIn';
 import { ACCOUNTS_ENABLED, APPLE_SERVICES_ID } from '../lib/auth';
@@ -365,6 +366,42 @@ export default function ProfileView({ profile, auth, practiceLog, streak, calend
 
       {/* Smart assistants: shown once the Alexa skill is published. */}
       <AssistantsSettings alexaLink={alexaLink} />
+
+      <UsageCountsSwitch />
     </div>
+  );
+}
+
+// Usage counts (KAN-32): on by default; off means nothing is recorded or sent.
+function UsageCountsSwitch() {
+  const [on, setOn] = useState(() => usage.isOn());
+  const toggle = () => {
+    usage.setOn(!on);
+    setOn(!on);
+  };
+  return (
+    <section className="bg-white/50 border border-white/30 p-6 sm:p-8 rounded-[24px] shadow-[0_10px_30px_rgba(0,0,0,0.02)] backdrop-blur-md flex items-start gap-4">
+      <div className="flex-1 min-w-0 space-y-1">
+        <p className="text-[17px] font-serif text-[#2D3436] leading-snug" id="usage-counts-label">
+          Share anonymous usage counts
+        </p>
+        <p className="text-[13.5px] text-stone-600 font-sans leading-relaxed">
+          Counts of when PranaVeda is opened, a message is sent, or a practice starts and finishes, so we can see what helps. Never what you say or practise, and never tied to your account.{' '}
+          <a href="/privacy" className="underline underline-offset-2 hover:text-[#71608E]">
+            Privacy
+          </a>
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-labelledby="usage-counts-label"
+        onClick={toggle}
+        className={`flex-shrink-0 mt-1 w-11 h-6 rounded-full transition-colors cursor-pointer relative ${on ? 'bg-[#8A79A5]' : 'bg-stone-300'}`}
+      >
+        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
+      </button>
+    </section>
   );
 }
