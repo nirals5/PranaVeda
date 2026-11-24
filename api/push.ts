@@ -2,8 +2,9 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { isSameOrigin, requireUser } from './_lib/http.js';
-import { parseCalendarUpload, parseSubscription, recordState, removeDeviceToken, removeSubscription, runTick, saveDeviceToken, saveSubscription, vapid } from './_lib/push.js';
-import { apnsConfig, parseDeviceToken } from './_lib/apns.js';
+import { parseCalendarUpload, parseDevice, parseSubscription, recordState, removeDeviceToken, removeSubscription, runTick, saveDeviceToken, saveSubscription, vapid } from './_lib/push.js';
+import { apnsConfig } from './_lib/apns.js';
+import { fcmConfig } from './_lib/fcm.js';
 
 // Push nudges for the website and the apps: /api/push/*. Signed-in only. The
 // browser subscribes (the apps register their push token) and keeps the
@@ -58,16 +59,16 @@ app.delete(
   })
 );
 
-// The iPhone app's push token, sent after sign-in and on each launch (KAN-31).
+// An app's push token (iPhone: APNs; Android: FCM), sent after sign-in and on each launch (KAN-31).
 app.put(
   '/api/push/device',
   route(async (req, res) => {
     if (!isSameOrigin(req)) return res.status(403).json({ error: 'cross_origin' });
     const user = await requireUser(req, res);
     if (!user) return;
-    const token = parseDeviceToken(req.body);
-    if (!token) return res.status(400).json({ error: 'invalid_token' });
-    await saveDeviceToken(user.id, token);
+    const device = parseDevice(req.body);
+    if (!device) return res.status(400).json({ error: 'invalid_token' });
+    await saveDeviceToken(user.id, device);
     res.json({ ok: true });
   })
 );
@@ -81,6 +82,8 @@ app.delete(
     if (!user) return;
     const token = req.body?.token;
     if (typeof token !== 'string') return res.status(400).json({ error: 'token_required' });
+    // APNs tokens are kept in lower case; FCM tokens exactly as given.
+    await removeDeviceToken(user.id, token);
     await removeDeviceToken(user.id, token.toLowerCase());
     res.json({ ok: true });
   })
@@ -115,7 +118,7 @@ app.post(
   '/api/push/tick',
   route(async (req, res) => {
     if (!tickAllowed(req)) return res.status(401).json({ error: 'unauthorized' });
-    if (!vapid() && !apnsConfig()) return res.status(503).json({ error: 'push_unavailable' });
+    if (!vapid() && !apnsConfig() && !fcmConfig()) return res.status(503).json({ error: 'push_unavailable' });
     res.json(await runTick());
   })
 );

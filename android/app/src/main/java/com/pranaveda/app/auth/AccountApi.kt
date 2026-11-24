@@ -10,6 +10,7 @@ import com.pranaveda.app.place.SavedPlace
 import com.pranaveda.app.model.PracticeLogEntry
 import com.pranaveda.app.model.PracticePage
 import com.pranaveda.app.model.PvJson
+import com.pranaveda.app.push.CalendarUpload
 import com.pranaveda.app.net.HttpStatusException
 import com.pranaveda.app.net.ApiClient
 import kotlinx.coroutines.Dispatchers
@@ -182,6 +183,28 @@ class AccountApi(private val api: ApiClient = ApiClient()) {
         if (reply.status != 200) throw HttpStatusException(reply.status)
         val list = PvJson.parseToJsonElement(reply.body).jsonObject["rituals"]?.jsonArray.orEmpty()
         return list.mapNotNull { runCatching { PvJson.decodeFromJsonElement(SavedRitual.serializer(), it) }.getOrNull() }
+    }
+
+    @Serializable private data class PushDeviceBody(val platform: String, val token: String)
+    @Serializable private data class PushForgetBody(val token: String)
+    @Serializable private data class PushStateBody(val seen: Boolean, val calendar: CalendarUpload)
+
+    /** This phone's FCM token, so the server can send it free-time nudges (KAN-31). */
+    suspend fun registerPushToken(token: String, accessToken: String) {
+        val reply = send("PUT", "api/push/device", bearer = accessToken, body = PvJson.encodeToString(PushDeviceBody.serializer(), PushDeviceBody("android", token)))
+        if (reply.status != 200) throw HttpStatusException(reply.status)
+    }
+
+    /** Before signing out, so the next person on this phone gets no nudges meant for this one. */
+    suspend fun forgetPushToken(token: String, accessToken: String) {
+        val reply = send("DELETE", "api/push/device", bearer = accessToken, body = PvJson.encodeToString(PushForgetBody.serializer(), PushForgetBody(token)))
+        if (reply.status != 200) throw HttpStatusException(reply.status)
+    }
+
+    /** Busy times (start and end only) and whether the app is on screen, as the website sends them. */
+    suspend fun sendPushState(seen: Boolean, calendar: CalendarUpload, accessToken: String) {
+        val reply = send("PUT", "api/push/state", bearer = accessToken, body = PvJson.encodeToString(PushStateBody.serializer(), PushStateBody(seen, calendar)))
+        if (reply.status != 200) throw HttpStatusException(reply.status)
     }
 
     /** Places kept on the account (opt-in), or that it keeps none. */

@@ -42,6 +42,8 @@ class AuthStore(
 
     /** Called whenever the session ends, by any route. */
     var onSignedOut: (() -> Unit)? = null
+    /** While the session still works: tell the server what this phone no longer wants (push nudges, KAN-31). */
+    var beforeSignOut: (suspend () -> Unit)? = null
 
     private var accessToken: String? = null
     private var accessTokenExpiry = 0L
@@ -87,6 +89,7 @@ class AuthStore(
     }
 
     suspend fun signOut() {
+        beforeSignOut?.invoke()
         val token = storage.refreshToken
         endSession()
         if (token != null) runCatching { api.signOut(token) }

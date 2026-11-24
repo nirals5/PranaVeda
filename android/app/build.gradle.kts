@@ -23,6 +23,12 @@ val apiBaseUrl: String = localProperties.getProperty("pv.apiBaseUrl") ?: "http:/
 val googleWebClientId: String = localProperties.getProperty("pv.googleWebClientId")
     ?: "163737232285-a82gbd3vfmlmles1v6cnlnn5ub21vld1.apps.googleusercontent.com"
 
+// Push nudges from the server (KAN-31): the Firebase project's Android app,
+// copied from its google-services.json into local.properties (not committed):
+//   pv.fcmApiKey, pv.fcmAppId, pv.fcmProjectId, pv.fcmSenderId
+// Without them the app builds as before and plans its own free-time reminders.
+fun fcm(name: String) = localProperties.getProperty("pv.$name") ?: ""
+
 // Release signing for Google Play: the upload key, kept outside the project,
 // described by keystore.properties (not committed; see README "Release build").
 // Without that file a release build is left unsigned and cannot be uploaded.
@@ -49,6 +55,10 @@ android {
         versionName = versionNameOverride ?: "0.1.0"
         buildConfigField("String", "PV_API_BASE_URL", "\"$apiBaseUrl\"")
         buildConfigField("String", "PV_GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+        buildConfigField("String", "PV_FCM_API_KEY", "\"${fcm("fcmApiKey")}\"")
+        buildConfigField("String", "PV_FCM_APP_ID", "\"${fcm("fcmAppId")}\"")
+        buildConfigField("String", "PV_FCM_PROJECT_ID", "\"${fcm("fcmProjectId")}\"")
+        buildConfigField("String", "PV_FCM_SENDER_ID", "\"${fcm("fcmSenderId")}\"")
     }
 
     signingConfigs {
@@ -125,6 +135,8 @@ dependencies {
     implementation(libs.androidx.glance.material3)
     // Recovery & Trends: sleep and heart readings from Health Connect, on the phone.
     implementation(libs.androidx.health.connect)
+    // Free-time nudges sent by the server (KAN-31).
+    implementation(libs.firebase.messaging)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
